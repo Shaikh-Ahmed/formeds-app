@@ -1,0 +1,174 @@
+{
+  "theme": "light",
+  "archetype": "Archetype 4: Swiss & High-Contrast (Adapted for Clinical Trust)",
+  "rationale": "The healthcare and job portal domain requires utmost trust, clarity, and authority. The brand's Deep Navy (#1A3A5C) and Red (#E84545) naturally fit a high-contrast, professional environment. The Red accent is strictly reserved for critical actions (AED AI Bubble, urgency), while the Deep Navy and logo Teal drive the calm, structured navigation of the app.",
+  "typography": {
+    "headings": {
+      "fontFamily": "Outfit, sans-serif",
+      "strategy": "Clean, authoritative, and modern. Tight letter spacing (tracking-tight) for large headers to ensure clinical precision without feeling dated."
+    },
+    "body": {
+      "fontFamily": "IBM Plex Sans, sans-serif",
+      "strategy": "Highly legible, objective, and functional. Excellent for dense medical data, job listings, and reading CME materials."
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-bold tracking-tight text-[#1A3A5C]",
+      "h2": "text-2xl sm:text-3xl font-semibold tracking-tight text-[#1A3A5C]",
+      "h3": "text-xl font-medium text-slate-800",
+      "body": "text-base leading-relaxed text-slate-600",
+      "small": "text-sm text-slate-500",
+      "overline": "text-xs font-semibold uppercase tracking-[0.2em] text-[#0F766E]"
+    }
+  },
+  "colors": {
+    "primary": {
+      "DEFAULT": "#1A3A5C",
+      "light": "#2A527D",
+      "dark": "#0F243A",
+      "foreground": "#FFFFFF",
+      "usage": "Headers, primary navigation tabs, standard primary buttons, key job listing titles."
+    },
+    "accent": {
+      "DEFAULT": "#E84545",
+      "hover": "#D13D3D",
+      "foreground": "#FFFFFF",
+      "usage": "AED AI floating bubble, urgent notifications, critical actions, high-priority active states."
+    },
+    "secondary": {
+      "DEFAULT": "#0F766E",
+      "light": "#14B8A6",
+      "usage": "Secondary buttons, 'Specialist Access' badges, verified ticks, and positive clinical indicators (derived from logo teal)."
+    },
+    "background": {
+      "DEFAULT": "#FFFFFF",
+      "subtle": "#F8FAFC",
+      "muted": "#F1F5F9"
+    },
+    "surface": {
+      "card": "#FFFFFF",
+      "elevated": "#FFFFFF",
+      "input": "#F8FAFC"
+    },
+    "text": {
+      "primary": "#0F172A",
+      "secondary": "#475569",
+      "muted": "#94A3B8"
+    },
+    "border": {
+      "DEFAULT": "#E2E8F0",
+      "focus": "#1A3A5C"
+    }
+  },
+  "layout": {
+    "spacing": {
+      "container": "px-4 sm:px-6 md:px-8",
+      "section_gap": "gap-8 sm:gap-12",
+      "card_padding": "p-4 sm:p-6"
+    },
+    "grid": {
+      "strategy": "Dense, functional, and organized. 'Control Room' grid layout for dashboards to maximize data visibility for jobs and feeds.",
+      "dashboard_base": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6"
+    },
+    "borders_and_radius": {
+      "strategy": "Sharp yet approachable. Subtle roundness.",
+      "radius": "rounded-lg sm:rounded-xl",
+      "card_border": "border border-slate-200"
+    },
+    "shadows": {
+      "strategy": "Clinical cleanliness. Avoid heavy dark shadows. Use crisp, light drop shadows for elevated elements.",
+      "card": "shadow-sm",
+      "floating_action": "shadow-[0_8px_30px_rgba(232,69,69,0.3)]",
+      "bottom_tab": "shadow-[0_-4px_20px_rgba(0,0,0,0.05)]"
+    }
+  },
+  "components": {
+    "AED_AI_Bubble": {
+      "style": "fixed bottom-20 right-4 sm:right-8 z-50 rounded-full bg-[#E84545] text-white p-4 shadow-[0_8px_30px_rgba(232,69,69,0.4)] flex items-center justify-center transition-transform hover:scale-105 active:scale-95",
+      "icon": "lucide-react/Bot or custom medical AI icon"
+    },
+    "Bottom_Navigation": {
+      "style": "fixed bottom-0 w-full bg-white border-t border-slate-200 pb-safe pt-2 px-4 flex justify-around items-center z-40",
+      "active_state": "text-[#1A3A5C] font-semibold",
+      "inactive_state": "text-slate-400"
+    },
+    "Job_Card": {
+      "style": "bg-white rounded-xl border border-slate-200 p-5 flex flex-col gap-3 hover:-translate-y-1 hover:shadow-md transition-all duration-200",
+      "badges": "rounded-full px-2.5 py-0.5 text-xs font-medium"
+    },
+    "Feed_Post": {
+      "style": "bg-white rounded-xl border border-slate-200 p-4 mb-4",
+      "interaction_bar": "flex items-center gap-6 mt-4 pt-3 border-t border-slate-100 text-slate-500"
+    },
+    "Buttons": {
+      "primary": "bg-[#1A3A5C] hover:bg-[#2A527D] text-white rounded-lg px-6 py-3 font-medium transition-colors focus:ring-2 focus:ring-[#1A3A5C]/50",
+      "accent": "bg-[#E84545] hover:bg-[#D13D3D] text-white rounded-lg px-6 py-3 font-medium transition-colors focus:ring-2 focus:ring-[#E84545]/50",
+      "outline": "border border-[#1A3A5C] text-[#1A3A5C] hover:bg-slate-50 rounded-lg px-6 py-3 font-medium transition-colors"
+    }
+  },
+  "interactions_and_motion": {
+    "strategy": "Responsive, quick, and snappy. Medical professionals value speed over flashy animations. Use micro-interactions to confirm actions.",
+    "hover": "Subtle -translate-y-[2px] on cards. Background color shifts on buttons.",
+    "page_transition": "Simple opacity fade-in.",
+    "loading": "Use skeleton loaders rather than full-screen spinners for dashboards."
+  },
+  "accessibility": {
+    "contrast": "Strict adherence to WCAG AA. Ensure #E84545 (Red) and #1A3A5C (Navy) have sufficient contrast against white backgrounds. Text over primary buttons must be pure white.",
+    "touch_targets": "Minimum 48x48px for all mobile interactive elements, particularly the bottom tab navigation and AED AI Bubble.",
+    "focus": "Clear focus rings (focus:ring-2) for keyboard navigability in web views."
+  },
+  "testing": {
+    "attributes": "All interactive and key informational elements MUST include a data-testid attribute in kebab-case, role-based format (e.g., data-testid='job-apply-button')."
+  },
+  "media": {
+    "brand_logo": {
+      "url": "https://customer-assets.emergentagent.com/job_medcare-deploy/artifacts/kex3yymq_eer.png",
+      "description": "ForMeds official logo with teal/navy colors and human figure forming 'M'."
+    },
+    "images": {
+      "doctor_portraits": [
+        {
+          "url": "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNzl8MHwxfHNlYXJjaHwzfHxkb2N0b3IlMjBwb3J0cmFpdHxlbnwwfHx8fDE3NzUxNTEzMjN8MA&ixlib=rb-4.1.0&q=85",
+          "description": "Male doctor in white coat with eyeglasses",
+          "category": "avatars_and_profiles"
+        },
+        {
+          "url": "https://images.pexels.com/photos/5452195/pexels-photo-5452195.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+          "description": "Female doctor with stethoscope indoors",
+          "category": "avatars_and_profiles"
+        }
+      ],
+      "hospital_buildings": [
+        {
+          "url": "https://images.unsplash.com/photo-1769147555720-71fc71bfc216?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NjV8MHwxfHNlYXJjaHwxfHxtZWRpY2FsJTIwYnVpbGRpbmd8ZW58MHx8fHwxNzc1MTUxMzIyfDA&ixlib=rb-4.1.0&q=85",
+          "description": "Modern hospital building exterior",
+          "category": "hospital_profiles"
+        },
+        {
+          "url": "https://images.pexels.com/photos/668300/pexels-photo-668300.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+          "description": "University Hospitals building against clear sky",
+          "category": "hospital_profiles"
+        }
+      ],
+      "learning_hub": [
+        {
+          "url": "https://images.pexels.com/photos/3985154/pexels-photo-3985154.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+          "description": "Medical students in a hospital hallway sharing notes",
+          "category": "learning_cme_banners"
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1766297247194-9b635e9eea56?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwxfHxtZWRpY2FsJTIwc3R1ZGVudHMlMjBsZWFybmluZ3xlbnwwfHx8fDE3NzUxNTEzMjN8MA&ixlib=rb-4.1.0&q=85",
+          "description": "Scientist/Students examining liquid in lab",
+          "category": "learning_cme_banners"
+        }
+      ]
+    }
+  },
+  "instructions_to_main_agent": [
+    "1. This is a mobile-first hybrid application. Ensure all components map effectively to mobile views, prioritizing touch targets and bottom tab navigation.",
+    "2. Stick strictly to the defined color palette: Deep Navy (#1A3A5C) for primary, Red (#E84545) for critical accents/AED Bubble, and Teal (#0F766E) for secondary highlights.",
+    "3. Use Outfit for headings and IBM Plex Sans for body text to maintain a clinical yet modern aesthetic.",
+    "4. The AED AI Bubble must be persistently accessible across all authenticated screens.",
+    "5. Do NOT use generic placeholder images. Use the explicitly provided URLs in the 'media' section for logos, avatars, and cover images.",
+    "6. Ensure rigorous adherence to data-testid attributes for testing."
+  ]
+}
