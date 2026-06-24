@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Share } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Share, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
-import { apiFetch } from '../../src/utils/api';
+import { apiFetch, API_URL } from '../../src/utils/api';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 
 interface Post {
   id: string;
@@ -12,6 +13,7 @@ interface Post {
   author_role: string;
   content: string;
   post_type: string;
+  image_url?: string;
   like_count: number;
   comment_count: number;
   likes: string[];
@@ -48,6 +50,8 @@ export default function FeedScreen() {
   const [newPost, setNewPost] = useState('');
   const [posting, setPosting] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadMsgs, setUnreadMsgs] = useState(0);
 
@@ -70,13 +74,35 @@ export default function FeedScreen() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const handlePost = async () => {
-    if (!newPost.trim()) return;
+    if (!newPost.trim() && !attachedImage) return;
     setPosting(true);
     try {
-      await apiFetch('/api/feed', token, { method: 'POST', body: JSON.stringify({ content: newPost, post_type: 'text' }) });
-      setNewPost(''); setShowCompose(false); loadData();
+      const body = { 
+        content: newPost, 
+        post_type: attachedImage ? 'image' : 'text',
+        image_url: attachedImage || ''
+      };
+      await apiFetch('/api/feed', token, { method: 'POST', body: JSON.stringify(body) });
+      setNewPost(''); 
+      setAttachedImage(null);
+      setShowCompose(false); 
+      loadData();
     } catch (e) { console.log('Post error:', e); }
     finally { setPosting(false); }
+  };
+
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) { alert('Permission required to access photos'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.5, base64: true, allowsEditing: true });
+    if (result.canceled || !result.assets?.[0]?.base64) return;
+    setUploadingImage(true);
+    try {
+      const b64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      const upload = await apiFetch('/api/upload/image', token, { method: 'POST', body: JSON.stringify({ image: b64 }) });
+      setAttachedImage(`${API_URL}${upload.url}`);
+    } catch (e: any) { alert(e.message || 'Upload failed'); }
+    finally { setUploadingImage(false); }
   };
 
   const handleLike = async (postId: string) => {
@@ -120,6 +146,9 @@ export default function FeedScreen() {
           </View>
         </View>
         <Text style={styles.postContent}>{item.content}</Text>
+        {item.image_url ? (
+          <Image source={{ uri: item.image_url }} style={styles.postImage} resizeMode="cover" />
+        ) : null}
         <View style={styles.postActions}>
           <TouchableOpacity testID={`like-btn-${item.id}`} style={styles.actionBtn} onPress={() => handleLike(item.id)}>
             <Ionicons name={isLiked ? "heart" : "heart-outline"} size={22} color={isLiked ? "#E84545" : "#94A3B8"} />
@@ -187,9 +216,24 @@ export default function FeedScreen() {
       {showCompose && activeTab === 'community' && (
         <View style={styles.composeBox}>
           <TextInput testID="post-input" style={styles.composeInput} placeholder="Share something with the community..." placeholderTextColor="#94A3B8" value={newPost} onChangeText={setNewPost} multiline />
-          <TouchableOpacity testID="submit-post-btn" style={[styles.postBtn, !newPost.trim() && styles.postBtnDisabled]} onPress={handlePost} disabled={posting || !newPost.trim()}>
-            {posting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.postBtnText}>Post</Text>}
-          </TouchableOpacity>
+          
+          {attachedImage && (
+            <View style={styles.attachedImageWrap}>
+              <Image source={{ uri: attachedImage }} style={styles.attachedImagePreview} />
+              <TouchableOpacity style={styles.removeImageBtn} onPress={() => setAttachedImage(null)}>
+                <Ionicons name="close-circle" size={24} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View style={styles.composeActions}>
+            <TouchableOpacity testID="attach-image-btn" style={styles.attachBtn} onPress={pickImage} disabled={uploadingImage}>
+              {uploadingImage ? <ActivityIndicator size="small" color="#1A3A5C" /> : <Ionicons name="image-outline" size={24} color="#1A3A5C" />}
+            </TouchableOpacity>
+            <TouchableOpacity testID="submit-post-btn" style={[styles.postBtn, (!newPost.trim() && !attachedImage) && styles.postBtnDisabled]} onPress={handlePost} disabled={posting || (!newPost.trim() && !attachedImage)}>
+              {posting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.postBtnText}>Post</Text>}
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -223,7 +267,12 @@ const styles = StyleSheet.create({
   tabTextActive: { color: '#FFFFFF' },
   composeBox: { backgroundColor: '#FFFFFF', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   composeInput: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, fontSize: 15, color: '#0F172A', minHeight: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: '#E2E8F0' },
-  postBtn: { backgroundColor: '#1A3A5C', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 24, alignSelf: 'flex-end', marginTop: 10 },
+  composeActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
+  attachBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
+  attachedImageWrap: { marginTop: 10, position: 'relative', alignSelf: 'flex-start' },
+  attachedImagePreview: { width: 100, height: 100, borderRadius: 12 },
+  removeImageBtn: { position: 'absolute', top: -10, right: -10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 12 },
+  postBtn: { backgroundColor: '#1A3A5C', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 24 },
   postBtnDisabled: { opacity: 0.5 },
   postBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
   list: { padding: 16, paddingBottom: 100 },
@@ -238,6 +287,7 @@ const styles = StyleSheet.create({
   roleTagText: { fontSize: 11, fontWeight: '600' },
   timeText: { fontSize: 12, color: '#94A3B8' },
   postContent: { fontSize: 15, color: '#334155', lineHeight: 22, marginBottom: 12 },
+  postImage: { width: '100%', height: 250, borderRadius: 12, marginBottom: 12 },
   postActions: { flexDirection: 'row', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 24 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionText: { fontSize: 14, color: '#94A3B8', fontWeight: '500' },

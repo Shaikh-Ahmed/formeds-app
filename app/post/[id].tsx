@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Share } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Share, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -108,6 +108,9 @@ export default function PostDetailScreen() {
           </View>
         </View>
         <Text style={styles.postContent}>{post.content}</Text>
+        {post.image_url ? (
+          <Image source={{ uri: post.image_url }} style={styles.postImage} resizeMode="cover" />
+        ) : null}
         <View style={styles.postActions}>
           <TouchableOpacity testID="post-like-btn" style={styles.actionBtn} onPress={handleLike}>
             <Ionicons name={isLiked ? "heart" : "heart-outline"} size={22} color={isLiked ? "#E84545" : "#94A3B8"} />
@@ -214,6 +217,7 @@ const styles = StyleSheet.create({
   roleTagText: { fontSize: 11, fontWeight: '600' },
   timeText: { fontSize: 12, color: '#94A3B8' },
   postContent: { fontSize: 16, color: '#334155', lineHeight: 24, marginBottom: 16 },
+  postImage: { width: '100%', height: 250, borderRadius: 12, marginBottom: 16 },
   postActions: { flexDirection: 'row', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 24, paddingBottom: 16 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionText: { fontSize: 14, color: '#94A3B8', fontWeight: '500' },
