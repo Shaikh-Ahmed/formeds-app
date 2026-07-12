@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
 
@@ -39,7 +39,20 @@ export default function MessagesScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      const poll = async () => {
+        if (!isActive) return;
+        await load();
+        if (isActive) {
+          setTimeout(poll, 10000);
+        }
+      };
+      poll();
+      return () => { isActive = false; };
+    }, [load])
+  );
 
   const timeAgo = (d: string) => {
     const diff = Date.now() - new Date(d).getTime();

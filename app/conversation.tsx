@@ -153,13 +153,27 @@ export default function ConversationScreen() {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) { alert('Permission required to access photos'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.5, base64: true, allowsEditing: true });
-    if (result.canceled || !result.assets?.[0]?.base64) return;
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.5, allowsEditing: true });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
     setUploadingImage(true);
     try {
-      const b64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      const upload = await apiFetch('/api/upload/image', token, { method: 'POST', body: JSON.stringify({ image: b64 }) });
-      await sendMessage('image', `${API_URL}${upload.url}`);
+      const formData = new FormData();
+      const asset = result.assets[0];
+      const filename = asset.uri.split('/').pop() || 'image.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : `image`;
+      
+      if (Platform.OS === 'web') {
+        const res = await fetch(asset.uri);
+        const blob = await res.blob();
+        formData.append('file', blob, filename);
+      } else {
+        formData.append('file', { uri: asset.uri, name: filename, type } as any);
+      }
+      
+      const upload = await apiFetch('/api/upload/image', token, { method: 'POST', body: formData });
+      const finalUrl = upload.url.startsWith('http') ? upload.url : `${API_URL}${upload.url}`;
+      await sendMessage('image', finalUrl);
     } catch (e: any) { alert(e.message || 'Upload failed'); }
     finally { setUploadingImage(false); }
   };

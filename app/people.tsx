@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
 
@@ -35,7 +35,20 @@ export default function PeopleScreen() {
     finally { setLoading(false); }
   }, [token]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      const poll = async () => {
+        if (!isActive) return;
+        await loadData();
+        if (isActive) {
+          setTimeout(poll, 10000);
+        }
+      };
+      poll();
+      return () => { isActive = false; };
+    }, [loadData])
+  );
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -127,7 +140,13 @@ export default function PeopleScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity testID="people-back-btn" style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity testID="people-back-btn" style={styles.backBtn} onPress={() => {
+          if (Platform.OS === 'web' && !router.canGoBack()) {
+            router.replace('/(tabs)/feed');
+          } else {
+            router.back();
+          }
+        }}>
           <Ionicons name="arrow-back" size={24} color="#1A3A5C" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>People</Text>

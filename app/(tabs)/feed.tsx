@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Share, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Share, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch, API_URL } from '../../src/utils/api';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
 interface Post {
@@ -26,7 +26,7 @@ interface PubMedArticle {
   title: string;
   journal: string;
   abstract: string;
-  authors: string[];
+  authors: string | string[];
   pub_date: string;
   keywords: string[];
   doi: string;
@@ -71,7 +71,20 @@ export default function FeedScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      const poll = async () => {
+        if (!isActive) return;
+        await loadData();
+        if (isActive) {
+          setTimeout(poll, 10000);
+        }
+      };
+      poll();
+      return () => { isActive = false; };
+    }, [loadData])
+  );
 
   const handlePost = async () => {
     if (!newPost.trim() && !attachedImage) return;
@@ -94,13 +107,27 @@ export default function FeedScreen() {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) { alert('Permission required to access photos'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.5, base64: true, allowsEditing: true });
-    if (result.canceled || !result.assets?.[0]?.base64) return;
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.5, allowsEditing: true });
+    if (result.canceled || !result.assets?.[0]?.uri) return;
     setUploadingImage(true);
     try {
-      const b64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      const upload = await apiFetch('/api/upload/image', token, { method: 'POST', body: JSON.stringify({ image: b64 }) });
-      setAttachedImage(`${API_URL}${upload.url}`);
+      const formData = new FormData();
+      const asset = result.assets[0];
+      const filename = asset.uri.split('/').pop() || 'image.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : `image`;
+      
+      if (Platform.OS === 'web') {
+        const res = await fetch(asset.uri);
+        const blob = await res.blob();
+        formData.append('file', blob, filename);
+      } else {
+        formData.append('file', { uri: asset.uri, name: filename, type } as any);
+      }
+      
+      const upload = await apiFetch('/api/upload/image', token, { method: 'POST', body: formData });
+      const finalUrl = upload.url.startsWith('http') ? upload.url : `${API_URL}${upload.url}`;
+      setAttachedImage(finalUrl);
     } catch (e: any) { alert(e.message || 'Upload failed'); }
     finally { setUploadingImage(false); }
   };
@@ -162,17 +189,20 @@ export default function FeedScreen() {
   };
 
   const renderPubMedArticle = ({ item }: { item: PubMedArticle }) => (
-    <View testID={`pubmed-${item.pmid}`} style={styles.pubmedCard}>
+    <View testID={`pubmed-${item.pmid || item.id}`} style={styles.pubmedCard}>
       <View style={styles.pubmedHeader}>
         <View style={styles.pubmedIcon}><Ionicons name="document-text" size={20} color="#7C3AED" /></View>
         <View style={styles.pubmedBadge}><Text style={styles.pubmedBadgeText}>PubMed Research</Text></View>
       </View>
       <Text style={styles.pubmedTitle}>{item.title}</Text>
-      <Text style={styles.pubmedJournal}>{item.journal}</Text>
-      {item.authors.length > 0 && <Text style={styles.pubmedAuthors}>{item.authors.slice(0, 3).join(', ')}{item.authors.length > 3 ? ` +${item.authors.length - 3} more` : ''}</Text>}
+      {item.journal ? <Text style={styles.pubmedJournal}>{item.journal}</Text> : null}
+      {(() => {
+        const auths = item.authors ? (typeof item.authors === 'string' ? item.authors.split(', ') : (Array.isArray(item.authors) ? item.authors : [])) : [];
+        return auths.length > 0 ? <Text style={styles.pubmedAuthors}>{auths.slice(0, 3).join(', ')}{auths.length > 3 ? ` +${auths.length - 3} more` : ''}</Text> : null;
+      })()}
       <Text style={styles.pubmedAbstract} numberOfLines={4}>{item.abstract}</Text>
       <View style={styles.pubmedFooter}>
-        {item.keywords.slice(0, 3).map((kw, i) => (
+        {Array.isArray(item.keywords) && item.keywords.length > 0 && item.keywords.slice(0, 3).map((kw, i) => (
           <View key={i} style={styles.keywordTag}><Text style={styles.keywordText}>{kw}</Text></View>
         ))}
       </View>
