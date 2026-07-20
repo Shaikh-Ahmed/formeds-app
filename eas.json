@@ -12,9 +12,17 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://formeds-api.onrender.com"
       }
     },
-    "production": {}
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://formeds-api.onrender.com"
+      }
+    }
   },
   "submit": {
     "production": {}

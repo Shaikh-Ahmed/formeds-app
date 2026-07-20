@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
@@ -19,7 +19,7 @@ export default function WelcomeScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Image source={{ uri: 'https://customer-assets.emergentagent.com/job_medcare-deploy/artifacts/kex3yymq_eer.png' }} style={styles.splashLogo} resizeMode="contain" />
+        <Image source={require('../assets/images/formeds-logo.png')} style={styles.splashLogo} resizeMode="contain" />
       </View>
     );
   }
@@ -27,7 +27,7 @@ export default function WelcomeScreen() {
   return (
     <View style={styles.container} testID="welcome-screen">
       <View style={styles.topSection}>
-        <Image source={{ uri: 'https://customer-assets.emergentagent.com/job_medcare-deploy/artifacts/kex3yymq_eer.png' }} style={styles.logo} resizeMode="contain" />
+        <Image source={require('../assets/images/formeds-logo.png')} style={styles.logo} resizeMode="contain" />
         <Text style={styles.tagline}>India&apos;s First Integrated Healthcare Platform</Text>
         <Text style={styles.mission}>Ensuring access to medical care is driven by need, not geography</Text>
       </View>

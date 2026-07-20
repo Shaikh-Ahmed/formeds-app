@@ -68,6 +68,8 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!name || !email || !password) { setError('Please fill in required fields'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Please enter a valid email address'); return; }
+    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
     setLoading(true); setError('');
     try {
       const data: any = { email, password, name, role };
@@ -118,7 +120,7 @@ export default function RegisterScreen() {
 
           <InputField testID="register-name-input" label="Full Name *" icon="person-outline" value={name} onChangeText={setName} placeholder={role === 'hospital' ? 'Hospital Name' : role === 'clinic' ? 'Clinic Name' : 'Dr. Full Name'} />
           <InputField testID="register-email-input" label="Email *" icon="mail-outline" value={email} onChangeText={setEmail} placeholder="you@example.com" keyboardType="email-address" />
-          <InputField testID="register-password-input" label="Password *" icon="lock-closed-outline" value={password} onChangeText={setPassword} placeholder="Min 6 characters" secureTextEntry />
+          <InputField testID="register-password-input" label="Password *" icon="lock-closed-outline" value={password} onChangeText={setPassword} placeholder="Min 8 characters" secureTextEntry />
 
           {role === 'healthcare_professional' && (
             <>

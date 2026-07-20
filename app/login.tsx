@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
@@ -33,7 +33,7 @@ export default function LoginScreen() {
             <Ionicons name="arrow-back" size={24} color="#1A3A5C" />
           </TouchableOpacity>
 
-          <Image source={{ uri: 'https://customer-assets.emergentagent.com/job_medcare-deploy/artifacts/kex3yymq_eer.png' }} style={styles.logo} resizeMode="contain" />
+          <Image source={require('../assets/images/formeds-logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to your ForMeds account</Text>
 
