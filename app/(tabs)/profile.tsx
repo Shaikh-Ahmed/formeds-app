@@ -70,6 +70,17 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {user?.is_admin && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Admin</Text>
+            <TouchableOpacity testID="admin-kyc-btn" style={styles.menuItem} onPress={() => router.push('/admin/kyc')}>
+              <View style={styles.menuIcon}><Ionicons name="shield-checkmark-outline" size={20} color="#0F766E" /></View>
+              <Text style={styles.menuText}>KYC Review Queue</Text>
+              <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <TouchableOpacity testID="edit-profile-btn" style={styles.menuItem}>

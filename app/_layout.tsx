@@ -10,7 +10,7 @@ if (SENTRY_DSN) {
   Sentry.init({ dsn: SENTRY_DSN, tracesSampleRate: 0.1, sendDefaultPii: false });
 }
 
-const PUBLIC_SEGMENTS = new Set(['index', 'login', 'register']);
+const PUBLIC_SEGMENTS = new Set(['index', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']);
 
 function RootNavigator() {
   const { user, loading } = useAuth();
@@ -41,7 +41,11 @@ function RootNavigator() {
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
       <Stack.Screen name="register" />
+      <Stack.Screen name="forgot-password" />
+      <Stack.Screen name="reset-password" />
+      <Stack.Screen name="verify-email" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="admin/kyc" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="aed-chat" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="messages" options={{ animation: 'slide_from_right' }} />

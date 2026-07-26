@@ -20,6 +20,9 @@ interface User {
   location?: string;
   specialty_focus?: string;
   avatar?: string;
+  email_verified?: boolean;
+  is_admin?: boolean;
+  verified?: boolean;
   [key: string]: any;
 }
 
