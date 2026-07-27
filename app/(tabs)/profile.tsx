@@ -4,17 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { useRouter } from 'expo-router';
-
-const ROLE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  healthcare_professional: { label: 'Healthcare Professional', color: '#0F766E', bg: '#F0FDF4' },
-  hospital: { label: 'Hospital', color: '#1A3A5C', bg: '#EFF6FF' },
-  clinic: { label: 'Clinic', color: '#0F766E', bg: '#F0FDFA' },
-};
+import { Avatar, RoleBadge } from '../../src/components';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const roleConfig = ROLE_CONFIG[user?.role || ''] || ROLE_CONFIG.healthcare_professional;
 
   const handleLogout = async () => {
     await logout();
@@ -29,13 +23,11 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.profileCard}>
-          <View style={styles.avatarLarge}>
-            <Text style={styles.avatarLargeText}>{user?.name?.charAt(0) || 'U'}</Text>
+          <View style={styles.avatarWrap}>
+            <Avatar name={user?.name} role={user?.role} uri={user?.avatar} size={80} />
           </View>
           <Text style={styles.profileName}>{user?.name}</Text>
-          <View style={[styles.roleBadge, { backgroundColor: roleConfig.bg }]}>
-            <Text style={[styles.roleBadgeText, { color: roleConfig.color }]}>{roleConfig.label}</Text>
-          </View>
+          <RoleBadge role={user?.role} long />
           <Text style={styles.profileEmail}>{user?.email}</Text>
         </View>
 
@@ -83,17 +75,17 @@ export default function ProfileScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
-          <TouchableOpacity testID="edit-profile-btn" style={styles.menuItem}>
+          <TouchableOpacity testID="edit-profile-btn" style={styles.menuItem} onPress={() => router.push('/edit-profile')} accessibilityRole="button" accessibilityLabel="Edit profile">
             <View style={styles.menuIcon}><Ionicons name="create-outline" size={20} color="#1A3A5C" /></View>
             <Text style={styles.menuText}>Edit Profile</Text>
             <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
           </TouchableOpacity>
-          <TouchableOpacity testID="settings-btn" style={styles.menuItem}>
+          <TouchableOpacity testID="settings-btn" style={styles.menuItem} onPress={() => router.push('/settings')} accessibilityRole="button" accessibilityLabel="Settings">
             <View style={styles.menuIcon}><Ionicons name="settings-outline" size={20} color="#1A3A5C" /></View>
             <Text style={styles.menuText}>Settings</Text>
             <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
           </TouchableOpacity>
-          <TouchableOpacity testID="help-btn" style={styles.menuItem}>
+          <TouchableOpacity testID="help-btn" style={styles.menuItem} onPress={() => router.push('/help')} accessibilityRole="button" accessibilityLabel="Help and support">
             <View style={styles.menuIcon}><Ionicons name="help-circle-outline" size={20} color="#1A3A5C" /></View>
             <Text style={styles.menuText}>Help & Support</Text>
             <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
@@ -127,8 +119,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   headerTitle: { fontSize: 24, fontWeight: '700', color: '#0F172A' },
   profileCard: { backgroundColor: '#FFFFFF', alignItems: 'center', paddingVertical: 28, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
-  avatarLarge: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#1A3A5C', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  avatarLargeText: { color: '#FFF', fontSize: 32, fontWeight: '700' },
+  avatarWrap: { marginBottom: 14 },
   profileName: { fontSize: 22, fontWeight: '700', color: '#0F172A', marginBottom: 6 },
   roleBadge: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, marginBottom: 6 },
   roleBadgeText: { fontSize: 13, fontWeight: '600' },

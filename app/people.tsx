@@ -5,12 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
-
-const ROLE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  healthcare_professional: { label: 'Professional', color: '#0F766E', bg: '#F0FDF4' },
-  hospital: { label: 'Hospital', color: '#1A3A5C', bg: '#EFF6FF' },
-  clinic: { label: 'Clinic', color: '#0F766E', bg: '#F0FDFA' },
-};
+import { Avatar, RoleBadge } from '../src/components';
 
 export default function PeopleScreen() {
   const { user, token } = useAuth();
@@ -70,13 +65,12 @@ export default function PeopleScreen() {
   };
 
   const renderSearchUser = ({ item }: any) => {
-    const role = ROLE_LABELS[item.role] || ROLE_LABELS.healthcare_professional;
     return (
       <View testID={`search-user-${item.id}`} style={styles.userCard}>
-        <View style={[styles.avatar, { backgroundColor: role.color }]}><Text style={styles.avatarText}>{item.name?.charAt(0)}</Text></View>
+        <Avatar name={item.name} role={item.role} size={48} />
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{item.name}</Text>
-          <View style={[styles.roleBadge, { backgroundColor: role.bg }]}><Text style={[styles.roleText, { color: role.color }]}>{role.label}</Text></View>
+          <RoleBadge role={item.role} />
           {item.specialty && <Text style={styles.userDetail}>{item.specialty}</Text>}
           {item.city && <Text style={styles.userDetail}>{item.city}{item.state ? `, ${item.state}` : ''}</Text>}
         </View>
@@ -89,10 +83,9 @@ export default function PeopleScreen() {
   };
 
   const renderConnection = ({ item }: any) => {
-    const role = ROLE_LABELS[item.role] || ROLE_LABELS.healthcare_professional;
     return (
-      <TouchableOpacity testID={`connection-${item.id}`} style={styles.userCard} onPress={() => router.push({ pathname: '/conversation', params: { userId: item.id, userName: item.name } })}>
-        <View style={[styles.avatar, { backgroundColor: role.color }]}><Text style={styles.avatarText}>{item.name?.charAt(0)}</Text></View>
+      <TouchableOpacity testID={`connection-${item.id}`} style={styles.userCard} onPress={() => router.push({ pathname: '/conversation', params: { userId: item.id, userName: item.name } })} accessibilityRole="button" accessibilityLabel={`Open conversation with ${item.name}`}>
+        <Avatar name={item.name} role={item.role} size={48} />
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{item.name}</Text>
           {item.specialty && <Text style={styles.userDetail}>{item.specialty}</Text>}

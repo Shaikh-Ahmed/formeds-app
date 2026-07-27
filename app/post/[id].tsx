@@ -5,12 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
-
-const ROLE_TAGS: Record<string, { label: string; color: string; bg: string }> = {
-  healthcare_professional: { label: 'Professional', color: '#0F766E', bg: '#F0FDF4' },
-  hospital: { label: 'Hospital', color: '#1A3A5C', bg: '#EFF6FF' },
-  clinic: { label: 'Clinic', color: '#0F766E', bg: '#F0FDFA' },
-};
+import { timeAgo } from '../../src/utils/time';
+import { Avatar, RoleBadge } from '../../src/components';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -82,27 +78,18 @@ export default function PostDetailScreen() {
     }
   };
 
-  const timeAgo = (date: string) => {
-    const diff = Date.now() - new Date(date).getTime();
-    const hours = Math.floor(diff / 3600000);
-    if (hours < 1) return 'Just now';
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
-  };
-
   const renderPostHeader = () => {
     if (!post) return null;
-    const tag = ROLE_TAGS[post.author_role] || ROLE_TAGS.healthcare_professional;
     const isLiked = post.likes?.includes(user?.id || '');
 
     return (
       <View style={styles.postCard}>
         <View style={styles.postHeader}>
-          <View style={styles.avatarCircle}><Text style={styles.avatarText}>{post.author_name?.charAt(0)}</Text></View>
+          <Avatar name={post.author_name} role={post.author_role} size={44} />
           <View style={styles.postMeta}>
             <Text style={styles.authorName}>{post.author_name}</Text>
             <View style={styles.metaRow}>
-              <View style={[styles.roleTag, { backgroundColor: tag.bg }]}><Text style={[styles.roleTagText, { color: tag.color }]}>{tag.label}</Text></View>
+              <RoleBadge role={post.author_role} />
               <Text style={styles.timeText}>{timeAgo(post.created_at)}</Text>
             </View>
           </View>

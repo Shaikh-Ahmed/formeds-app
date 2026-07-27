@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
 
 export default function LearningScreen() {
   const { token } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'books' | 'cme' | 'research'>('books');
   const [books, setBooks] = useState<any[]>([]);
   const [cme, setCme] = useState<any[]>([]);
@@ -70,7 +72,13 @@ export default function LearningScreen() {
           <Ionicons name="help-circle-outline" size={14} color="#64748B" style={{ marginLeft: 12 }} /><Text style={styles.metaText}>{item.quiz_questions} questions</Text>
         </View>
         <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
-        <TouchableOpacity testID={`start-cme-${item.id}`} style={styles.startBtn}>
+        <TouchableOpacity
+          testID={`start-cme-${item.id}`}
+          style={styles.startBtn}
+          onPress={() => router.push({ pathname: '/lesson/[id]', params: { id: item.id } })}
+          accessibilityRole="button"
+          accessibilityLabel={`Start lesson: ${item.title}`}
+        >
           <Ionicons name="play-circle" size={18} color="#FFF" /><Text style={styles.startText}>Start Lesson</Text>
         </TouchableOpacity>
       </View>

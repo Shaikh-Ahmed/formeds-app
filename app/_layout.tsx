@@ -49,6 +49,10 @@ function RootNavigator() {
       <Stack.Screen name="verify-email" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="admin/kyc" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="edit-profile" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="help" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="lesson/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="aed-chat" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="messages" options={{ animation: 'slide_from_right' }} />

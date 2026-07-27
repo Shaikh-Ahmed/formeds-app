@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
+import { timeAgo } from '../src/utils/time';
 
 interface Notification {
   id: string;
@@ -55,14 +56,6 @@ export default function NotificationsScreen() {
     } catch (e) { console.log('Mark all read error:', e); }
   };
 
-  const timeAgo = (date: string) => {
-    const diff = Date.now() - new Date(date).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
-  };
 
   const renderNotification = ({ item }: { item: Notification }) => {
     const config = TYPE_ICONS[item.type] || TYPE_ICONS.general;

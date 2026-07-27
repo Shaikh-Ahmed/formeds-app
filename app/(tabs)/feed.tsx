@@ -6,6 +6,8 @@ import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch, API_URL } from '../../src/utils/api';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { timeAgo } from '../../src/utils/time';
+import { Avatar, RoleBadge } from '../../src/components';
 
 interface Post {
   id: string;
@@ -33,11 +35,6 @@ interface PubMedArticle {
   source: string;
 }
 
-const ROLE_TAGS: Record<string, { label: string; color: string; bg: string }> = {
-  healthcare_professional: { label: 'Professional', color: '#0F766E', bg: '#F0FDF4' },
-  hospital: { label: 'Hospital', color: '#1A3A5C', bg: '#EFF6FF' },
-  clinic: { label: 'Clinic', color: '#0F766E', bg: '#F0FDFA' },
-};
 
 export default function FeedScreen() {
   const { user, token } = useAuth();
@@ -137,25 +134,16 @@ export default function FeedScreen() {
     }
   };
 
-  const timeAgo = (date: string) => {
-    const diff = Date.now() - new Date(date).getTime();
-    const hours = Math.floor(diff / 3600000);
-    if (hours < 1) return 'Just now';
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
-  };
-
   const renderPost = ({ item }: { item: Post }) => {
-    const tag = ROLE_TAGS[item.author_role] || ROLE_TAGS.healthcare_professional;
     const isLiked = item.likes?.includes(user?.id || '');
     return (
       <View testID={`feed-post-${item.id}`} style={styles.postCard}>
         <View style={styles.postHeader}>
-          <View style={styles.avatarCircle}><Text style={styles.avatarText}>{item.author_name?.charAt(0)}</Text></View>
+          <Avatar name={item.author_name} role={item.author_role} size={44} />
           <View style={styles.postMeta}>
             <Text style={styles.authorName}>{item.author_name}</Text>
             <View style={styles.metaRow}>
-              <View style={[styles.roleTag, { backgroundColor: tag.bg }]}><Text style={[styles.roleTagText, { color: tag.color }]}>{tag.label}</Text></View>
+              <RoleBadge role={item.author_role} />
               <Text style={styles.timeText}>{timeAgo(item.created_at)}</Text>
             </View>
           </View>

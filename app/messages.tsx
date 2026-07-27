@@ -6,6 +6,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
 import { useWebSocket } from '../src/hooks/useWebSocket';
+import { timeAgo } from '../src/utils/time';
+import { Avatar } from '../src/components';
 
 interface Conversation {
   user_id: string;
@@ -18,7 +20,6 @@ interface Conversation {
   unread: number;
 }
 
-const ROLE_COLORS: Record<string, string> = { healthcare_professional: '#0F766E', hospital: '#1A3A5C', clinic: '#0F766E' };
 
 export default function MessagesScreen() {
   const { user, token } = useAuth();
@@ -47,22 +48,11 @@ export default function MessagesScreen() {
     if (data.type === 'new_message' || data.type === 'presence') load();
   }, [load]));
 
-  const timeAgo = (d: string) => {
-    const diff = Date.now() - new Date(d).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 60) return `${m}m`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h`;
-    return `${Math.floor(h / 24)}d`;
-  };
 
   const renderConversation = ({ item }: { item: Conversation }) => (
     <TouchableOpacity testID={`convo-${item.user_id}`} style={styles.convoCard} onPress={() => router.push({ pathname: '/conversation', params: { userId: item.user_id, userName: item.user_name } })} activeOpacity={0.7}>
       <View style={styles.avatarWrap}>
-        <View style={[styles.avatar, { backgroundColor: ROLE_COLORS[item.user_role] || '#1A3A5C' }]}>
-          <Text style={styles.avatarText}>{item.user_name?.charAt(0)}</Text>
-        </View>
-        {onlineUsers.includes(item.user_id) && <View style={styles.onlineDot} />}
+        <Avatar name={item.user_name} role={item.user_role} online={onlineUsers.includes(item.user_id)} size={52} />
       </View>
       <View style={styles.convoContent}>
         <View style={styles.convoTop}>
