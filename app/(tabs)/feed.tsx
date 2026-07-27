@@ -71,20 +71,8 @@ export default function FeedScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-      const poll = async () => {
-        if (!isActive) return;
-        await loadData();
-        if (isActive) {
-          setTimeout(poll, 10000);
-        }
-      };
-      poll();
-      return () => { isActive = false; };
-    }, [loadData])
-  );
+  // Refetch on focus + pull-to-refresh (interval polling removed in Phase 5).
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const handlePost = async () => {
     if (!newPost.trim() && !attachedImage) return;

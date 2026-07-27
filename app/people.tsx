@@ -35,20 +35,8 @@ export default function PeopleScreen() {
     finally { setLoading(false); }
   }, [token]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-      const poll = async () => {
-        if (!isActive) return;
-        await loadData();
-        if (isActive) {
-          setTimeout(poll, 10000);
-        }
-      };
-      poll();
-      return () => { isActive = false; };
-    }, [loadData])
-  );
+  // Refetch on focus (interval polling removed in Phase 5).
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;

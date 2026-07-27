@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { usePushNotifications } from '../src/hooks/usePushNotifications';
 import { StatusBar } from 'expo-status-bar';
 
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || '';
@@ -13,9 +14,11 @@ if (SENTRY_DSN) {
 const PUBLIC_SEGMENTS = new Set(['index', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']);
 
 function RootNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, token } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  usePushNotifications(token);
 
   useEffect(() => {
     if (loading) return;

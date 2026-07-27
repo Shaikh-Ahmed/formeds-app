@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
+import { useWebSocket } from '../src/hooks/useWebSocket';
 
 interface Conversation {
   user_id: string;
@@ -39,20 +40,12 @@ export default function MessagesScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-      const poll = async () => {
-        if (!isActive) return;
-        await load();
-        if (isActive) {
-          setTimeout(poll, 10000);
-        }
-      };
-      poll();
-      return () => { isActive = false; };
-    }, [load])
-  );
+  // Refetch when the screen gains focus; realtime updates arrive over the socket.
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  useWebSocket(token, useCallback((data: any) => {
+    if (data.type === 'new_message' || data.type === 'presence') load();
+  }, [load]));
 
   const timeAgo = (d: string) => {
     const diff = Date.now() - new Date(d).getTime();

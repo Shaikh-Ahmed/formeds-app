@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch, API_URL } from '../src/utils/api';
+import { useWebSocket } from '../src/hooks/useWebSocket';
 import * as ImagePicker from 'expo-image-picker';
 
 interface Message {
@@ -31,9 +32,7 @@ export default function ConversationScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const flatRef = useRef<FlatList>(null);
-  const wsRef = useRef<WebSocket | null>(null);
   const typingTimerRef = useRef<any>(null);
-  const reconnectRef = useRef<any>(null);
 
   // Load initial messages
   const loadMessages = useCallback(async () => {
@@ -52,78 +51,43 @@ export default function ConversationScreen() {
     } catch (e) {}
   }, [userId, token]);
 
-  // WebSocket connection
-  const connectWS = useCallback(() => {
-    if (!token || !userId) return;
-    const wsUrl = API_URL.replace('https://', 'wss://').replace('http://', 'ws://');
-    const ws = new WebSocket(`${wsUrl}/api/ws?token=${token}`);
-    
-    ws.onopen = () => {
-      console.log('WS connected');
-      wsRef.current = ws;
-    };
-    
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'new_message' && data.message) {
-          const msg = data.message;
-          if (msg.sender_id === userId) {
-            setMessages(prev => {
-              if (prev.find(m => m.id === msg.id)) return prev;
-              return [...prev, msg];
-            });
-            // Send read receipt
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ type: 'read_receipt', target_id: userId, message_ids: [msg.id] }));
-            }
-          }
-        } else if (data.type === 'typing' && data.user_id === userId) {
-          setIsTyping(data.is_typing);
-          if (data.is_typing) {
-            if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-            typingTimerRef.current = setTimeout(() => setIsTyping(false), 4000);
-          }
-        } else if (data.type === 'read_receipt' && data.user_id === userId) {
-          setMessages(prev => prev.map(m => data.message_ids.includes(m.id) ? { ...m, read: true } : m));
-        } else if (data.type === 'presence' && data.user_id === userId) {
-          setIsOnline(data.online);
-        }
-      } catch (e) {}
-    };
-    
-    ws.onclose = () => {
-      wsRef.current = null;
-      reconnectRef.current = setTimeout(connectWS, 3000);
-    };
-    
-    ws.onerror = () => { ws.close(); };
-    
-    return ws;
-  }, [token, userId]);
+  // Realtime events (shared socket hook: header-free auth + backoff reconnect)
+  const handleWsMessage = useCallback((data: any) => {
+    if (data.type === 'new_message' && data.message) {
+      const msg = data.message;
+      if (msg.sender_id === userId) {
+        setMessages(prev => (prev.find(m => m.id === msg.id) ? prev : [...prev, msg]));
+        wsSendRef.current?.({ type: 'read_receipt', target_id: userId, message_ids: [msg.id] });
+      }
+    } else if (data.type === 'typing' && data.user_id === userId) {
+      setIsTyping(data.is_typing);
+      if (data.is_typing) {
+        if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+        typingTimerRef.current = setTimeout(() => setIsTyping(false), 4000);
+      }
+    } else if (data.type === 'read_receipt' && data.user_id === userId) {
+      setMessages(prev => prev.map(m => (data.message_ids.includes(m.id) ? { ...m, read: true } : m)));
+    } else if (data.type === 'presence' && data.user_id === userId) {
+      setIsOnline(data.online);
+    }
+  }, [userId]);
+
+  const { send } = useWebSocket(token, handleWsMessage);
+  const wsSendRef = useRef(send);
+  wsSendRef.current = send;
 
   useEffect(() => {
     loadMessages();
     checkOnline();
-    const ws = connectWS();
-    // Fallback polling every 10s (lighter than before since WS handles real-time)
-    const poll = setInterval(loadMessages, 10000);
-    const onlineCheck = setInterval(checkOnline, 15000);
     return () => {
-      clearInterval(poll);
-      clearInterval(onlineCheck);
-      if (reconnectRef.current) clearTimeout(reconnectRef.current);
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-      if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
     };
-  }, [loadMessages, checkOnline, connectWS]);
+  }, [loadMessages, checkOnline]);
 
   // Send typing indicator
   const handleInputChange = (text: string) => {
     setInput(text);
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: text ? 'typing' : 'stop_typing', target_id: userId }));
-    }
+    send({ type: text ? 'typing' : 'stop_typing', target_id: userId });
   };
 
   const sendMessage = async (msgType: string = 'text', attachment?: string) => {
@@ -131,9 +95,7 @@ export default function ConversationScreen() {
     if (msgType === 'text' && !content) return;
     if (msgType === 'text') setInput('');
     // Stop typing
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: 'stop_typing', target_id: userId }));
-    }
+    send({ type: 'stop_typing', target_id: userId });
     // Optimistic update
     const tempId = `temp-${Date.now()}`;
     const tempMsg: Message = { id: tempId, sender_id: user?.id || '', sender_name: user?.name || '', receiver_id: userId || '', content, message_type: msgType, attachment, read: false, created_at: new Date().toISOString() };

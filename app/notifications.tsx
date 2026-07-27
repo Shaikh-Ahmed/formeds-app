@@ -38,20 +38,8 @@ export default function NotificationsScreen() {
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-      const poll = async () => {
-        if (!isActive) return;
-        await loadNotifications();
-        if (isActive) {
-          setTimeout(poll, 10000);
-        }
-      };
-      poll();
-      return () => { isActive = false; };
-    }, [loadNotifications])
-  );
+  // Refetch on focus + pull-to-refresh (interval polling removed in Phase 5).
+  useFocusEffect(useCallback(() => { loadNotifications(); }, [loadNotifications]));
 
   const markRead = async (id: string) => {
     try {
