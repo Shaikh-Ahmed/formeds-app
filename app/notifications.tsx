@@ -6,6 +6,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
 import { timeAgo } from '../src/utils/time';
+import { usePaginatedList } from '../src/hooks/usePaginatedList';
+import { LoadingState, EmptyState, ErrorState } from '../src/components';
 
 interface Notification {
   id: string;
@@ -27,20 +29,13 @@ const TYPE_ICONS: Record<string, { icon: string; color: string; bg: string }> = 
 export default function NotificationsScreen() {
   const { token } = useAuth();
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const loadNotifications = useCallback(async () => {
-    try {
-      const data = await apiFetch('/api/notifications', token);
-      setNotifications(data);
-    } catch (e) { console.log('Notif error:', e); }
-    finally { setLoading(false); setRefreshing(false); }
-  }, [token]);
+  const {
+    items: notifications, setItems: setNotifications,
+    loading, refreshing, loadingMore, error, load, refresh, loadMore,
+  } = usePaginatedList<Notification>({ path: '/api/notifications/', token });
 
   // Refetch on focus + pull-to-refresh (interval polling removed in Phase 5).
-  useFocusEffect(useCallback(() => { loadNotifications(); }, [loadNotifications]));
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const markRead = async (id: string) => {
     try {
@@ -50,10 +45,14 @@ export default function NotificationsScreen() {
   };
 
   const markAllRead = async () => {
+    // Optimistic: reflect immediately, roll back if the request fails.
+    const previous = notifications;
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     try {
       await apiFetch('/api/notifications/read-all', token, { method: 'POST' });
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    } catch (e) { console.log('Mark all read error:', e); }
+    } catch {
+      setNotifications(previous);
+    }
   };
 
 
@@ -91,20 +90,25 @@ export default function NotificationsScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color="#1A3A5C" /></View>
+        <LoadingState label="Loading notifications…" />
+      ) : error && notifications.length === 0 ? (
+        <ErrorState message={error} onRetry={load} />
       ) : (
         <FlatList
           data={notifications}
           renderItem={renderNotification}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadNotifications(); }} tintColor="#1A3A5C" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#1A3A5C" />}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.footer} color="#1A3A5C" /> : null}
           ListEmptyComponent={
-            <View style={styles.emptyBox}>
-              <View style={styles.emptyIcon}><Ionicons name="notifications-off-outline" size={48} color="#CBD5E1" /></View>
-              <Text style={styles.emptyTitle}>No notifications yet</Text>
-              <Text style={styles.emptySubtitle}>You&apos;ll see alerts for job applications, specialist opt-ins, and more here.</Text>
-            </View>
+            <EmptyState
+              icon="notifications-off-outline"
+              title="No notifications yet"
+              hint="You'll see alerts for job applications, specialist opt-ins, and more here."
+            />
           }
         />
       )}
@@ -120,6 +124,7 @@ const styles = StyleSheet.create({
   markAllBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: '#EFF6FF' },
   markAllText: { fontSize: 13, fontWeight: '600', color: '#1A3A5C' },
   list: { paddingVertical: 8 },
+  footer: { paddingVertical: 20 },
   notifCard: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   unreadCard: { backgroundColor: '#FAFBFF' },
   notifIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 12 },

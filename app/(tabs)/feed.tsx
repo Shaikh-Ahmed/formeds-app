@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+
+const FEED_PAGE_SIZE = 20;
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Share, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,22 +53,43 @@ export default function FeedScreen() {
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [unreadMsgs, setUnreadMsgs] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const pageRef = useRef(1);
 
   const loadData = useCallback(async () => {
     try {
       const [feedData, pubmedData, notifCount, msgCount] = await Promise.all([
-        apiFetch('/api/feed', token),
+        apiFetch(`/api/feed/?page=1&limit=${FEED_PAGE_SIZE}`, token),
         apiFetch('/api/feed/pubmed', token).catch(() => []),
         apiFetch('/api/notifications/unread-count', token).catch(() => ({ count: 0 })),
         apiFetch('/api/messages/unread-total', token).catch(() => ({ count: 0 })),
       ]);
-      setPosts(feedData);
+      const items = Array.isArray(feedData) ? feedData : (feedData?.items ?? []);
+      setPosts(items);
+      pageRef.current = 1;
+      setHasMorePosts(items.length >= FEED_PAGE_SIZE);
       setPubmedArticles(pubmedData);
       setUnreadCount(notifCount.count || 0);
       setUnreadMsgs(msgCount.count || 0);
     } catch (e) { console.log('Feed error:', e); }
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
+
+  // Append the next page when the user reaches the end of the list.
+  const loadMorePosts = useCallback(async () => {
+    if (!hasMorePosts || loadingMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const next = pageRef.current + 1;
+      const raw = await apiFetch(`/api/feed/?page=${next}&limit=${FEED_PAGE_SIZE}`, token);
+      const items = Array.isArray(raw) ? raw : (raw?.items ?? []);
+      setPosts(prev => [...prev, ...items]);
+      pageRef.current = next;
+      setHasMorePosts(items.length >= FEED_PAGE_SIZE);
+    } catch (e) { console.log('Feed page error:', e); }
+    finally { setLoadingMore(false); }
+  }, [token, hasMorePosts, loadingMore, loading]);
 
   // Refetch on focus + pull-to-refresh (interval polling removed in Phase 5).
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -248,6 +271,9 @@ export default function FeedScreen() {
       ) : activeTab === 'community' ? (
         <FlatList data={posts} renderItem={renderPost} keyExtractor={item => item.id} contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor="#1A3A5C" />}
+          onEndReached={loadMorePosts}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ paddingVertical: 20 }} color="#1A3A5C" /> : null}
           ListEmptyComponent={<View style={styles.center}><Ionicons name="newspaper-outline" size={48} color="#CBD5E1" /><Text style={styles.emptyText}>No posts yet</Text></View>} />
       ) : (
         <FlatList data={pubmedArticles} renderItem={renderPubMedArticle} keyExtractor={item => item.id} contentContainerStyle={styles.list}
