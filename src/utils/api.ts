@@ -16,9 +16,19 @@ export function setAuthHandlers(handlers: AuthHandlers | null) {
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** Stable machine-readable code from the server (e.g. 'email_unverified',
+   *  'kyc_required'), when it sent one. Branch on this, never on the message. */
+  code?: string;
+  /** Full parsed response body, for errors that carry extra fields. */
+  data?: any;
+  constructor(message: string, status: number, data?: any) {
     super(message);
     this.status = status;
+    this.data = data;
+    const detail = data?.detail;
+    if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
+      this.code = detail.code;
+    }
   }
 }
 
@@ -34,12 +44,17 @@ async function parseBody(res: Response): Promise<any> {
   return null;
 }
 
-function detailToMessage(data: any, fallback: string): string {
+export function detailToMessage(data: any, fallback: string): string {
   if (!data) return fallback;
-  if (typeof data.detail === 'string') return data.detail;
+  const detail = data.detail;
+  if (typeof detail === 'string') return detail;
   // FastAPI validation errors arrive as a list of {loc, msg, type}
-  if (Array.isArray(data.detail) && data.detail.length > 0 && data.detail[0].msg) {
-    return data.detail[0].msg;
+  if (Array.isArray(detail) && detail.length > 0 && detail[0].msg) {
+    return detail[0].msg;
+  }
+  // Structured app errors: {code, message, ...}
+  if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+    return detail.message;
   }
   return fallback;
 }
@@ -96,7 +111,7 @@ export async function apiFetch(path: string, token?: string | null, options: Req
 
   const data = await parseBody(res);
   if (!res.ok) {
-    throw new ApiError(detailToMessage(data, `Request failed (${res.status})`), res.status);
+    throw new ApiError(detailToMessage(data, `Request failed (${res.status})`), res.status, data);
   }
   return data;
 }

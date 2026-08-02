@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Text } from 'react-native';
+import { StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
@@ -8,7 +8,7 @@ import { Button, FormInput, ScreenHeader, ErrorBanner } from '../src/components'
 import { colors, spacing, typography } from '../src/theme';
 
 export default function EditProfileScreen() {
-  const { user, refreshUser } = useAuth();
+  const { user, token, refreshUser } = useAuth();
   const router = useRouter();
 
   const [name, setName] = useState(user?.name ?? '');
@@ -47,7 +47,8 @@ export default function EditProfileScreen() {
         payload.specialty_focus = specialtyFocus.trim();
         payload.location = location.trim();
       }
-      await apiFetch('/api/profile/update', null, { method: 'PUT', body: JSON.stringify(payload) });
+      // Passing `null` here sent no Authorization header, so every save 401'd.
+      await apiFetch('/api/profile/update', token, { method: 'PUT', body: JSON.stringify(payload) });
       await refreshUser();
       router.back();
     } catch (e: any) {

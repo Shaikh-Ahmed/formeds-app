@@ -4,3 +4,4 @@ export { Avatar } from './Avatar';
 export { RoleBadge } from './RoleBadge';
 export { LoadingState, EmptyState, ErrorState, ErrorBanner } from './States';
 export { ScreenHeader } from './ScreenHeader';
+export { KycNotice } from './KycNotice';

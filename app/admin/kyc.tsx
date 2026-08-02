@@ -11,7 +11,6 @@ interface KycRequest {
   registration_type: string;
   registration_number: string;
   state_council?: string;
-  provider_hint?: string;
   document_path?: string;
   applicant_name?: string;
   applicant_email?: string;
@@ -100,7 +99,10 @@ export default function AdminKycScreen() {
               <Text style={styles.name}>{item.applicant_name || 'Unknown'} <Text style={styles.role}>· {item.applicant_role}</Text></Text>
               <Text style={styles.meta}>{item.applicant_email}</Text>
               <Text style={styles.meta}>{item.registration_type.toUpperCase()}: {item.registration_number}{item.state_council ? ` · ${item.state_council}` : ''}</Text>
-              {item.provider_hint ? <Text style={styles.hint}>Auto-check: {item.provider_hint}</Text> : null}
+              {/* The old "Auto-check: verified" line came from a mock provider that
+                  derived that verdict from a string prefix. Showing a fabricated
+                  pass to a human reviewer invites rubber-stamping — approval must
+                  rest on the document alone. */}
               <View style={styles.actions}>
                 {item.document_path ? (
                   <TouchableOpacity style={[styles.btn, styles.viewBtn]} onPress={() => viewDoc(item.id)}><Ionicons name="document-text-outline" size={16} color="#1A3A5C" /><Text style={styles.viewText}>Document</Text></TouchableOpacity>
@@ -141,7 +143,6 @@ const styles = StyleSheet.create({
   name: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
   role: { fontSize: 13, fontWeight: '500', color: '#64748B' },
   meta: { fontSize: 13, color: '#64748B', marginTop: 2 },
-  hint: { fontSize: 12, color: '#0F766E', marginTop: 6 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
   viewBtn: { backgroundColor: '#F1F5F9' },

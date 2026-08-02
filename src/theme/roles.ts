@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from './colors';
 
 export type Role = 'healthcare_professional' | 'hospital' | 'clinic';
@@ -9,6 +10,10 @@ export interface RoleMeta {
   longLabel: string;
   color: string;
   bg: string;
+  /** Icon for role pickers and badges (welcome + register screens). */
+  icon: keyof typeof Ionicons.glyphMap;
+  /** One-line description shown on the "Get Started As" cards. */
+  description: string;
 }
 
 /**
@@ -23,18 +28,24 @@ export const ROLE_META: Record<Role, RoleMeta> = {
     longLabel: 'Healthcare Professional',
     color: colors.teal,
     bg: colors.successBg,
+    icon: 'medkit',
+    description: 'Doctor, Nurse, or Allied Health Worker',
   },
   hospital: {
     label: 'Hospital',
     longLabel: 'Hospital',
     color: colors.navy,
     bg: '#EFF6FF',
+    icon: 'business',
+    description: 'Post jobs and manage staffing',
   },
   clinic: {
     label: 'Clinic',
     longLabel: 'Clinic',
     color: colors.teal,
     bg: colors.tealBg,
+    icon: 'fitness',
+    description: 'Find visiting specialists',
   },
 };
 

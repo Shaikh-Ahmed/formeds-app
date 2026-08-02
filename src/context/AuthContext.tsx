@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { API_URL, setAuthHandlers } from '../utils/api';
+import { API_URL, apiFetch, ApiError, setAuthHandlers } from '../utils/api';
 import * as secureStorage from '../utils/secureStorage';
 
 const TOKEN_KEY = 'auth_token';
@@ -10,6 +10,7 @@ interface User {
   email: string;
   name: string;
   role: string;
+  phone?: string;
   professional_role?: string;
   specialty?: string;
   city?: string;
@@ -21,27 +22,66 @@ interface User {
   specialty_focus?: string;
   avatar?: string;
   email_verified?: boolean;
+  phone_verified?: boolean;
   is_admin?: boolean;
+  /** KYC approval — distinct from email_verified. Legacy column name. */
   verified?: boolean;
   [key: string]: any;
+}
+
+/** What registration returns: no session, just what's left to verify. */
+export interface PendingVerification {
+  verification_token: string;
+  email: string;
+  phone: string;
+  email_verified: boolean;
+  phone_verified: boolean;
+  phone_required: boolean;
+  complete: boolean;
+  /** False when the provider rejected the message — the code will never arrive,
+   *  so the UI must say so rather than wait on an unsatisfiable input. */
+  delivered: boolean;
+}
+
+/** A verify/confirm response, which carries a session once every step passes. */
+export interface VerificationResult extends Omit<PendingVerification, 'verification_token'> {
+  token?: string;
+  refresh_token?: string;
+  user?: User;
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
+  /** True once KYC has been approved — the gate on professional actions. */
+  isKycApproved: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: any) => Promise<void>;
+  register: (data: RegisterInput) => Promise<PendingVerification>;
+  /** Store the session handed back at the end of verification (auto sign-in). */
+  completeSignup: (result: VerificationResult) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+}
+
+export interface RegisterInput {
+  email: string;
+  password: string;
+  name: string;
+  role: string;
+  phone: string;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   token: null,
   loading: true,
+  isKycApproved: false,
   login: async () => {},
-  register: async () => {},
+  register: async () => {
+    throw new Error('AuthProvider is missing');
+  },
+  completeSignup: async () => {},
   logout: async () => {},
   refreshUser: async () => {},
 });
@@ -140,34 +180,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadStoredAuth]);
 
   const login = async (email: string, password: string) => {
-    const res = await fetch(`${API_URL}/api/auth/login`, {
+    // apiFetch shapes server errors (including the structured `code` the verify
+    // screen branches on) — no token is passed, so its 401-refresh path is inert.
+    const data = await apiFetch('/api/auth/login', null, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Login failed');
     await storeSession(data.token, data.refresh_token, data.user);
   };
 
-  const register = async (regData: any) => {
-    const res = await fetch(`${API_URL}/api/auth/register`, {
+  /**
+   * Creates the account but establishes NO session — the server withholds
+   * tokens until email (and phone, when SMS is configured) are verified.
+   */
+  const register = async (regData: RegisterInput): Promise<PendingVerification> => {
+    return await apiFetch('/api/auth/register', null, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(regData),
+      body: JSON.stringify({ ...regData, email: regData.email.trim().toLowerCase() }),
     });
-    const data = await res.json();
-    if (!res.ok) {
-      const detail = data?.detail;
-      const msg =
-        typeof detail === 'string'
-          ? detail
-          : Array.isArray(detail) && detail[0]?.msg
-            ? detail[0].msg
-            : 'Registration failed';
-      throw new Error(msg);
+  };
+
+  const completeSignup = async (result: VerificationResult) => {
+    if (!result.token || !result.user) {
+      throw new ApiError('Verification is not complete yet', 400);
     }
-    await storeSession(data.token, data.refresh_token, data.user);
+    await storeSession(result.token, result.refresh_token, result.user);
   };
 
   const logout = async () => {
@@ -185,20 +222,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await clearSession();
   };
 
-  const refreshUser = async () => {
-    if (token) {
-      const res = await fetch(`${API_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user);
-      }
+  const refreshUser = useCallback(async () => {
+    if (!token) return;
+    try {
+      const data = await apiFetch('/api/auth/me', token);
+      setUser(data.user);
+    } catch {
+      // A failed refresh must not blank out a working session; apiFetch has
+      // already forced a logout if the session was genuinely dead.
     }
-  };
+  }, [token]);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        isKycApproved: !!user?.verified,
+        login,
+        register,
+        completeSignup,
+        logout,
+        refreshUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

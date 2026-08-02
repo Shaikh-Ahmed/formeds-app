@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -50,11 +50,24 @@ export default function SettingsScreen() {
             label="Email verified"
             value={user?.email_verified ? 'Yes' : 'Not yet'}
           />
-          <Row
-            icon={user?.verified ? 'shield-checkmark-outline' : 'shield-outline'}
-            label="Professional KYC"
-            value={user?.verified ? 'Verified' : 'Pending'}
-          />
+          <Row icon="call-outline" label="Phone" value={user?.phone} />
+          {/* Previously a dead read-only row — there was no way to act on it. */}
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => router.push('/kyc')}
+            accessibilityRole="button"
+            accessibilityLabel={`Professional verification: ${user?.verified ? 'verified' : 'not verified'}. Tap to view.`}
+            testID="settings-kyc"
+          >
+            <Ionicons
+              name={user?.verified ? 'shield-checkmark-outline' : 'shield-outline'}
+              size={18}
+              color={user?.verified ? colors.teal : colors.warning}
+            />
+            <Text style={styles.rowLabel}>Professional verification</Text>
+            <Text style={styles.rowValue}>{user?.verified ? 'Verified' : 'Not verified'}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -98,7 +111,7 @@ const styles = StyleSheet.create({
   scroll: { paddingBottom: spacing.xxxl },
   section: { backgroundColor: colors.white, marginTop: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg },
   sectionTitle: { ...typography.h3, color: colors.navy, marginBottom: spacing.md },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: MIN_TOUCH_TARGET, paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
   rowLabel: { ...typography.body, color: colors.textSecondary, marginLeft: spacing.sm + 2, flex: 1 },
   rowValue: { ...typography.bodyStrong, color: colors.text, maxWidth: '55%', textAlign: 'right' },
   link: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2, minHeight: MIN_TOUCH_TARGET, paddingVertical: spacing.md },

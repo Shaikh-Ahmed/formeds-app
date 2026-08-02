@@ -1,10 +1,10 @@
 ﻿import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-
-const { width } = Dimensions.get('window');
+import { ROLE_META } from '../src/theme';
+import type { Role } from '../src/theme';
 
 export default function WelcomeScreen() {
   const { user, loading } = useAuth();
@@ -35,38 +35,28 @@ export default function WelcomeScreen() {
       <View style={styles.bottomSection}>
         <Text style={styles.getStartedText}>Get Started As</Text>
         
-        <TouchableOpacity testID="role-professional-btn" style={[styles.roleCard, styles.professionalCard]} onPress={() => router.push({ pathname: '/register', params: { role: 'healthcare_professional' } })}>
-          <View style={styles.roleIconContainer}>
-            <Ionicons name="medkit" size={28} color="#0F766E" />
-          </View>
-          <View style={styles.roleTextContainer}>
-            <Text style={styles.roleTitle}>Healthcare Professional</Text>
-            <Text style={styles.roleDesc}>Doctor, Nurse, or Allied Health Worker</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={22} color="#94A3B8" />
-        </TouchableOpacity>
-
-        <TouchableOpacity testID="role-hospital-btn" style={[styles.roleCard, styles.hospitalCard]} onPress={() => router.push({ pathname: '/register', params: { role: 'hospital' } })}>
-          <View style={[styles.roleIconContainer, { backgroundColor: '#EFF6FF' }]}>
-            <Ionicons name="business" size={28} color="#1A3A5C" />
-          </View>
-          <View style={styles.roleTextContainer}>
-            <Text style={styles.roleTitle}>Hospital</Text>
-            <Text style={styles.roleDesc}>Post jobs and manage staffing</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={22} color="#94A3B8" />
-        </TouchableOpacity>
-
-        <TouchableOpacity testID="role-clinic-btn" style={[styles.roleCard, styles.clinicCard]} onPress={() => router.push({ pathname: '/register', params: { role: 'clinic' } })}>
-          <View style={[styles.roleIconContainer, { backgroundColor: '#F0FDFA' }]}>
-            <Ionicons name="fitness" size={28} color="#0F766E" />
-          </View>
-          <View style={styles.roleTextContainer}>
-            <Text style={styles.roleTitle}>Clinic</Text>
-            <Text style={styles.roleDesc}>Find visiting specialists</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={22} color="#94A3B8" />
-        </TouchableOpacity>
+        {(['healthcare_professional', 'hospital', 'clinic'] as Role[]).map((role) => {
+          const meta = ROLE_META[role];
+          return (
+            <TouchableOpacity
+              key={role}
+              testID={`role-${role === 'healthcare_professional' ? 'professional' : role}-btn`}
+              style={styles.roleCard}
+              onPress={() => router.push({ pathname: '/register', params: { role } })}
+              accessibilityRole="button"
+              accessibilityLabel={`Get started as ${meta.longLabel}. ${meta.description}`}
+            >
+              <View style={[styles.roleIconContainer, { backgroundColor: meta.bg }]}>
+                <Ionicons name={meta.icon} size={28} color={meta.color} />
+              </View>
+              <View style={styles.roleTextContainer}>
+                <Text style={styles.roleTitle}>{meta.longLabel}</Text>
+                <Text style={styles.roleDesc}>{meta.description}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={22} color="#94A3B8" />
+            </TouchableOpacity>
+          );
+        })}
 
         <TouchableOpacity testID="login-link" style={styles.loginLink} onPress={() => router.push('/login')}>
           <Text style={styles.loginText}>Already have an account? <Text style={styles.loginBold}>Sign In</Text></Text>
