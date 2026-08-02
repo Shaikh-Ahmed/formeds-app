@@ -9,7 +9,7 @@ import { apiFetch, API_URL } from '../../src/utils/api';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { timeAgo } from '../../src/utils/time';
-import { Avatar, RoleBadge } from '../../src/components';
+import { Avatar, RoleBadge, KycNotice } from '../../src/components';
 
 interface Post {
   id: string;
@@ -39,7 +39,7 @@ interface PubMedArticle {
 
 
 export default function FeedScreen() {
-  const { user, token } = useAuth();
+  const { user, token, isKycApproved } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'community' | 'research'>('community');
   const [posts, setPosts] = useState<Post[]>([]);
@@ -244,7 +244,10 @@ export default function FeedScreen() {
 
       {showCompose && activeTab === 'community' && (
         <View style={styles.composeBox}>
-          <TextInput testID="post-input" style={styles.composeInput} placeholder="Share something with the community..." placeholderTextColor="#94A3B8" value={newPost} onChangeText={setNewPost} multiline />
+          {/* Posting is KYC-gated server-side; explain that instead of letting
+              the user write a post and only then hit a 403. */}
+          <KycNotice action="post to the community" />
+          <TextInput testID="post-input" style={styles.composeInput} placeholder="Share something with the community..." placeholderTextColor="#94A3B8" value={newPost} onChangeText={setNewPost} multiline editable={isKycApproved} />
           
           {attachedImage && (
             <View style={styles.attachedImageWrap}>
@@ -256,10 +259,10 @@ export default function FeedScreen() {
           )}
 
           <View style={styles.composeActions}>
-            <TouchableOpacity testID="attach-image-btn" style={styles.attachBtn} onPress={pickImage} disabled={uploadingImage}>
-              {uploadingImage ? <ActivityIndicator size="small" color="#1A3A5C" /> : <Ionicons name="image-outline" size={24} color="#1A3A5C" />}
+            <TouchableOpacity testID="attach-image-btn" style={styles.attachBtn} onPress={pickImage} disabled={uploadingImage || !isKycApproved}>
+              {uploadingImage ? <ActivityIndicator size="small" color="#1A3A5C" /> : <Ionicons name="image-outline" size={24} color={isKycApproved ? '#1A3A5C' : '#94A3B8'} />}
             </TouchableOpacity>
-            <TouchableOpacity testID="submit-post-btn" style={[styles.postBtn, (!newPost.trim() && !attachedImage) && styles.postBtnDisabled]} onPress={handlePost} disabled={posting || (!newPost.trim() && !attachedImage)}>
+            <TouchableOpacity testID="submit-post-btn" style={[styles.postBtn, (!isKycApproved || (!newPost.trim() && !attachedImage)) && styles.postBtnDisabled]} onPress={handlePost} disabled={posting || !isKycApproved || (!newPost.trim() && !attachedImage)}>
               {posting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.postBtnText}>Post</Text>}
             </TouchableOpacity>
           </View>

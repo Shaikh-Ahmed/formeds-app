@@ -1,71 +1,114 @@
-﻿import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Image } from 'react-native';
+import React, { useState } from 'react';
+import { Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../src/context/AuthContext';
+import { ApiError } from '../src/utils/api';
+import { Button, FormInput, ErrorBanner } from '../src/components';
+import { colors, radius, spacing, typography } from '../src/theme';
+import { validateEmail, validateRequired, firstError } from '../src/utils/validation';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showPw, setShowPw] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
 
   const handleLogin = async () => {
-    if (!email || !password) { setError('Please fill in all fields'); return; }
-    setLoading(true); setError('');
+    const problem = firstError(validateEmail(email), validateRequired(password, 'Password'));
+    if (problem) { setError(problem); return; }
+
+    setLoading(true);
+    setError(null);
     try {
       await login(email, password);
-      router.replace('/(tabs)/feed');
+      // Destination is RootNavigator's call — it sends users who still need KYC
+      // there instead of the feed. Racing it with a replace() here would make
+      // the landing screen depend on which effect won.
     } catch (e: any) {
-      setError(e.message || 'Login failed');
-    } finally { setLoading(false); }
+      // An account that never finished signup gets resumed rather than
+      // dead-ended: the server returns a fresh signup token and a new code.
+      if (e instanceof ApiError && e.code === 'email_unverified') {
+        const detail = e.data?.detail ?? {};
+        router.replace({
+          pathname: '/verify',
+          params: {
+            verificationToken: detail.verification_token,
+            email: detail.email ?? email.trim(),
+            phoneRequired: '0',
+          },
+        });
+        return;
+      }
+      setError(e?.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <TouchableOpacity testID="login-back-btn" style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#1A3A5C" />
+          <TouchableOpacity
+            testID="login-back-btn"
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.navy} />
           </TouchableOpacity>
 
           <Image source={require('../assets/images/formeds-logo.png')} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.title}>Welcome Back</Text>
+          <Text style={styles.title} accessibilityRole="header">Welcome back</Text>
           <Text style={styles.subtitle}>Sign in to your ForMeds account</Text>
 
-          {error ? <View style={styles.errorBox}><Ionicons name="alert-circle" size={18} color="#E84545" /><Text style={styles.errorText}>{error}</Text></View> : null}
+          <ErrorBanner message={error} />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <View style={styles.inputWrap}>
-              <Ionicons name="mail-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
-              <TextInput testID="login-email-input" style={styles.input} placeholder="you@example.com" placeholderTextColor="#94A3B8" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
-            </View>
-          </View>
+          <FormInput
+            testID="login-email-input"
+            label="Email"
+            icon="mail-outline"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            returnKeyType="next"
+          />
+          <FormInput
+            testID="login-password-input"
+            label="Password"
+            icon="lock-closed-outline"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Enter password"
+            autoCapitalize="none"
+            autoComplete="current-password"
+            secure
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
-            <View style={styles.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={20} color="#94A3B8" style={styles.inputIcon} />
-              <TextInput testID="login-password-input" style={styles.input} placeholder="Enter password" placeholderTextColor="#94A3B8" value={password} onChangeText={setPassword} secureTextEntry={!showPw} />
-              <TouchableOpacity onPress={() => setShowPw(!showPw)}><Ionicons name={showPw ? "eye-off" : "eye"} size={20} color="#94A3B8" /></TouchableOpacity>
-            </View>
-          </View>
-
-          <TouchableOpacity style={styles.forgotBtn} onPress={() => router.push('/forgot-password')}>
+          <TouchableOpacity
+            style={styles.forgotBtn}
+            onPress={() => router.push('/forgot-password')}
+            accessibilityRole="link"
+          >
             <Text style={styles.forgotText}>Forgot password?</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity testID="login-submit-btn" style={styles.submitBtn} onPress={handleLogin} disabled={loading}>
-            {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitText}>Sign In</Text>}
-          </TouchableOpacity>
+          <Button testID="login-submit-btn" label="Sign in" onPress={handleLogin} loading={loading} />
 
-          <TouchableOpacity style={styles.linkBtn} onPress={() => router.push('/register')}>
-            <Text style={styles.linkText}>Don&apos;t have an account? <Text style={styles.linkBold}>Register</Text></Text>
+          <TouchableOpacity style={styles.linkBtn} onPress={() => router.replace('/')} accessibilityRole="link">
+            <Text style={styles.linkText}>
+              Don&apos;t have an account? <Text style={styles.linkBold}>Register</Text>
+            </Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -74,25 +117,19 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
+  safe: { flex: 1, backgroundColor: colors.white },
   flex: { flex: 1 },
-  scroll: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 40 },
-  backBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-  logo: { width: 140, height: 60, alignSelf: 'center', marginBottom: 24 },
-  title: { fontSize: 28, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
-  subtitle: { fontSize: 15, color: '#64748B', marginBottom: 28 },
-  errorBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', borderRadius: 10, padding: 12, marginBottom: 16 },
-  errorText: { color: '#E84545', fontSize: 14, marginLeft: 8, flex: 1 },
-  inputGroup: { marginBottom: 18 },
-  label: { fontSize: 14, fontWeight: '600', color: '#334155', marginBottom: 6 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 14, height: 52 },
-  inputIcon: { marginRight: 10 },
-  input: { flex: 1, fontSize: 16, color: '#0F172A' },
-  submitBtn: { backgroundColor: '#1A3A5C', borderRadius: 14, height: 52, alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 20 },
-  submitText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  forgotBtn: { alignSelf: 'flex-end', paddingVertical: 4, marginBottom: 8 },
-  forgotText: { fontSize: 14, color: '#0F766E', fontWeight: '600' },
-  linkBtn: { alignItems: 'center', paddingVertical: 8 },
-  linkText: { fontSize: 15, color: '#64748B' },
-  linkBold: { fontWeight: '700', color: '#1A3A5C' },
+  scroll: { paddingHorizontal: spacing.xxl, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
+  backBtn: {
+    width: 44, height: 44, borderRadius: radius.lg, backgroundColor: colors.bgMuted,
+    alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xxl,
+  },
+  logo: { width: 140, height: 60, alignSelf: 'center', marginBottom: spacing.xxl },
+  title: { ...typography.h1, color: colors.text, marginBottom: spacing.xs },
+  subtitle: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xxl },
+  forgotBtn: { alignSelf: 'flex-end', paddingVertical: spacing.sm, marginBottom: spacing.md, minHeight: 44, justifyContent: 'center' },
+  forgotText: { ...typography.label, color: colors.teal },
+  linkBtn: { alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.lg },
+  linkText: { ...typography.body, color: colors.textSecondary },
+  linkBold: { fontWeight: '700', color: colors.navy },
 });

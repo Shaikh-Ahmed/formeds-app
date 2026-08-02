@@ -4,10 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
+import { ErrorBanner, KycNotice } from '../../src/components';
 
 export default function JobsScreen() {
-  const { user, token } = useAuth();
+  const { user, token, isKycApproved } = useAuth();
   const isHospital = user?.role === 'hospital';
+  const [actionError, setActionError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'permanent' | 'locum'>('permanent');
   const [permanentJobs, setPermanentJobs] = useState<any[]>([]);
   const [locumShifts, setLocumShifts] = useState<any[]>([]);
@@ -35,18 +37,22 @@ export default function JobsScreen() {
 
   useEffect(() => { loadJobs(); }, [loadJobs]);
 
+  // `alert()` is a web-only API — on native it is undefined and the failure was
+  // swallowed silently. Surface errors through the shared ErrorBanner instead.
   const handleApply = async (jobId: string) => {
+    setActionError(null);
     try {
       await apiFetch(`/api/jobs/permanent/${jobId}/apply`, token, { method: 'POST' });
       setPermanentJobs(prev => prev.map(j => j.id === jobId ? { ...j, applied: true } : j));
-    } catch (e: any) { alert(e.message); }
+    } catch (e: any) { setActionError(e?.message || 'Could not submit your application.'); }
   };
 
   const handleAcceptShift = async (shiftId: string) => {
+    setActionError(null);
     try {
       await apiFetch(`/api/jobs/locum/${shiftId}/accept`, token, { method: 'POST' });
       setLocumShifts(prev => prev.map(s => s.id === shiftId ? { ...s, accepted: true } : s));
-    } catch (e: any) { alert(e.message); }
+    } catch (e: any) { setActionError(e?.message || 'Could not accept this shift.'); }
   };
 
   const renderJobCard = ({ item }: any) => (
@@ -107,7 +113,19 @@ export default function JobsScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{isHospital ? 'My Postings' : 'Jobs'}</Text>
-        {isHospital && <TouchableOpacity testID="add-job-btn" style={styles.addBtn} onPress={() => setShowForm(true)}><Ionicons name="add" size={24} color="#FFF" /></TouchableOpacity>}
+        {isHospital && (
+          <TouchableOpacity
+            testID="add-job-btn"
+            style={[styles.addBtn, !isKycApproved && styles.addBtnDisabled]}
+            onPress={() => setShowForm(true)}
+            disabled={!isKycApproved}
+            accessibilityRole="button"
+            accessibilityLabel="Post a new job"
+            accessibilityState={{ disabled: !isKycApproved }}
+          >
+            <Ionicons name="add" size={24} color="#FFF" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.tabBar}>
@@ -117,6 +135,11 @@ export default function JobsScreen() {
         <TouchableOpacity testID="tab-locum" style={[styles.tab, activeTab === 'locum' && styles.tabActive]} onPress={() => setActiveTab('locum')}>
           <Text style={[styles.tabText, activeTab === 'locum' && styles.tabTextActive]}>Locum Shifts</Text>
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.noticeWrap}>
+        <KycNotice action={isHospital ? 'post jobs and shifts' : 'apply for jobs and shifts'} />
+        <ErrorBanner message={actionError} />
       </View>
 
       {loading ? (
@@ -149,9 +172,11 @@ function JobFormModal({ visible, onClose, token, activeTab, onCreated }: any) {
   const [duration, setDuration] = useState('');
   const [pay, setPay] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setSubmitError(null);
     try {
       if (activeTab === 'permanent') {
         await apiFetch('/api/jobs/permanent', token, { method: 'POST', body: JSON.stringify({ title, specialty, location, salary_min: parseInt(salaryMin) || 0, salary_max: parseInt(salaryMax) || 0, description }) });
@@ -159,7 +184,7 @@ function JobFormModal({ visible, onClose, token, activeTab, onCreated }: any) {
         await apiFetch('/api/jobs/locum', token, { method: 'POST', body: JSON.stringify({ shift_date: shiftDate, shift_time: shiftTime, duration, specialty, pay: parseInt(pay) || 0 }) });
       }
       onCreated();
-    } catch (e: any) { alert(e.message); }
+    } catch (e: any) { setSubmitError(e?.message || 'Could not save this posting.'); }
     finally { setSubmitting(false); }
   };
 
@@ -172,6 +197,7 @@ function JobFormModal({ visible, onClose, token, activeTab, onCreated }: any) {
             <TouchableOpacity onPress={onClose}><Ionicons name="close" size={24} color="#64748B" /></TouchableOpacity>
           </View>
           <ScrollView style={styles.modalScroll}>
+            <ErrorBanner message={submitError} />
             {activeTab === 'permanent' ? (
               <>
                 <FormInput label="Job Title" value={title} onChangeText={setTitle} placeholder="e.g. Senior Cardiologist" />
@@ -214,6 +240,8 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
   headerTitle: { fontSize: 24, fontWeight: '700', color: '#0F172A' },
   addBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#1A3A5C', alignItems: 'center', justifyContent: 'center' },
+  addBtnDisabled: { opacity: 0.4 },
+  noticeWrap: { paddingHorizontal: 16 },
   tabBar: { flexDirection: 'row', backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   tab: { flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center' },
   tabActive: { backgroundColor: '#1A3A5C' },
