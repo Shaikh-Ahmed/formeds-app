@@ -18,7 +18,7 @@ const PUBLIC_SEGMENTS = new Set([
 ]);
 
 function RootNavigator() {
-  const { user, loading, token } = useAuth();
+  const { user, loading, token, isKycApproved } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   // Prompt for KYC once per app launch — never trap an unapproved user in a
@@ -37,15 +37,14 @@ function RootNavigator() {
       return;
     }
     if (user && inPublicArea) {
-      // A signed-in user who still needs KYC lands there first. Admins are
-      // exempt: `verified` is a professional credential review and staff
-      // accounts never submit one, so without this they are sent to /kyc on
-      // every launch for a document they have no reason to file.
-      const needsKyc = !user.verified && !user.is_admin && !kycPrompted.current;
+      // A signed-in user who still needs KYC lands there first. `isKycApproved`
+      // owns the admin exemption so this screen and every KYC-gated control
+      // agree on who is approved.
+      const needsKyc = !isKycApproved && !kycPrompted.current;
       kycPrompted.current = true;
       router.replace(needsKyc ? '/kyc' : '/(tabs)/feed');
     }
-  }, [user, loading, segments, router]);
+  }, [user, loading, segments, router, isKycApproved]);
 
   if (loading) {
     return (

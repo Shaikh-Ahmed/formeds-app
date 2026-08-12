@@ -54,7 +54,10 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   loading: boolean;
-  /** True once KYC has been approved — the gate on professional actions. */
+  /** True once KYC has been approved — the gate on professional actions.
+   * Admins count as approved: `verified` is a professional credential review
+   * and staff accounts never file one, so gating them on it would leave every
+   * professional action permanently disabled. Mirrors require_kyc_approved(). */
   isKycApproved: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterInput) => Promise<PendingVerification>;
@@ -239,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         token,
         loading,
-        isKycApproved: !!user?.verified,
+        isKycApproved: !!user?.verified || !!user?.is_admin,
         login,
         register,
         completeSignup,
