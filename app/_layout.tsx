@@ -37,8 +37,11 @@ function RootNavigator() {
       return;
     }
     if (user && inPublicArea) {
-      // A signed-in user who still needs KYC lands there first.
-      const needsKyc = !user.verified && !kycPrompted.current;
+      // A signed-in user who still needs KYC lands there first. Admins are
+      // exempt: `verified` is a professional credential review and staff
+      // accounts never submit one, so without this they are sent to /kyc on
+      // every launch for a document they have no reason to file.
+      const needsKyc = !user.verified && !user.is_admin && !kycPrompted.current;
       kycPrompted.current = true;
       router.replace(needsKyc ? '/kyc' : '/(tabs)/feed');
     }
