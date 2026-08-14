@@ -12,7 +12,7 @@ export default function WelcomeScreen() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace('/(tabs)/feed');
+      router.replace('/(tabs)/community');
     }
   }, [user, loading]);
 

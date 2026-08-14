@@ -123,7 +123,7 @@ export default function PeopleScreen() {
       <View style={styles.header}>
         <TouchableOpacity testID="people-back-btn" style={styles.backBtn} onPress={() => {
           if (Platform.OS === 'web' && !router.canGoBack()) {
-            router.replace('/(tabs)/feed');
+            router.replace('/(tabs)/community');
           } else {
             router.back();
           }

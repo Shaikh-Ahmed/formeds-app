@@ -31,7 +31,9 @@ export default function TabLayout() {
         tabBarStyle: { backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0', height: 60, paddingBottom: 8, paddingTop: 4 },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}>
-        <Tabs.Screen name="feed" options={{ title: 'Feed', tabBarIcon: ({ color, size }) => <Ionicons name="newspaper" size={size} color={color} /> }} />
+        {/* "chatbubbles", not "people" — the Specialists tab already owns the
+            people glyph, and these read as the same shape at tab-bar size. */}
+        <Tabs.Screen name="community" options={{ title: 'Community', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} /> }} />
         <Tabs.Screen name="jobs" options={{
           title: role === 'hospital' ? 'Postings' : 'Jobs',
           tabBarIcon: ({ color, size }) => <Ionicons name="briefcase" size={size} color={color} />,

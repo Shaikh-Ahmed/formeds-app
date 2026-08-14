@@ -5,3 +5,8 @@ export { RoleBadge } from './RoleBadge';
 export { LoadingState, EmptyState, ErrorState, ErrorBanner } from './States';
 export { ScreenHeader } from './ScreenHeader';
 export { KycNotice } from './KycNotice';
+export { ComingSoon } from './ComingSoon';
+export { VoteControl } from './VoteControl';
+export { TagChip } from './TagChip';
+export { CaseCard } from './CaseCard';
+export { CasesList } from './CasesList';
