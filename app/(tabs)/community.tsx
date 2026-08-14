@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 const FEED_PAGE_SIZE = 20;
-import { View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Share, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Share, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
@@ -9,7 +9,7 @@ import { apiFetch, API_URL } from '../../src/utils/api';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { timeAgo } from '../../src/utils/time';
-import { Avatar, RoleBadge, KycNotice, ComingSoon } from '../../src/components';
+import { Avatar, RoleBadge, KycNotice, CasesList } from '../../src/components';
 
 interface Post {
   id: string;
@@ -23,19 +23,6 @@ interface Post {
   likes: string[];
   created_at: string;
 }
-
-/** Clinical Q&A ships in a later phase; the tab is a placeholder for now. */
-const CASES_COPY = {
-  title: 'Cases are coming soon',
-  description:
-    'Post a case, ask the room, and get answers from colleagues who have seen it before — with the useful answer voted to the top.',
-  bullets: [
-    'Ask a question against a real case',
-    'Answers ranked by peer upvotes',
-    'Mark the answer that resolved it',
-  ],
-};
-
 
 export default function FeedScreen() {
   const { user, token, isKycApproved } = useAuth();
@@ -199,8 +186,17 @@ export default function FeedScreen() {
             <Ionicons name="notifications-outline" size={24} color="#1A3A5C" />
             {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>}
           </TouchableOpacity>
-          <TouchableOpacity testID="compose-post-btn" style={styles.iconBtn} onPress={() => setShowCompose(!showCompose)}>
-            <Ionicons name={showCompose ? "close" : "create-outline"} size={24} color="#1A3A5C" />
+          {/* One compose affordance, two destinations: the inline box for a
+              feed post, the full composer for a case (which needs a title and
+              tags and so can't sit in a header dropdown). */}
+          <TouchableOpacity
+            testID="compose-post-btn"
+            style={styles.iconBtn}
+            onPress={() => (activeTab === 'cases' ? router.push('/case/new' as any) : setShowCompose(!showCompose))}
+            accessibilityRole="button"
+            accessibilityLabel={activeTab === 'cases' ? 'Post a case' : 'Write a post'}
+          >
+            <Ionicons name={showCompose && activeTab === 'feed' ? "close" : "create-outline"} size={24} color="#1A3A5C" />
           </TouchableOpacity>
         </View>
       </View>
@@ -210,7 +206,7 @@ export default function FeedScreen() {
           <Ionicons name="newspaper-outline" size={16} color={activeTab === 'feed' ? '#FFF' : '#64748B'} />
           <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Feed</Text>
         </TouchableOpacity>
-        <TouchableOpacity testID="tab-cases" style={[styles.tab, activeTab === 'cases' && styles.tabActive]} onPress={() => setActiveTab('cases')} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'cases' }} accessibilityLabel="Cases — coming soon">
+        <TouchableOpacity testID="tab-cases" style={[styles.tab, activeTab === 'cases' && styles.tabActive]} onPress={() => setActiveTab('cases')} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'cases' }}>
           <Ionicons name="help-buoy-outline" size={16} color={activeTab === 'cases' ? '#FFF' : '#64748B'} />
           <Text style={[styles.tabText, activeTab === 'cases' && styles.tabTextActive]}>Cases</Text>
         </TouchableOpacity>
@@ -244,15 +240,7 @@ export default function FeedScreen() {
       )}
 
       {activeTab === 'cases' ? (
-        <ScrollView contentContainerStyle={styles.comingSoonBody}>
-          <ComingSoon
-            testID="coming-soon-cases"
-            icon="help-buoy-outline"
-            title={CASES_COPY.title}
-            description={CASES_COPY.description}
-            bullets={CASES_COPY.bullets}
-          />
-        </ScrollView>
+        <CasesList />
       ) : loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color="#1A3A5C" /></View>
       ) : (
@@ -306,7 +294,6 @@ const styles = StyleSheet.create({
   postActions: { flexDirection: 'row', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 24 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionText: { fontSize: 14, color: '#94A3B8', fontWeight: '500' },
-  comingSoonBody: { padding: 16, paddingBottom: 100 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   emptyText: { fontSize: 16, color: '#94A3B8', marginTop: 12 },
 });

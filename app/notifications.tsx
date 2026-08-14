@@ -14,6 +14,8 @@ interface Notification {
   title: string;
   message: string;
   type: string;
+  /** What the alert is about — a case id for `case`, a user id for `connection`. */
+  ref_id?: string;
   read: boolean;
   created_at: string;
 }
@@ -22,6 +24,7 @@ const TYPE_ICONS: Record<string, { icon: string; color: string; bg: string }> = 
   application: { icon: 'briefcase', color: '#1A3A5C', bg: '#EFF6FF' },
   optin: { icon: 'people', color: '#0F766E', bg: '#F0FDF4' },
   message: { icon: 'chatbubble', color: '#7C3AED', bg: '#F5F3FF' },
+  case: { icon: 'help-buoy', color: '#0F766E', bg: '#F0FDFA' },
   general: { icon: 'notifications', color: '#D97706', bg: '#FFFBEB' },
   shift: { icon: 'time', color: '#E84545', bg: '#FEF2F2' },
 };
@@ -56,10 +59,18 @@ export default function NotificationsScreen() {
   };
 
 
+  // A case alert is only useful if it takes you to the thread it is about.
+  const open = (item: Notification) => {
+    markRead(item.id);
+    if (item.type === 'case' && item.ref_id) {
+      router.push({ pathname: '/case/[id]', params: { id: item.ref_id } } as any);
+    }
+  };
+
   const renderNotification = ({ item }: { item: Notification }) => {
     const config = TYPE_ICONS[item.type] || TYPE_ICONS.general;
     return (
-      <TouchableOpacity testID={`notif-${item.id}`} style={[styles.notifCard, !item.read && styles.unreadCard]} onPress={() => markRead(item.id)}>
+      <TouchableOpacity testID={`notif-${item.id}`} style={[styles.notifCard, !item.read && styles.unreadCard]} onPress={() => open(item)}>
         <View style={[styles.notifIcon, { backgroundColor: config.bg }]}>
           <Ionicons name={config.icon as any} size={20} color={config.color} />
         </View>

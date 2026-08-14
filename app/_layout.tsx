@@ -70,6 +70,9 @@ function RootNavigator() {
       <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="help" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="lesson/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="post/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="case/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="case/new" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="aed-chat" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="messages" options={{ animation: 'slide_from_right' }} />
