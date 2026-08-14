@@ -42,7 +42,7 @@ function RootNavigator() {
       // agree on who is approved.
       const needsKyc = !isKycApproved && !kycPrompted.current;
       kycPrompted.current = true;
-      router.replace(needsKyc ? '/kyc' : '/(tabs)/feed');
+      router.replace(needsKyc ? '/kyc' : '/(tabs)/community');
     }
   }, [user, loading, segments, router, isKycApproved]);
 

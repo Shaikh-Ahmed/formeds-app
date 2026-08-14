@@ -126,7 +126,7 @@ export default function KycScreen() {
         title="You're verified"
         body="Your registration has been approved. You have full access to ForMeds."
         actionLabel="Continue"
-        onAction={() => router.replace('/(tabs)/feed')}
+        onAction={() => router.replace('/(tabs)/community')}
       />
     );
   }
@@ -139,14 +139,14 @@ export default function KycScreen() {
         title="Under review"
         body="Our team is checking your certificate. This usually takes 1–2 working days. You can keep exploring ForMeds while you wait — posting and job applications unlock once you're approved."
         actionLabel="Explore ForMeds"
-        onAction={() => router.replace('/(tabs)/feed')}
+        onAction={() => router.replace('/(tabs)/community')}
       />
     );
   }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScreenHeader title="Verification" onBack={() => router.replace('/(tabs)/feed')} />
+      <ScreenHeader title="Verification" onBack={() => router.replace('/(tabs)/community')} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           {status === 'rejected' && state?.reject_reason ? (
@@ -231,7 +231,7 @@ export default function KycScreen() {
           <TouchableOpacity
             testID="kyc-skip-btn"
             style={styles.skip}
-            onPress={() => router.replace('/(tabs)/feed')}
+            onPress={() => router.replace('/(tabs)/community')}
             accessibilityRole="button"
           >
             <Text style={styles.skipText}>I&apos;ll do this later</Text>

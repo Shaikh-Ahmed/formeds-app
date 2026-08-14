@@ -56,7 +56,7 @@ export default function VerifyEmailScreen() {
             </Text>
             <Button
               label={user ? 'Go to feed' : 'Sign in'}
-              onPress={() => router.replace(user ? '/(tabs)/feed' : '/login')}
+              onPress={() => router.replace(user ? '/(tabs)/community' : '/login')}
               style={styles.action}
             />
           </>

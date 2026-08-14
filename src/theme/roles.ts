@@ -18,7 +18,7 @@ export interface RoleMeta {
 
 /**
  * THE role map. Replaces the five divergent copies that previously lived in
- * feed.tsx (ROLE_TAGS), post/[id].tsx (ROLE_TAGS), people.tsx (ROLE_LABELS),
+ * community.tsx (ROLE_TAGS), post/[id].tsx (ROLE_TAGS), people.tsx (ROLE_LABELS),
  * messages.tsx (ROLE_COLORS) and profile.tsx (ROLE_CONFIG) — which had already
  * drifted in both shape and colour. Never add a local copy again.
  */

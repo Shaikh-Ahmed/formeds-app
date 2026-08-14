@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 const FEED_PAGE_SIZE = 20;
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Share, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Share, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
@@ -9,7 +9,7 @@ import { apiFetch, API_URL } from '../../src/utils/api';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { timeAgo } from '../../src/utils/time';
-import { Avatar, RoleBadge, KycNotice } from '../../src/components';
+import { Avatar, RoleBadge, KycNotice, ComingSoon } from '../../src/components';
 
 interface Post {
   id: string;
@@ -24,26 +24,24 @@ interface Post {
   created_at: string;
 }
 
-interface PubMedArticle {
-  id: string;
-  pmid: string;
-  title: string;
-  journal: string;
-  abstract: string;
-  authors: string | string[];
-  pub_date: string;
-  keywords: string[];
-  doi: string;
-  source: string;
-}
+/** Clinical Q&A ships in a later phase; the tab is a placeholder for now. */
+const CASES_COPY = {
+  title: 'Cases are coming soon',
+  description:
+    'Post a case, ask the room, and get answers from colleagues who have seen it before — with the useful answer voted to the top.',
+  bullets: [
+    'Ask a question against a real case',
+    'Answers ranked by peer upvotes',
+    'Mark the answer that resolved it',
+  ],
+};
 
 
 export default function FeedScreen() {
   const { user, token, isKycApproved } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'community' | 'research'>('community');
+  const [activeTab, setActiveTab] = useState<'feed' | 'cases'>('feed');
   const [posts, setPosts] = useState<Post[]>([]);
-  const [pubmedArticles, setPubmedArticles] = useState<PubMedArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [newPost, setNewPost] = useState('');
@@ -59,9 +57,8 @@ export default function FeedScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const [feedData, pubmedData, notifCount, msgCount] = await Promise.all([
+      const [feedData, notifCount, msgCount] = await Promise.all([
         apiFetch(`/api/feed/?page=1&limit=${FEED_PAGE_SIZE}`, token),
-        apiFetch('/api/feed/pubmed', token).catch(() => []),
         apiFetch('/api/notifications/unread-count', token).catch(() => ({ count: 0 })),
         apiFetch('/api/messages/unread-total', token).catch(() => ({ count: 0 })),
       ]);
@@ -69,7 +66,6 @@ export default function FeedScreen() {
       setPosts(items);
       pageRef.current = 1;
       setHasMorePosts(items.length >= FEED_PAGE_SIZE);
-      setPubmedArticles(pubmedData);
       setUnreadCount(notifCount.count || 0);
       setUnreadMsgs(msgCount.count || 0);
     } catch (e) { console.log('Feed error:', e); }
@@ -187,32 +183,10 @@ export default function FeedScreen() {
     );
   };
 
-  const renderPubMedArticle = ({ item }: { item: PubMedArticle }) => (
-    <View testID={`pubmed-${item.pmid || item.id}`} style={styles.pubmedCard}>
-      <View style={styles.pubmedHeader}>
-        <View style={styles.pubmedIcon}><Ionicons name="document-text" size={20} color="#7C3AED" /></View>
-        <View style={styles.pubmedBadge}><Text style={styles.pubmedBadgeText}>PubMed Research</Text></View>
-      </View>
-      <Text style={styles.pubmedTitle}>{item.title}</Text>
-      {item.journal ? <Text style={styles.pubmedJournal}>{item.journal}</Text> : null}
-      {(() => {
-        const auths = item.authors ? (typeof item.authors === 'string' ? item.authors.split(', ') : (Array.isArray(item.authors) ? item.authors : [])) : [];
-        return auths.length > 0 ? <Text style={styles.pubmedAuthors}>{auths.slice(0, 3).join(', ')}{auths.length > 3 ? ` +${auths.length - 3} more` : ''}</Text> : null;
-      })()}
-      <Text style={styles.pubmedAbstract} numberOfLines={4}>{item.abstract}</Text>
-      <View style={styles.pubmedFooter}>
-        {Array.isArray(item.keywords) && item.keywords.length > 0 && item.keywords.slice(0, 3).map((kw, i) => (
-          <View key={i} style={styles.keywordTag}><Text style={styles.keywordText}>{kw}</Text></View>
-        ))}
-      </View>
-      {item.doi ? <Text style={styles.doiText}>DOI: {item.doi}</Text> : null}
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Feed</Text>
+        <Text style={styles.headerTitle}>Community</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity testID="network-btn" style={styles.iconBtn} onPress={() => router.push('/people')}>
             <Ionicons name="people-outline" size={24} color="#1A3A5C" />
@@ -232,17 +206,17 @@ export default function FeedScreen() {
       </View>
 
       <View style={styles.tabBar}>
-        <TouchableOpacity testID="tab-community" style={[styles.tab, activeTab === 'community' && styles.tabActive]} onPress={() => setActiveTab('community')}>
-          <Ionicons name="people-outline" size={16} color={activeTab === 'community' ? '#FFF' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'community' && styles.tabTextActive]}>Community</Text>
+        <TouchableOpacity testID="tab-feed" style={[styles.tab, activeTab === 'feed' && styles.tabActive]} onPress={() => setActiveTab('feed')} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'feed' }}>
+          <Ionicons name="newspaper-outline" size={16} color={activeTab === 'feed' ? '#FFF' : '#64748B'} />
+          <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Feed</Text>
         </TouchableOpacity>
-        <TouchableOpacity testID="tab-research" style={[styles.tab, activeTab === 'research' && styles.tabActive]} onPress={() => setActiveTab('research')}>
-          <Ionicons name="flask-outline" size={16} color={activeTab === 'research' ? '#FFF' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'research' && styles.tabTextActive]}>Research</Text>
+        <TouchableOpacity testID="tab-cases" style={[styles.tab, activeTab === 'cases' && styles.tabActive]} onPress={() => setActiveTab('cases')} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'cases' }} accessibilityLabel="Cases — coming soon">
+          <Ionicons name="help-buoy-outline" size={16} color={activeTab === 'cases' ? '#FFF' : '#64748B'} />
+          <Text style={[styles.tabText, activeTab === 'cases' && styles.tabTextActive]}>Cases</Text>
         </TouchableOpacity>
       </View>
 
-      {showCompose && activeTab === 'community' && (
+      {showCompose && activeTab === 'feed' && (
         <View style={styles.composeBox}>
           {/* Posting is KYC-gated server-side; explain that instead of letting
               the user write a post and only then hit a 403. */}
@@ -269,19 +243,25 @@ export default function FeedScreen() {
         </View>
       )}
 
-      {loading ? (
+      {activeTab === 'cases' ? (
+        <ScrollView contentContainerStyle={styles.comingSoonBody}>
+          <ComingSoon
+            testID="coming-soon-cases"
+            icon="help-buoy-outline"
+            title={CASES_COPY.title}
+            description={CASES_COPY.description}
+            bullets={CASES_COPY.bullets}
+          />
+        </ScrollView>
+      ) : loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color="#1A3A5C" /></View>
-      ) : activeTab === 'community' ? (
+      ) : (
         <FlatList data={posts} renderItem={renderPost} keyExtractor={item => item.id} contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor="#1A3A5C" />}
           onEndReached={loadMorePosts}
           onEndReachedThreshold={0.5}
           ListFooterComponent={loadingMore ? <ActivityIndicator style={{ paddingVertical: 20 }} color="#1A3A5C" /> : null}
           ListEmptyComponent={<View style={styles.center}><Ionicons name="newspaper-outline" size={48} color="#CBD5E1" /><Text style={styles.emptyText}>No posts yet</Text></View>} />
-      ) : (
-        <FlatList data={pubmedArticles} renderItem={renderPubMedArticle} keyExtractor={item => item.id} contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor="#1A3A5C" />}
-          ListEmptyComponent={<View style={styles.center}><Ionicons name="flask-outline" size={48} color="#CBD5E1" /><Text style={styles.emptyText}>Loading research articles...</Text></View>} />
       )}
     </SafeAreaView>
   );
@@ -326,20 +306,7 @@ const styles = StyleSheet.create({
   postActions: { flexDirection: 'row', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 24 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionText: { fontSize: 14, color: '#94A3B8', fontWeight: '500' },
-  // PubMed styles
-  pubmedCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0', borderLeftWidth: 4, borderLeftColor: '#7C3AED' },
-  pubmedHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
-  pubmedIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center' },
-  pubmedBadge: { backgroundColor: '#F5F3FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  pubmedBadgeText: { fontSize: 11, fontWeight: '700', color: '#7C3AED' },
-  pubmedTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A', lineHeight: 22, marginBottom: 6 },
-  pubmedJournal: { fontSize: 13, color: '#7C3AED', fontWeight: '500', marginBottom: 4 },
-  pubmedAuthors: { fontSize: 13, color: '#64748B', marginBottom: 8 },
-  pubmedAbstract: { fontSize: 14, color: '#475569', lineHeight: 20, marginBottom: 10 },
-  pubmedFooter: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
-  keywordTag: { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  keywordText: { fontSize: 11, color: '#64748B', fontWeight: '500' },
-  doiText: { fontSize: 11, color: '#94A3B8', marginTop: 4 },
+  comingSoonBody: { padding: 16, paddingBottom: 100 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   emptyText: { fontSize: 16, color: '#94A3B8', marginTop: 12 },
 });
