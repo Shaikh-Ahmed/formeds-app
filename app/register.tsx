@@ -8,6 +8,7 @@ import { Button, FormInput, ErrorBanner } from '../src/components';
 import { colors, radius, spacing, typography, getRoleMeta } from '../src/theme';
 import type { Role } from '../src/theme';
 import { validateEmail, validatePassword, validatePhone, validateRequired, firstError } from '../src/utils/validation';
+import { AuthShell } from '../src/components/web';
 
 /**
  * Step 2 of signup. Deliberately minimal: name, email, password, phone.
@@ -68,6 +69,7 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <AuthShell maxWidth={520}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <TouchableOpacity
@@ -157,6 +159,7 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+      </AuthShell>
     </SafeAreaView>
   );
 }

@@ -7,6 +7,7 @@ import { apiFetch } from '../src/utils/api';
 import { Button, FormInput, ErrorBanner } from '../src/components';
 import { colors, spacing, typography } from '../src/theme';
 import { validatePassword } from '../src/utils/validation';
+import { AuthShell } from '../src/components/web';
 
 export default function ResetPasswordScreen() {
   const { token } = useLocalSearchParams<{ token?: string }>();
@@ -41,6 +42,7 @@ export default function ResetPasswordScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <AuthShell maxWidth={460}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           {done ? (
@@ -90,6 +92,7 @@ export default function ResetPasswordScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      </AuthShell>
     </SafeAreaView>
   );
 }

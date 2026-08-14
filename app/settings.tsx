@@ -7,6 +7,7 @@ import Constants from 'expo-constants';
 import { useAuth } from '../src/context/AuthContext';
 import { ScreenHeader, Button } from '../src/components';
 import { colors, spacing, typography, MIN_TOUCH_TARGET } from '../src/theme';
+import { PageColumn } from '../src/components/web';
 
 const SUPPORT_EMAIL = 'support@formeds.in';
 
@@ -40,6 +41,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageColumn maxWidth={640} testID="settings-column">
       <ScreenHeader title="Settings" />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.section}>
@@ -92,6 +94,7 @@ export default function SettingsScreen() {
           <Button label="Delete account" onPress={confirmDelete} variant="danger" testID="settings-delete" />
         </View>
       </ScrollView>
+      </PageColumn>
     </SafeAreaView>
   );
 }

@@ -13,6 +13,7 @@ import {
   Button, ErrorBanner, KycNotice, LoadingState, ScreenHeader, TagChip,
 } from '../../src/components';
 import { colors, radius, spacing, typography, MIN_TOUCH_TARGET } from '../../src/theme';
+import { PageColumn } from '../../src/components/web';
 
 // Mirrors the server's validators (models/schemas.py). Enforced here too so the
 // writer sees the limit while typing rather than as a 422 on submit.
@@ -146,6 +147,7 @@ export default function CaseComposerScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageColumn maxWidth={720} testID="case-new-column">
       <ScreenHeader title={editing ? 'Edit case' : 'Post a case'} />
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
@@ -298,6 +300,7 @@ export default function CaseComposerScreen() {
           />
         </ScrollView>
       </KeyboardAvoidingView>
+      </PageColumn>
     </SafeAreaView>
   );
 }

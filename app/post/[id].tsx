@@ -7,6 +7,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
 import { timeAgo } from '../../src/utils/time';
 import { Avatar, RoleBadge } from '../../src/components';
+import { PageColumn } from '../../src/components/web';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -133,6 +134,7 @@ export default function PostDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PageColumn testID="post-column">
       <View style={styles.header}>
         <TouchableOpacity testID="back-btn" style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#1A3A5C" />
@@ -181,6 +183,7 @@ export default function PostDetailScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      </PageColumn>
     </SafeAreaView>
   );
 }

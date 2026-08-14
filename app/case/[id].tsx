@@ -18,6 +18,7 @@ import {
   ANSWER_SORTS, REPORT_REASONS,
   type AnswerSort, type CaseAnswer, type CaseThread, type VoteValue,
 } from '../../src/types/cases';
+import { PageColumn } from '../../src/components/web';
 
 type ReplyTarget = { id: string; author: string } | null;
 
@@ -376,6 +377,7 @@ export default function CaseDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageColumn testID="case-column">
       <View style={styles.header}>
         <TouchableOpacity
           testID="case-back-btn"
@@ -539,6 +541,7 @@ export default function CaseDetailScreen() {
           </View>
         </View>
       </Modal>
+      </PageColumn>
     </SafeAreaView>
   );
 }

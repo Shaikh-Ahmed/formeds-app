@@ -7,6 +7,7 @@ import { useAuth } from '../src/context/AuthContext';
 import { apiFetch, API_URL } from '../src/utils/api';
 import { useWebSocket } from '../src/hooks/useWebSocket';
 import * as ImagePicker from 'expo-image-picker';
+import { PageColumn } from '../src/components/web';
 
 interface Message {
   id: string;
@@ -178,6 +179,7 @@ export default function ConversationScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
+      <PageColumn maxWidth={760} testID="conversation-column">
       <View style={s.header}>
         <TouchableOpacity testID="convo-back-btn" style={s.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#FFF" />
@@ -228,6 +230,7 @@ export default function ConversationScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      </PageColumn>
     </SafeAreaView>
   );
 }

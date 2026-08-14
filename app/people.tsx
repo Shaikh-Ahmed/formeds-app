@@ -6,6 +6,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
 import { Avatar, RoleBadge } from '../src/components';
+import { PageColumn } from '../src/components/web';
 
 export default function PeopleScreen() {
   const { user, token } = useAuth();
@@ -120,6 +121,7 @@ export default function PeopleScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PageColumn testID="people-column">
       <View style={styles.header}>
         <TouchableOpacity testID="people-back-btn" style={styles.backBtn} onPress={() => {
           if (Platform.OS === 'web' && !router.canGoBack()) {
@@ -170,6 +172,7 @@ export default function PeopleScreen() {
         <FlatList data={pending} renderItem={renderPending} keyExtractor={item => item.id} contentContainerStyle={styles.list}
           ListEmptyComponent={<View style={styles.emptyBox}><Ionicons name="person-add-outline" size={40} color="#CBD5E1" /><Text style={styles.emptyText}>No pending requests</Text></View>} />
       )}
+      </PageColumn>
     </SafeAreaView>
   );
 }

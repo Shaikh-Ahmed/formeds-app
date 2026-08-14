@@ -8,6 +8,7 @@ import { apiFetch } from '../src/utils/api';
 import { timeAgo } from '../src/utils/time';
 import { usePaginatedList } from '../src/hooks/usePaginatedList';
 import { LoadingState, EmptyState, ErrorState } from '../src/components';
+import { PageColumn } from '../src/components/web';
 
 interface Notification {
   id: string;
@@ -88,6 +89,7 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PageColumn testID="notifications-column">
       <View style={styles.header}>
         <TouchableOpacity testID="notif-back-btn" style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#1A3A5C" />
@@ -123,6 +125,7 @@ export default function NotificationsScreen() {
           }
         />
       )}
+      </PageColumn>
     </SafeAreaView>
   );
 }

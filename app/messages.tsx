@@ -8,6 +8,7 @@ import { apiFetch } from '../src/utils/api';
 import { useWebSocket } from '../src/hooks/useWebSocket';
 import { timeAgo } from '../src/utils/time';
 import { Avatar } from '../src/components';
+import { PageColumn } from '../src/components/web';
 
 interface Conversation {
   user_id: string;
@@ -70,6 +71,7 @@ export default function MessagesScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PageColumn testID="messages-column">
       <View style={styles.header}>
         <TouchableOpacity testID="messages-back-btn" style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color="#1A3A5C" />
@@ -102,6 +104,7 @@ export default function MessagesScreen() {
           }
         />
       )}
+      </PageColumn>
     </SafeAreaView>
   );
 }

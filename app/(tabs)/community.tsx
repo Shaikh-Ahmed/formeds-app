@@ -10,6 +10,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { timeAgo } from '../../src/utils/time';
 import { Avatar, RoleBadge, KycNotice, CasesList } from '../../src/components';
+import { PageGrid, ProfileRail, FeedRail, WideHeader, Hoverable } from '../../src/components/web';
+import { colors, spacing, radius, typography, useBreakpoint } from '../../src/theme';
 
 interface Post {
   id: string;
@@ -27,6 +29,7 @@ interface Post {
 export default function FeedScreen() {
   const { user, token, isKycApproved } = useAuth();
   const router = useRouter();
+  const { isMobile } = useBreakpoint();
   const [activeTab, setActiveTab] = useState<'feed' | 'cases'>('feed');
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,8 +146,16 @@ export default function FeedScreen() {
   const renderPost = ({ item }: { item: Post }) => {
     const isLiked = item.likes?.includes(user?.id || '');
     return (
-      <View testID={`feed-post-${item.id}`} style={styles.postCard}>
-        <View style={styles.postHeader}>
+      <View testID={`feed-post-${item.id}`} style={[styles.postCard, !isMobile && styles.postCardWide]}>
+        {/* The author block opens the post on desktop, where a pointer user
+            expects the header to be clickable; on mobile the dedicated
+            comment button stays the only route in. */}
+        <Hoverable
+          onPress={isMobile ? undefined : () => router.push({ pathname: '/post/[id]', params: { id: item.id } } as any)}
+          accessibilityLabel={`Post by ${item.author_name}`}
+          style={styles.postHeader}
+          hoverStyle={styles.postHeaderHover}
+        >
           <Avatar name={item.author_name} role={item.author_role} size={44} />
           <View style={styles.postMeta}>
             <Text style={styles.authorName}>{item.author_name}</Text>
@@ -153,55 +164,78 @@ export default function FeedScreen() {
               <Text style={styles.timeText}>{timeAgo(item.created_at)}</Text>
             </View>
           </View>
-        </View>
+        </Hoverable>
         <Text style={styles.postContent}>{item.content}</Text>
         {item.image_url ? (
           <Image source={{ uri: item.image_url }} style={styles.postImage} resizeMode="cover" />
         ) : null}
         <View style={styles.postActions}>
-          <TouchableOpacity testID={`like-btn-${item.id}`} style={styles.actionBtn} onPress={() => handleLike(item.id)}>
-            <Ionicons name={isLiked ? "heart" : "heart-outline"} size={22} color={isLiked ? "#E84545" : "#94A3B8"} />
-            <Text style={[styles.actionText, isLiked && { color: '#E84545' }]}>{item.like_count}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id } } as any)}><Ionicons name="chatbubble-outline" size={20} color="#94A3B8" /><Text style={styles.actionText}>{item.comment_count}</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={() => handleShare(item)}><Ionicons name="share-social-outline" size={20} color="#94A3B8" /></TouchableOpacity>
+          <Hoverable
+            testID={`like-btn-${item.id}`}
+            style={styles.actionBtn}
+            hoverStyle={styles.actionBtnHover}
+            onPress={() => handleLike(item.id)}
+            accessibilityLabel={`${isLiked ? 'Unlike' : 'Like'}, ${item.like_count} likes`}
+          >
+            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={22} color={isLiked ? colors.red : colors.textMuted} />
+            <Text style={[styles.actionText, isLiked && { color: colors.red }]}>{item.like_count}</Text>
+          </Hoverable>
+          <Hoverable
+            style={styles.actionBtn}
+            hoverStyle={styles.actionBtnHover}
+            onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id } } as any)}
+            accessibilityLabel={`Comments, ${item.comment_count}`}
+          >
+            <Ionicons name="chatbubble-outline" size={20} color={colors.textMuted} />
+            <Text style={styles.actionText}>{item.comment_count}</Text>
+          </Hoverable>
+          <Hoverable
+            style={styles.actionBtn}
+            hoverStyle={styles.actionBtnHover}
+            onPress={() => handleShare(item)}
+            accessibilityLabel="Share this post"
+          >
+            <Ionicons name="share-social-outline" size={20} color={colors.textMuted} />
+          </Hoverable>
         </View>
       </View>
     );
   };
 
+  const mobileHeaderActions = (
+    <>
+      <TouchableOpacity testID="network-btn" style={styles.iconBtn} onPress={() => router.push('/people')} accessibilityRole="button" accessibilityLabel="My network">
+        <Ionicons name="people-outline" size={24} color={colors.navy} />
+      </TouchableOpacity>
+      <TouchableOpacity testID="messages-btn" style={styles.iconBtn} onPress={() => router.push('/messages')} accessibilityRole="button" accessibilityLabel={unreadMsgs > 0 ? `Messages, ${unreadMsgs} unread` : 'Messages'}>
+        <Ionicons name="chatbubbles-outline" size={24} color={colors.navy} />
+        {unreadMsgs > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadMsgs > 9 ? '9+' : unreadMsgs}</Text></View>}
+      </TouchableOpacity>
+      <TouchableOpacity testID="notifications-btn" style={styles.iconBtn} onPress={() => router.push('/notifications')} accessibilityRole="button" accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}>
+        <Ionicons name="notifications-outline" size={24} color={colors.navy} />
+        {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>}
+      </TouchableOpacity>
+      {/* One compose affordance, two destinations: the inline box for a
+          feed post, the full composer for a case (which needs a title and
+          tags and so can't sit in a header dropdown). */}
+      <TouchableOpacity
+        testID="compose-post-btn"
+        style={styles.iconBtn}
+        onPress={() => (activeTab === 'cases' ? router.push('/case/new' as any) : setShowCompose(!showCompose))}
+        accessibilityRole="button"
+        accessibilityLabel={activeTab === 'cases' ? 'Post a case' : 'Write a post'}
+      >
+        <Ionicons name={showCompose && activeTab === 'feed' ? 'close' : 'create-outline'} size={24} color={colors.navy} />
+      </TouchableOpacity>
+    </>
+  );
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Community</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity testID="network-btn" style={styles.iconBtn} onPress={() => router.push('/people')}>
-            <Ionicons name="people-outline" size={24} color="#1A3A5C" />
-          </TouchableOpacity>
-          <TouchableOpacity testID="messages-btn" style={styles.iconBtn} onPress={() => router.push('/messages')}>
-            <Ionicons name="chatbubbles-outline" size={24} color="#1A3A5C" />
-            {unreadMsgs > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadMsgs > 9 ? '9+' : unreadMsgs}</Text></View>}
-          </TouchableOpacity>
-          <TouchableOpacity testID="notifications-btn" style={styles.iconBtn} onPress={() => router.push('/notifications')}>
-            <Ionicons name="notifications-outline" size={24} color="#1A3A5C" />
-            {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>}
-          </TouchableOpacity>
-          {/* One compose affordance, two destinations: the inline box for a
-              feed post, the full composer for a case (which needs a title and
-              tags and so can't sit in a header dropdown). */}
-          <TouchableOpacity
-            testID="compose-post-btn"
-            style={styles.iconBtn}
-            onPress={() => (activeTab === 'cases' ? router.push('/case/new' as any) : setShowCompose(!showCompose))}
-            accessibilityRole="button"
-            accessibilityLabel={activeTab === 'cases' ? 'Post a case' : 'Write a post'}
-          >
-            <Ionicons name={showCompose && activeTab === 'feed' ? "close" : "create-outline"} size={24} color="#1A3A5C" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <WideHeader title="Community" actions={mobileHeaderActions} />
 
-      <View style={styles.tabBar}>
+      <PageGrid left={<ProfileRail />} right={<FeedRail />} testID="community-grid">
+      <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
         <TouchableOpacity testID="tab-feed" style={[styles.tab, activeTab === 'feed' && styles.tabActive]} onPress={() => setActiveTab('feed')} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'feed' }}>
           <Ionicons name="newspaper-outline" size={16} color={activeTab === 'feed' ? '#FFF' : '#64748B'} />
           <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Feed</Text>
@@ -212,8 +246,25 @@ export default function FeedScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Desktop gets a persistent "start a post" affordance. On mobile the
+          composer stays behind the header icon, because a phone screen can't
+          spare the vertical space above the feed. */}
+      {!isMobile && !showCompose && activeTab === 'feed' && (
+        <Hoverable
+          testID="compose-trigger-wide"
+          onPress={() => setShowCompose(true)}
+          accessibilityLabel="Write a post"
+          style={styles.composeTrigger}
+          hoverStyle={styles.composeTriggerHover}
+        >
+          <Avatar name={user?.name} role={user?.role} uri={user?.avatar} size={40} />
+          <Text style={styles.composeTriggerText}>Share something with the community…</Text>
+          <Ionicons name="create-outline" size={20} color={colors.textMuted} />
+        </Hoverable>
+      )}
+
       {showCompose && activeTab === 'feed' && (
-        <View style={styles.composeBox}>
+        <View style={[styles.composeBox, !isMobile && styles.composeBoxWide]}>
           {/* Posting is KYC-gated server-side; explain that instead of letting
               the user write a post and only then hit a 403. */}
           <KycNotice action="post to the community" />
@@ -229,12 +280,27 @@ export default function FeedScreen() {
           )}
 
           <View style={styles.composeActions}>
-            <TouchableOpacity testID="attach-image-btn" style={styles.attachBtn} onPress={pickImage} disabled={uploadingImage || !isKycApproved}>
-              {uploadingImage ? <ActivityIndicator size="small" color="#1A3A5C" /> : <Ionicons name="image-outline" size={24} color={isKycApproved ? '#1A3A5C' : '#94A3B8'} />}
+            <TouchableOpacity testID="attach-image-btn" style={styles.attachBtn} onPress={pickImage} disabled={uploadingImage || !isKycApproved} accessibilityRole="button" accessibilityLabel="Attach an image">
+              {uploadingImage ? <ActivityIndicator size="small" color={colors.navy} /> : <Ionicons name="image-outline" size={24} color={isKycApproved ? colors.navy : colors.textMuted} />}
             </TouchableOpacity>
-            <TouchableOpacity testID="submit-post-btn" style={[styles.postBtn, (!isKycApproved || (!newPost.trim() && !attachedImage)) && styles.postBtnDisabled]} onPress={handlePost} disabled={posting || !isKycApproved || (!newPost.trim() && !attachedImage)}>
-              {posting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.postBtnText}>Post</Text>}
-            </TouchableOpacity>
+            <View style={styles.composeRight}>
+              {/* Desktop has no header close button to fall back on, so the
+                  composer carries its own way out. */}
+              {!isMobile && (
+                <Hoverable
+                  testID="compose-cancel-btn"
+                  onPress={() => { setShowCompose(false); setNewPost(''); setAttachedImage(null); }}
+                  accessibilityLabel="Cancel post"
+                  style={styles.cancelBtn}
+                  hoverStyle={styles.cancelBtnHover}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </Hoverable>
+              )}
+              <TouchableOpacity testID="submit-post-btn" style={[styles.postBtn, (!isKycApproved || (!newPost.trim() && !attachedImage)) && styles.postBtnDisabled]} onPress={handlePost} disabled={posting || !isKycApproved || (!newPost.trim() && !attachedImage)} accessibilityRole="button" accessibilityLabel="Publish post">
+                {posting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.postBtnText}>Post</Text>}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
@@ -242,15 +308,17 @@ export default function FeedScreen() {
       {activeTab === 'cases' ? (
         <CasesList />
       ) : loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color="#1A3A5C" /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color={colors.navy} /></View>
       ) : (
-        <FlatList data={posts} renderItem={renderPost} keyExtractor={item => item.id} contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor="#1A3A5C" />}
+        <FlatList data={posts} renderItem={renderPost} keyExtractor={item => item.id}
+          contentContainerStyle={[styles.list, !isMobile && styles.listWide]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={colors.navy} />}
           onEndReached={loadMorePosts}
           onEndReachedThreshold={0.5}
-          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ paddingVertical: 20 }} color="#1A3A5C" /> : null}
+          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ paddingVertical: 20 }} color={colors.navy} /> : null}
           ListEmptyComponent={<View style={styles.center}><Ionicons name="newspaper-outline" size={48} color="#CBD5E1" /><Text style={styles.emptyText}>No posts yet</Text></View>} />
       )}
+      </PageGrid>
     </SafeAreaView>
   );
 }
@@ -264,11 +332,47 @@ const styles = StyleSheet.create({
   badge: { position: 'absolute', top: 2, right: 2, backgroundColor: '#E84545', borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: '#FFF', fontSize: 10, fontWeight: '700' },
   tabBar: { flexDirection: 'row', backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
+  // On desktop the segmented control becomes a card in the content column
+  // instead of a full-bleed strip, so it reads as part of the feed.
+  tabBarWide: {
+    marginTop: spacing.xxl,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm,
+  },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10, backgroundColor: '#F1F5F9' },
   tabActive: { backgroundColor: '#1A3A5C' },
   tabText: { fontSize: 14, fontWeight: '600', color: '#64748B' },
   tabTextActive: { color: '#FFFFFF' },
+
+  composeTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    marginTop: spacing.lg,
+  },
+  composeTriggerHover: { backgroundColor: colors.bgMuted, borderColor: colors.textMuted },
+  composeTriggerText: { ...typography.body, color: colors.textSecondary, flex: 1 },
+
   composeBox: { backgroundColor: '#FFFFFF', padding: 16, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  composeBoxWide: {
+    marginTop: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderBottomColor: colors.border,
+  },
+  composeRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  cancelBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.md },
+  cancelBtnHover: { backgroundColor: colors.bgMuted },
+  cancelBtnText: { ...typography.label, color: colors.textSecondary },
   composeInput: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, fontSize: 15, color: '#0F172A', minHeight: 80, textAlignVertical: 'top', borderWidth: 1, borderColor: '#E2E8F0' },
   composeActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
   attachBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
@@ -279,8 +383,13 @@ const styles = StyleSheet.create({
   postBtnDisabled: { opacity: 0.5 },
   postBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
   list: { padding: 16, paddingBottom: 100 },
+  // The grid already supplies the horizontal gutter; doubling it would push
+  // the readable column narrower than the 65–75ch target.
+  listWide: { paddingHorizontal: 0, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
   postCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  postHeader: { flexDirection: 'row', marginBottom: 12 },
+  postCardWide: { marginBottom: spacing.lg },
+  postHeader: { flexDirection: 'row', marginBottom: 12, borderRadius: radius.md, marginHorizontal: -4, paddingHorizontal: 4, paddingVertical: 2 },
+  postHeaderHover: { backgroundColor: colors.bgMuted },
   avatarCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1A3A5C', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   avatarText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
   postMeta: { flex: 1 },
@@ -291,8 +400,19 @@ const styles = StyleSheet.create({
   timeText: { fontSize: 12, color: '#94A3B8' },
   postContent: { fontSize: 15, color: '#334155', lineHeight: 22, marginBottom: 12 },
   postImage: { width: '100%', height: 250, borderRadius: 12, marginBottom: 12 },
-  postActions: { flexDirection: 'row', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 24 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  postActions: { flexDirection: 'row', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 8 },
+  // Padding rather than bare icons: gives the hover tint something to fill and
+  // keeps every action at the 44px minimum target.
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+  },
+  actionBtnHover: { backgroundColor: colors.bgMuted },
   actionText: { fontSize: 14, color: '#94A3B8', fontWeight: '500' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   emptyText: { fontSize: 16, color: '#94A3B8', marginTop: 12 },
