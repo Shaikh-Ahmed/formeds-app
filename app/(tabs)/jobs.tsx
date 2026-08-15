@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
 import { ErrorBanner, KycNotice } from '../../src/components';
-import { PageGrid, ProfileRail, WideHeader, Hoverable } from '../../src/components/web';
+import { PageGrid, ProfileRail, Hoverable } from '../../src/components/web';
 import { colors, spacing, radius, typography, useBreakpoint } from '../../src/theme';
 
 export default function JobsScreen() {
@@ -116,55 +116,42 @@ export default function JobsScreen() {
   const jobs = isHospital ? (activeTab === 'permanent' ? myPostings.permanent : myPostings.locum) : (activeTab === 'permanent' ? permanentJobs : locumShifts);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <WideHeader
-        title={isHospital ? 'My Postings' : 'Jobs'}
-        actions={isHospital ? (
-          <TouchableOpacity
-            testID="add-job-btn"
-            style={[styles.addBtn, !isKycApproved && styles.addBtnDisabled]}
-            onPress={() => setShowForm(true)}
-            disabled={!isKycApproved}
-            accessibilityRole="button"
-            accessibilityLabel="Post a new job"
-            accessibilityState={{ disabled: !isKycApproved }}
-          >
-            <Ionicons name="add" size={24} color="#FFF" />
-          </TouchableOpacity>
-        ) : undefined}
-      />
-
+    <SafeAreaView style={styles.safe} edges={[]}>
       {/* No right rail here: the two-up card grid needs the width more than a
           contextual sidebar would use it. */}
       <PageGrid left={<ProfileRail />} fluid testID="jobs-grid">
-        {!isMobile && (
-          <View style={styles.wideTitleRow}>
-            <View style={styles.wideTitleText}>
-              <Text style={styles.wideTitle} accessibilityRole="header">
-                {isHospital ? 'My Postings' : 'Jobs & Locum Shifts'}
-              </Text>
-              <Text style={styles.wideSubtitle}>
-                {isHospital
-                  ? 'Roles and shifts your organisation has published.'
-                  : 'Permanent roles and single shifts open to your specialty.'}
-              </Text>
-            </View>
-            {isHospital && (
-              <Hoverable
-                testID="add-job-btn-wide"
-                onPress={() => setShowForm(true)}
-                disabled={!isKycApproved}
-                accessibilityLabel="Post a new job"
-                accessibilityState={{ disabled: !isKycApproved }}
-                style={[styles.widePostBtn, !isKycApproved && styles.addBtnDisabled]}
-                hoverStyle={styles.widePostBtnHover}
-              >
-                <Ionicons name="add" size={18} color={colors.white} />
-                <Text style={styles.widePostBtnText}>Post a {activeTab === 'permanent' ? 'job' : 'shift'}</Text>
-              </Hoverable>
-            )}
+        {/* The page title scrolls with the content at every width rather than
+            sitting in a fixed bar. On a phone the persistent top bar is
+            already ~56px of chrome; a second fixed title bar under it would
+            cost a card's worth of feed on every screen. */}
+        <View style={[styles.wideTitleRow, isMobile && styles.titleRowMobile]}>
+          <View style={styles.wideTitleText}>
+            <Text style={styles.wideTitle} accessibilityRole="header">
+              {isHospital ? 'My Postings' : 'Jobs & Locum Shifts'}
+            </Text>
+            <Text style={styles.wideSubtitle}>
+              {isHospital
+                ? 'Roles and shifts your organisation has published.'
+                : 'Permanent roles and single shifts open to your specialty.'}
+            </Text>
           </View>
-        )}
+          {isHospital && (
+            <Hoverable
+              testID="add-job-btn"
+              onPress={() => setShowForm(true)}
+              disabled={!isKycApproved}
+              accessibilityLabel="Post a new job"
+              accessibilityState={{ disabled: !isKycApproved }}
+              style={[styles.widePostBtn, !isKycApproved && styles.addBtnDisabled]}
+              hoverStyle={styles.widePostBtnHover}
+            >
+              <Ionicons name="add" size={18} color={colors.white} />
+              <Text style={styles.widePostBtnText}>
+                {isMobile ? 'Post' : `Post a ${activeTab === 'permanent' ? 'job' : 'shift'}`}
+              </Text>
+            </Hoverable>
+          )}
+        </View>
 
         <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
           <TouchableOpacity testID="tab-permanent" style={[styles.tab, activeTab === 'permanent' && styles.tabActive]} onPress={() => setActiveTab('permanent')} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'permanent' }}>
@@ -287,9 +274,6 @@ function FormInput({ label, ...props }: any) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
-  headerTitle: { fontSize: 24, fontWeight: '700', color: '#0F172A' },
-  addBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#1A3A5C', alignItems: 'center', justifyContent: 'center' },
   addBtnDisabled: { opacity: 0.4 },
   noticeWrap: { paddingHorizontal: 16 },
   noticeWrapWide: { paddingHorizontal: 0 },
@@ -305,6 +289,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xxl,
     paddingBottom: spacing.lg,
   },
+  titleRowMobile: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
   wideTitleText: { flex: 1 },
   wideTitle: { ...typography.h2, color: colors.text },
   wideSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },

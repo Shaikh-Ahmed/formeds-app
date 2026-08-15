@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +23,7 @@ export default function WelcomeScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
+        <StatusBar style="light" />
         {/* On a navy field the logo needs a light chip: its lettering is brand
             navy on a transparent background, so unbacked it renders blank. */}
         <View style={styles.logoChip}>
@@ -89,13 +92,18 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.container} testID="welcome-screen">
-      <View style={styles.topSection}>
+      {/* Navy field: light status-bar content, overriding the app-wide dark
+          default set in _layout.tsx. */}
+      <StatusBar style="light" />
+      {/* Replaces a hardcoded paddingTop: 60, which guessed at the status bar
+          height and left the logo under the notch on taller devices. */}
+      <SafeAreaView style={styles.topSection} edges={['top']}>
         <View style={styles.logoChip}>
           <Image source={require('../assets/images/formeds-logo.png')} style={styles.logo} resizeMode="contain" />
         </View>
         <Text style={styles.tagline}>India&apos;s First Integrated Healthcare Platform</Text>
         <Text style={styles.mission}>Ensuring access to medical care is driven by need, not geography</Text>
-      </View>
+      </SafeAreaView>
 
       <View style={styles.bottomSection}>
         <Text style={styles.getStartedText}>Get Started As</Text>
@@ -117,7 +125,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   splashLogo: { width: 180, height: 72 },
-  topSection: { flex: 0.35, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingTop: 60 },
+  topSection: { flex: 0.35, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   logo: { width: 168, height: 56 },
   tagline: { fontSize: 18, fontWeight: '700', color: colors.white, textAlign: 'center', marginBottom: 8 },
   mission: { fontSize: 14, color: '#B6C6D8', textAlign: 'center', lineHeight: 20 },

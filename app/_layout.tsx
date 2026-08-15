@@ -79,8 +79,10 @@ function RootNavigator() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1A3A5C' }}>
-        <ActivityIndicator size="large" color="#FFFFFF" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.navy }}>
+        {/* Navy field, so the clock and battery need to be light here. */}
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color={colors.white} />
       </View>
     );
   }
@@ -113,6 +115,9 @@ function RootNavigator() {
       <Stack.Screen name="messages" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="conversation" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="people" options={{ animation: 'slide_from_right' }} />
+      {/* Fades rather than slides: search is a mode you enter from the header,
+          not a place further along the stack. */}
+      <Stack.Screen name="search" options={{ animation: 'fade' }} />
     </Stack>
     </View>
   );
@@ -121,7 +126,14 @@ function RootNavigator() {
 function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="light" />
+      {/*
+        Dark content is the app-wide default because the signed-in shell is
+        white — MobileTopBar now paints the status-bar strip, and light icons
+        on it were invisible. The two navy screens (the loading splash above
+        and the welcome gateway) mount their own light StatusBar, which wins
+        while they are on screen.
+      */}
+      <StatusBar style="dark" />
       <RootNavigator />
     </AuthProvider>
   );

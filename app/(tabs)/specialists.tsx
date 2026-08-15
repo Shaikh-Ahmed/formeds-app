@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/context/AuthContext';
 import { ComingSoon } from '../../src/components';
-import { PageGrid, ProfileRail, WideHeader } from '../../src/components/web';
+import { PageGrid, ProfileRail } from '../../src/components/web';
 import { colors, spacing, typography, useBreakpoint } from '../../src/theme';
 
 /**
@@ -43,21 +43,17 @@ export default function SpecialistsScreen() {
   const title = isClinic ? 'My Listings' : 'Specialist Access';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <WideHeader title={title} />
-
+    <SafeAreaView style={styles.safe} edges={[]}>
       <PageGrid left={<ProfileRail />} testID="specialists-grid">
         <ScrollView contentContainerStyle={[styles.body, !isMobile && styles.bodyWide]}>
-          {!isMobile && (
-            <View style={styles.wideTitleWrap}>
+          <View style={[styles.wideTitleWrap, isMobile && styles.titleWrapMobile]}>
               <Text style={styles.wideTitle} accessibilityRole="header">{title}</Text>
               <Text style={styles.wideSubtitle}>
                 {isClinic
                   ? 'Visiting-specialist slots your clinic has published.'
                   : 'Visiting-specialist openings at clinics near you.'}
               </Text>
-            </View>
-          )}
+          </View>
           <ComingSoon
             testID="coming-soon-specialists"
             icon="people-outline"
@@ -76,15 +72,8 @@ export default function SpecialistsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: 14,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: { ...typography.h1, fontSize: 24, color: colors.text },
   wideTitleWrap: { paddingBottom: spacing.xs },
+  titleWrapMobile: { paddingBottom: spacing.md },
   wideTitle: { ...typography.h2, color: colors.text },
   wideSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   body: { padding: spacing.lg, paddingBottom: 100 },

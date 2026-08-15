@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ComingSoon } from '../../src/components';
-import { PageGrid, ProfileRail, WideHeader } from '../../src/components/web';
+import { PageGrid, ProfileRail } from '../../src/components/web';
 import { colors, spacing, radius, typography, useBreakpoint } from '../../src/theme';
 
 /**
@@ -56,18 +56,14 @@ export default function LearningScreen() {
   const { isMobile } = useBreakpoint();
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <WideHeader title="Learning Hub" />
-
+    <SafeAreaView style={styles.safe} edges={[]}>
       <PageGrid left={<ProfileRail />} testID="learning-grid">
-      {!isMobile && (
-        <View style={styles.wideTitleWrap}>
-          <Text style={styles.wideTitle} accessibilityRole="header">Learning Hub</Text>
-          <Text style={styles.wideSubtitle}>
-            Reference texts, accredited CME and peer-reviewed research, in one place.
-          </Text>
-        </View>
-      )}
+      <View style={[styles.wideTitleWrap, isMobile && styles.titleWrapMobile]}>
+        <Text style={styles.wideTitle} accessibilityRole="header">Learning Hub</Text>
+        <Text style={styles.wideSubtitle}>
+          Reference texts, accredited CME and peer-reviewed research, in one place.
+        </Text>
+      </View>
 
       <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
         {TABS.map(t => (
@@ -106,15 +102,8 @@ export default function LearningScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: 14,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: { ...typography.h1, fontSize: 24, color: colors.text },
   wideTitleWrap: { paddingTop: spacing.xxl, paddingBottom: spacing.lg },
+  titleWrapMobile: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
   wideTitle: { ...typography.h2, color: colors.text },
   wideSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   tabBar: {

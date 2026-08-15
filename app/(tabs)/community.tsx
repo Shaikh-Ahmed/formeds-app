@@ -10,7 +10,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { timeAgo } from '../../src/utils/time';
 import { Avatar, RoleBadge, KycNotice, CasesList } from '../../src/components';
-import { PageGrid, ProfileRail, FeedRail, WideHeader, Hoverable } from '../../src/components/web';
+import { PageGrid, ProfileRail, FeedRail, Hoverable } from '../../src/components/web';
 import { colors, spacing, radius, typography, useBreakpoint } from '../../src/theme';
 
 interface Post {
@@ -39,25 +39,19 @@ export default function FeedScreen() {
   const [showCompose, setShowCompose] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [unreadMsgs, setUnreadMsgs] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const pageRef = useRef(1);
 
+  // Unread counts moved to the layouts that own the persistent bars, which
+  // also drops two requests from every feed load and refresh.
   const loadData = useCallback(async () => {
     try {
-      const [feedData, notifCount, msgCount] = await Promise.all([
-        apiFetch(`/api/feed/?page=1&limit=${FEED_PAGE_SIZE}`, token),
-        apiFetch('/api/notifications/unread-count', token).catch(() => ({ count: 0 })),
-        apiFetch('/api/messages/unread-total', token).catch(() => ({ count: 0 })),
-      ]);
+      const feedData = await apiFetch(`/api/feed/?page=1&limit=${FEED_PAGE_SIZE}`, token);
       const items = Array.isArray(feedData) ? feedData : (feedData?.items ?? []);
       setPosts(items);
       pageRef.current = 1;
       setHasMorePosts(items.length >= FEED_PAGE_SIZE);
-      setUnreadCount(notifCount.count || 0);
-      setUnreadMsgs(msgCount.count || 0);
     } catch (e) { console.log('Feed error:', e); }
     finally { setLoading(false); setRefreshing(false); }
   }, [token]);
@@ -202,38 +196,12 @@ export default function FeedScreen() {
     );
   };
 
-  const mobileHeaderActions = (
-    <>
-      <TouchableOpacity testID="network-btn" style={styles.iconBtn} onPress={() => router.push('/people')} accessibilityRole="button" accessibilityLabel="My network">
-        <Ionicons name="people-outline" size={24} color={colors.navy} />
-      </TouchableOpacity>
-      <TouchableOpacity testID="messages-btn" style={styles.iconBtn} onPress={() => router.push('/messages')} accessibilityRole="button" accessibilityLabel={unreadMsgs > 0 ? `Messages, ${unreadMsgs} unread` : 'Messages'}>
-        <Ionicons name="chatbubbles-outline" size={24} color={colors.navy} />
-        {unreadMsgs > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadMsgs > 9 ? '9+' : unreadMsgs}</Text></View>}
-      </TouchableOpacity>
-      <TouchableOpacity testID="notifications-btn" style={styles.iconBtn} onPress={() => router.push('/notifications')} accessibilityRole="button" accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}>
-        <Ionicons name="notifications-outline" size={24} color={colors.navy} />
-        {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>}
-      </TouchableOpacity>
-      {/* One compose affordance, two destinations: the inline box for a
-          feed post, the full composer for a case (which needs a title and
-          tags and so can't sit in a header dropdown). */}
-      <TouchableOpacity
-        testID="compose-post-btn"
-        style={styles.iconBtn}
-        onPress={() => (activeTab === 'cases' ? router.push('/case/new' as any) : setShowCompose(!showCompose))}
-        accessibilityRole="button"
-        accessibilityLabel={activeTab === 'cases' ? 'Post a case' : 'Write a post'}
-      >
-        <Ionicons name={showCompose && activeTab === 'feed' ? 'close' : 'create-outline'} size={24} color={colors.navy} />
-      </TouchableOpacity>
-    </>
-  );
-
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <WideHeader title="Community" actions={mobileHeaderActions} />
-
+    // No page title and no header icon row: the persistent top bar already
+    // identifies the app and owns search and messages, Alerts is its own tab
+    // and My network lives in the drawer. Repeating any of them here would be
+    // two navigation systems stacked on top of each other.
+    <SafeAreaView style={styles.safe} edges={[]}>
       <PageGrid left={<ProfileRail />} right={<FeedRail />} testID="community-grid">
       <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
         <TouchableOpacity testID="tab-feed" style={[styles.tab, activeTab === 'feed' && styles.tabActive]} onPress={() => setActiveTab('feed')} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'feed' }}>
@@ -246,20 +214,26 @@ export default function FeedScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Desktop gets a persistent "start a post" affordance. On mobile the
-          composer stays behind the header icon, because a phone screen can't
-          spare the vertical space above the feed. */}
-      {!isMobile && !showCompose && activeTab === 'feed' && (
+      {/* A persistent "start a post" row at every width. It replaced the
+          header icon on mobile: a labelled row with your own avatar reads as
+          an invitation, where a bare pencil glyph in a header did not. On the
+          Cases tab it routes to the full composer, which needs a title and
+          tags and so can't expand inline. */}
+      {!showCompose && (
         <Hoverable
-          testID="compose-trigger-wide"
-          onPress={() => setShowCompose(true)}
-          accessibilityLabel="Write a post"
-          style={styles.composeTrigger}
+          testID="compose-trigger"
+          onPress={() =>
+            activeTab === 'cases' ? router.push('/case/new' as any) : setShowCompose(true)
+          }
+          accessibilityLabel={activeTab === 'cases' ? 'Post a case' : 'Write a post'}
+          style={[styles.composeTrigger, isMobile && styles.composeTriggerMobile]}
           hoverStyle={styles.composeTriggerHover}
         >
           <Avatar name={user?.name} role={user?.role} uri={user?.avatar} size={40} />
-          <Text style={styles.composeTriggerText}>Share something with the community…</Text>
-          <Ionicons name="create-outline" size={20} color={colors.textMuted} />
+          <Text style={styles.composeTriggerText} numberOfLines={1}>
+            {activeTab === 'cases' ? 'Ask the community about a case…' : 'Share something with the community…'}
+          </Text>
+          <Ionicons name="create-outline" size={20} color={colors.navy} />
         </Hoverable>
       )}
 
@@ -325,12 +299,8 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
-  headerTitle: { fontSize: 24, fontWeight: '700', color: '#0F172A' },
-  headerActions: { flexDirection: 'row', gap: 8 },
-  iconBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-  badge: { position: 'absolute', top: 2, right: 2, backgroundColor: '#E84545', borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  badgeText: { color: '#FFF', fontSize: 10, fontWeight: '700' },
+  // The header row, its icon buttons and their badges were removed with the
+  // in-screen header — MobileTopBar and the Alerts tab own those now.
   tabBar: { flexDirection: 'row', backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },
   // On desktop the segmented control becomes a card in the content column
   // instead of a full-bleed strip, so it reads as part of the feed.
@@ -358,6 +328,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     marginTop: spacing.lg,
   },
+  // The grid supplies side gutters on desktop; on a phone the row needs its own.
+  composeTriggerMobile: { marginHorizontal: spacing.lg, marginTop: spacing.md },
   composeTriggerHover: { backgroundColor: colors.bgMuted, borderColor: colors.textMuted },
   composeTriggerText: { ...typography.body, color: colors.textSecondary, flex: 1 },
 

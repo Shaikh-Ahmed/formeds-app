@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { Avatar, RoleBadge } from '../../src/components';
-import { PageGrid, WideHeader, Hoverable } from '../../src/components/web';
+import { PageGrid, Hoverable } from '../../src/components/web';
 import { colors, spacing, radius, typography, getRoleMeta, useBreakpoint } from '../../src/theme';
 
 export default function ProfileScreen() {
@@ -58,9 +58,7 @@ export default function ProfileScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <WideHeader title="Profile" />
-
+    <SafeAreaView style={styles.safe} edges={[]}>
       <PageGrid
         right={
           <View style={styles.rail}>
