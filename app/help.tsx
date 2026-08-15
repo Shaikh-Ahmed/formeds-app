@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenHeader } from '../src/components';
 import { colors, spacing, typography, radius, MIN_TOUCH_TARGET } from '../src/theme';
+import { PageColumn } from '../src/components/web';
 
 const SUPPORT_EMAIL = 'support@formeds.in';
 
@@ -35,6 +36,7 @@ export default function HelpScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageColumn maxWidth={640} testID="help-column">
       <ScreenHeader title="Help & Support" />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.intro}>Common questions, and how to reach a human if you need one.</Text>
@@ -72,6 +74,7 @@ export default function HelpScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      </PageColumn>
     </SafeAreaView>
   );
 }

@@ -7,6 +7,7 @@ import { apiFetch } from '../src/utils/api';
 import { useAuth } from '../src/context/AuthContext';
 import { Button, LoadingState } from '../src/components';
 import { colors, spacing, typography } from '../src/theme';
+import { AuthShell } from '../src/components/web';
 
 /**
  * Landing page for the emailed verification LINK. New signups verify with an
@@ -44,6 +45,7 @@ export default function VerifyEmailScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <AuthShell maxWidth={460}>
       <View style={styles.center}>
         {status === 'loading' && <LoadingState label="Verifying your email…" />}
 
@@ -77,6 +79,7 @@ export default function VerifyEmailScreen() {
           </>
         )}
       </View>
+      </AuthShell>
     </SafeAreaView>
   );
 }

@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ComingSoon } from '../../src/components';
-import { colors, spacing, radius, typography } from '../../src/theme';
+import { PageGrid, ProfileRail } from '../../src/components/web';
+import { colors, spacing, radius, typography, useBreakpoint } from '../../src/theme';
 
 /**
  * Learning Hub — Books, CME and Research all ship in a later phase.
@@ -52,12 +53,19 @@ const TABS: {
 export default function LearningScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('books');
   const active = TABS.find(t => t.key === activeTab)!;
+  const { isMobile } = useBreakpoint();
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}><Text style={styles.headerTitle}>Learning Hub</Text></View>
+    <SafeAreaView style={styles.safe} edges={[]}>
+      <PageGrid left={<ProfileRail />} testID="learning-grid">
+      <View style={[styles.wideTitleWrap, isMobile && styles.titleWrapMobile]}>
+        <Text style={styles.wideTitle} accessibilityRole="header">Learning Hub</Text>
+        <Text style={styles.wideSubtitle}>
+          Reference texts, accredited CME and peer-reviewed research, in one place.
+        </Text>
+      </View>
 
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
         {TABS.map(t => (
           <TouchableOpacity
             key={t.key}
@@ -87,26 +95,29 @@ export default function LearningScreen() {
           Books, CME and Research all arrive in a later phase. Nothing to do here yet.
         </Text>
       </ScrollView>
+      </PageGrid>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: 14,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  headerTitle: { ...typography.h1, fontSize: 24, color: colors.text },
+  wideTitleWrap: { paddingTop: spacing.xxl, paddingBottom: spacing.lg },
+  titleWrapMobile: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
+  wideTitle: { ...typography.h2, color: colors.text },
+  wideSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   tabBar: {
     flexDirection: 'row',
     backgroundColor: colors.white,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     gap: 6,
+  },
+  tabBarWide: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.sm,
   },
   tab: {
     flex: 1,

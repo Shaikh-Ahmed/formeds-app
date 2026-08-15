@@ -8,6 +8,7 @@ import { apiFetch } from '../src/utils/api';
 import { Button, FormInput, ErrorBanner } from '../src/components';
 import { useResendCooldown } from '../src/hooks/useResendCooldown';
 import { colors, radius, spacing, typography } from '../src/theme';
+import { AuthShell } from '../src/components/web';
 
 type Step = 'email' | 'phone';
 
@@ -114,18 +115,21 @@ export default function VerifyScreen() {
   if (!verificationToken) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          <Ionicons name="alert-circle-outline" size={56} color={colors.textMuted} />
-          <Text style={styles.title}>Nothing to verify</Text>
-          <Text style={styles.subtitle}>Sign in and we&apos;ll pick up where you left off.</Text>
-          <Button label="Go to sign in" onPress={() => router.replace('/login')} />
-        </View>
+        <AuthShell maxWidth={480}>
+          <View style={styles.center}>
+            <Ionicons name="alert-circle-outline" size={56} color={colors.textMuted} />
+            <Text style={styles.title}>Nothing to verify</Text>
+            <Text style={styles.subtitle}>Sign in and we&apos;ll pick up where you left off.</Text>
+            <Button label="Go to sign in" onPress={() => router.replace('/login')} />
+          </View>
+        </AuthShell>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.safe}>
+      <AuthShell maxWidth={480}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.iconWrap}>
@@ -220,6 +224,7 @@ export default function VerifyScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+      </AuthShell>
     </SafeAreaView>
   );
 }

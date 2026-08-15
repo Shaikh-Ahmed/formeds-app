@@ -6,6 +6,7 @@ import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
 import { Button, FormInput, ScreenHeader, ErrorBanner } from '../src/components';
 import { colors, spacing, typography } from '../src/theme';
+import { PageColumn } from '../src/components/web';
 
 export default function EditProfileScreen() {
   const { user, token, refreshUser } = useAuth();
@@ -60,6 +61,7 @@ export default function EditProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageColumn maxWidth={640} testID="edit-profile-column">
       <ScreenHeader title="Edit Profile" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -98,6 +100,7 @@ export default function EditProfileScreen() {
           <Button label="Save changes" onPress={save} loading={saving} testID="edit-save" />
         </ScrollView>
       </KeyboardAvoidingView>
+      </PageColumn>
     </SafeAreaView>
   );
 }

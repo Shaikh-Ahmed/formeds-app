@@ -10,6 +10,7 @@ import { API_URL, detailToMessage } from '../src/utils/api';
 import { Button, FormInput, ErrorBanner, LoadingState, ScreenHeader } from '../src/components';
 import { colors, radius, spacing, typography } from '../src/theme';
 import { validateRequired, firstError } from '../src/utils/validation';
+import { PageColumn } from '../src/components/web';
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // mirrors services/files.py
 
@@ -146,6 +147,7 @@ export default function KycScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageColumn maxWidth={640} testID="kyc-column">
       <ScreenHeader title="Verification" onBack={() => router.replace('/(tabs)/community')} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -238,6 +240,7 @@ export default function KycScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+      </PageColumn>
     </SafeAreaView>
   );
 }
@@ -254,6 +257,7 @@ function StatusScreen({
 }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageColumn maxWidth={640} testID="kyc-status-column">
       <ScreenHeader title="Verification" onBack={onAction} />
       <View style={styles.statusWrap}>
         <View style={[styles.statusIcon, { backgroundColor: `${tone}15` }]}>
@@ -263,6 +267,7 @@ function StatusScreen({
         <Text style={styles.statusBody}>{body}</Text>
         <Button label={actionLabel} onPress={onAction} style={styles.statusAction} />
       </View>
+      </PageColumn>
     </SafeAreaView>
   );
 }

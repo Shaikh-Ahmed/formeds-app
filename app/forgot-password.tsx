@@ -7,6 +7,7 @@ import { apiFetch } from '../src/utils/api';
 import { Button, FormInput, ErrorBanner } from '../src/components';
 import { colors, radius, spacing, typography } from '../src/theme';
 import { validateEmail } from '../src/utils/validation';
+import { AuthShell } from '../src/components/web';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -36,6 +37,7 @@ export default function ForgotPasswordScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <AuthShell maxWidth={460}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <TouchableOpacity
@@ -82,6 +84,7 @@ export default function ForgotPasswordScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      </AuthShell>
     </SafeAreaView>
   );
 }

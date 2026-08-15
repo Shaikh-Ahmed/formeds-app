@@ -5,6 +5,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
+import { PageColumn } from '../../src/components/web';
 
 interface KycRequest {
   id: string;
@@ -80,6 +81,7 @@ export default function AdminKycScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageColumn maxWidth={840} testID="admin-kyc-column">
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color="#1A3A5C" /></TouchableOpacity>
         <Text style={styles.headerTitle}>KYC Review</Text>
@@ -127,6 +129,7 @@ export default function AdminKycScreen() {
           </View>
         </View>
       </Modal>
+      </PageColumn>
     </SafeAreaView>
   );
 }

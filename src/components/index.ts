@@ -10,3 +10,4 @@ export { VoteControl } from './VoteControl';
 export { TagChip } from './TagChip';
 export { CaseCard } from './CaseCard';
 export { CasesList } from './CasesList';
+export { NotificationsView } from './NotificationsView';

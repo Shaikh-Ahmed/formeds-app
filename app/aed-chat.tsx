@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
+import { PageColumn } from '../src/components/web';
 
 interface Message {
   id: string;
@@ -71,6 +72,7 @@ export default function AEDChatScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PageColumn maxWidth={760} testID="aed-column">
       <View style={styles.header}>
         <TouchableOpacity testID="aed-back-btn" style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-down" size={24} color="#FFF" />
@@ -130,6 +132,7 @@ export default function AEDChatScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      </PageColumn>
     </SafeAreaView>
   );
 }

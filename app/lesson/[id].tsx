@@ -7,6 +7,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
 import { Button, ScreenHeader, LoadingState, ErrorState, ErrorBanner } from '../../src/components';
 import { colors, spacing, typography, radius } from '../../src/theme';
+import { PageColumn } from '../../src/components/web';
 
 interface Lesson {
   id: string;
@@ -69,6 +70,7 @@ export default function LessonScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <PageColumn testID="lesson-column">
       <ScreenHeader title="CME Lesson" />
       {loading ? (
         <LoadingState label="Loading lesson…" />
@@ -114,6 +116,7 @@ export default function LessonScreen() {
           <Button label="Back to Learning" onPress={() => router.back()} variant="outline" style={styles.backBtn} />
         </ScrollView>
       )}
+      </PageColumn>
     </SafeAreaView>
   );
 }

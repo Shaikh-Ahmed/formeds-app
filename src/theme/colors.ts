@@ -14,6 +14,12 @@ export const colors = {
   red: '#E84545',
   redHover: '#D13D3D',
   redBg: '#FEF2F2',
+  /**
+   * Red for TEXT on a light red surface. `red` itself only reaches 3.6:1 on
+   * `redBg` — fine for an icon or a filled button, below the 4.5:1 body-text
+   * minimum. Use this whenever red words sit on `redBg`.
+   */
+  redText: '#B91C1C',
 
   // Surfaces
   white: '#FFFFFF',

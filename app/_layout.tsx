@@ -1,10 +1,13 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
 import { StatusBar } from 'expo-status-bar';
+import { TopBar } from '../src/components/web';
+import { colors, useBreakpoint } from '../src/theme';
+import { apiFetch } from '../src/utils/api';
 
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || '';
 if (SENTRY_DSN) {
@@ -21,16 +24,44 @@ function RootNavigator() {
   const { user, loading, token, isKycApproved } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const { isMobile } = useBreakpoint();
   // Prompt for KYC once per app launch — never trap an unapproved user in a
   // loop, since they are explicitly allowed to explore before approval.
   const kycPrompted = useRef(false);
 
   usePushNotifications(token);
 
+  const currentSegment = segments[0] ?? 'index';
+  const inPublicArea = PUBLIC_SEGMENTS.has(currentSegment);
+
+  /**
+   * The desktop nav bar lives at the root, not inside (tabs).
+   * Messages, Notifications, People and the case/post detail screens are all
+   * stack routes outside the tab group — mounting the bar in (tabs) would
+   * make it vanish the moment a user opened any of them, which is exactly the
+   * kind of half-converted layout this redesign is meant to remove.
+   */
+  const showTopBar = !!user && !inPublicArea && !isMobile;
+
+  const [unreadMsgs, setUnreadMsgs] = useState(0);
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  const loadCounts = useCallback(async () => {
+    if (!token || !showTopBar) return;
+    const [msgs, notifs] = await Promise.all([
+      apiFetch('/api/messages/unread-total', token).catch(() => ({ count: 0 })),
+      apiFetch('/api/notifications/unread-count', token).catch(() => ({ count: 0 })),
+    ]);
+    setUnreadMsgs(msgs.count || 0);
+    setUnreadNotifs(notifs.count || 0);
+  }, [token, showTopBar]);
+
+  // Refresh on navigation: the bar is persistent, so its badges can't be owned
+  // by any one screen's fetch.
+  useEffect(() => { loadCounts(); }, [loadCounts, currentSegment]);
+
   useEffect(() => {
     if (loading) return;
-    const current = segments[0] ?? 'index';
-    const inPublicArea = PUBLIC_SEGMENTS.has(current);
 
     if (!user && !inPublicArea) {
       router.replace('/login');
@@ -44,17 +75,23 @@ function RootNavigator() {
       kycPrompted.current = true;
       router.replace(needsKyc ? '/kyc' : '/(tabs)/community');
     }
-  }, [user, loading, segments, router, isKycApproved]);
+  }, [user, loading, inPublicArea, router, isKycApproved]);
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1A3A5C' }}>
-        <ActivityIndicator size="large" color="#FFFFFF" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.navy }}>
+        {/* Navy field, so the clock and battery need to be light here. */}
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color={colors.white} />
       </View>
     );
   }
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      {showTopBar && (
+        <TopBar unreadMessages={unreadMsgs} unreadNotifications={unreadNotifs} />
+      )}
     <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
@@ -78,14 +115,25 @@ function RootNavigator() {
       <Stack.Screen name="messages" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="conversation" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="people" options={{ animation: 'slide_from_right' }} />
+      {/* Fades rather than slides: search is a mode you enter from the header,
+          not a place further along the stack. */}
+      <Stack.Screen name="search" options={{ animation: 'fade' }} />
     </Stack>
+    </View>
   );
 }
 
 function RootLayout() {
   return (
     <AuthProvider>
-      <StatusBar style="light" />
+      {/*
+        Dark content is the app-wide default because the signed-in shell is
+        white — MobileTopBar now paints the status-bar strip, and light icons
+        on it were invisible. The two navy screens (the loading splash above
+        and the welcome gateway) mount their own light StatusBar, which wins
+        while they are on screen.
+      */}
+      <StatusBar style="dark" />
       <RootNavigator />
     </AuthProvider>
   );
