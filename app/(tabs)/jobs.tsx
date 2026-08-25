@@ -11,12 +11,25 @@ import { colors, spacing, radius, typography, useBreakpoint } from '../../src/th
 export default function JobsScreen() {
   const { user, token, isKycApproved } = useAuth();
   const { isMobile, isDesktop } = useBreakpoint();
-  const isHospital = user?.role === 'hospital';
+  /**
+   * `isHospital` used to stand in for two unrelated things: who may advertise
+   * work, and who sees their own postings instead of the marketplace. Now that
+   * a consultant can post a locum for their own list, those come apart — a
+   * professional needs BOTH the marketplace (to apply) and their postings (to
+   * manage). Mirrors POSTING_ROLES / APPLYING_ROLES in backend/routes/jobs.py.
+   */
+  const canPost = !!user?.role;
+  const canApply = user?.role === 'healthcare_professional';
+  const isMine = (item: any) => !!user?.id && String(item?.hospital_id) === String(user.id);
   // Two-up on desktop: a job card is mostly short labelled rows, so a single
   // 1100px-wide column would leave most of each card empty.
   const numColumns = isDesktop ? 2 : 1;
   const [actionError, setActionError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'permanent' | 'locum'>('permanent');
+  type JobTab = 'permanent' | 'locum' | 'mine';
+  // Employers land on what they posted; professionals land on the marketplace.
+  const [activeTab, setActiveTab] = useState<JobTab>(
+    user?.role === 'hospital' || user?.role === 'clinic' ? 'mine' : 'permanent',
+  );
   const [permanentJobs, setPermanentJobs] = useState<any[]>([]);
   const [locumShifts, setLocumShifts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,20 +39,19 @@ export default function JobsScreen() {
 
   const loadJobs = useCallback(async () => {
     try {
-      if (isHospital) {
-        const data = await apiFetch('/api/jobs/my-postings', token);
-        setMyPostings(data);
-      } else {
-        const [perm, loc] = await Promise.all([
-          apiFetch('/api/jobs/permanent', token),
-          apiFetch('/api/jobs/locum', token),
-        ]);
-        setPermanentJobs(perm);
-        setLocumShifts(loc);
-      }
+      const [perm, loc, mine] = await Promise.all([
+        apiFetch('/api/jobs/permanent', token),
+        apiFetch('/api/jobs/locum', token),
+        // Empty for an account that has never advertised anything, which is the
+        // normal case for a professional — cheap enough to fetch regardless.
+        apiFetch('/api/jobs/my-postings', token).catch(() => ({ permanent: [], locum: [] })),
+      ]);
+      setPermanentJobs(perm);
+      setLocumShifts(loc);
+      setMyPostings(mine);
     } catch (e) { console.log('Jobs error:', e); }
     finally { setLoading(false); setRefreshing(false); }
-  }, [token, isHospital]);
+  }, [token]);
 
   useEffect(() => { loadJobs(); }, [loadJobs]);
 
@@ -64,7 +76,15 @@ export default function JobsScreen() {
   const renderJobCard = ({ item }: any) => (
     <View testID={`job-card-${item.id}`} style={[styles.card, !isMobile && styles.cardWide]}>
       <View style={styles.cardHeader}>
-        <View style={styles.cardIcon}><Ionicons name="briefcase" size={20} color="#1A3A5C" /></View>
+        {/* An individual advertising cover reads differently from a hospital
+            advertising a post, so the icon says which. */}
+        <View style={styles.cardIcon}>
+          <Ionicons
+            name={item.poster_role === 'healthcare_professional' ? 'person' : 'briefcase'}
+            size={20}
+            color="#1A3A5C"
+          />
+        </View>
         <View style={styles.cardMeta}>
           <Text style={styles.cardTitle}>{item.title}</Text>
           <Text style={styles.cardSubtitle}>{item.hospital_name || user?.name}</Text>
@@ -77,13 +97,17 @@ export default function JobsScreen() {
         {item.salary_min > 0 && <View style={styles.detailItem}><Ionicons name="cash-outline" size={16} color="#64748B" /><Text style={styles.detailText}>Rs. {(item.salary_min/1000).toFixed(0)}K - {(item.salary_max/1000).toFixed(0)}K/mo</Text></View>}
       </View>
       <Text style={styles.cardDesc} numberOfLines={2}>{item.description}</Text>
-      {!isHospital && (
+      {isMine(item) ? (
+        <View style={styles.statsRow}>
+          <Ionicons name="people-outline" size={16} color="#1A3A5C" />
+          <Text style={styles.statsText}>{item.applicant_count || 0} applicants</Text>
+        </View>
+      ) : canApply ? (
         <TouchableOpacity testID={`apply-btn-${item.id}`} style={[styles.applyBtn, item.applied && styles.appliedBtn]} onPress={() => handleApply(item.id)} disabled={item.applied}>
           <Ionicons name={item.applied ? "checkmark-circle" : "paper-plane"} size={18} color="#FFF" />
           <Text style={styles.applyText}>{item.applied ? 'Applied' : 'Quick Apply'}</Text>
         </TouchableOpacity>
-      )}
-      {isHospital && <View style={styles.statsRow}><Ionicons name="people-outline" size={16} color="#1A3A5C" /><Text style={styles.statsText}>{item.applicant_count || 0} applicants</Text></View>}
+      ) : null}
     </View>
   );
 
@@ -104,16 +128,30 @@ export default function JobsScreen() {
         <View style={styles.detailItem}><Ionicons name="time-outline" size={16} color="#64748B" /><Text style={styles.detailText}>{item.shift_time} ({item.duration})</Text></View>
         <View style={styles.detailItem}><Ionicons name="cash-outline" size={16} color="#64748B" /><Text style={styles.detailText}>Rs. {item.pay}/shift</Text></View>
       </View>
-      {!isHospital && (
+      {isMine(item) ? (
+        <View style={styles.statsRow}>
+          <Ionicons name={item.status === 'filled' ? 'checkmark-circle-outline' : 'time-outline'} size={16} color="#1A3A5C" />
+          <Text style={styles.statsText}>
+            {item.status === 'filled' ? `Filled by ${item.accepted_name || 'a professional'}` : 'Open for applications'}
+          </Text>
+        </View>
+      ) : canApply ? (
         <TouchableOpacity testID={`accept-shift-${item.id}`} style={[styles.applyBtn, { backgroundColor: '#0F766E' }, (item.accepted || item.status === 'filled') && styles.appliedBtn]} onPress={() => handleAcceptShift(item.id)} disabled={item.accepted || item.status === 'filled'}>
           <Ionicons name={item.accepted ? "checkmark-circle" : "hand-left"} size={18} color="#FFF" />
           <Text style={styles.applyText}>{item.accepted ? 'Accepted' : item.status === 'filled' ? 'Filled' : 'Accept Shift'}</Text>
         </TouchableOpacity>
-      )}
+      ) : null}
     </View>
   );
 
-  const jobs = isHospital ? (activeTab === 'permanent' ? myPostings.permanent : myPostings.locum) : (activeTab === 'permanent' ? permanentJobs : locumShifts);
+  const jobs =
+    activeTab === 'permanent' ? permanentJobs
+    : activeTab === 'locum' ? locumShifts
+    // "Mine" mixes both kinds, so the renderer keys off the shape of the row.
+    : [...(myPostings.permanent || []), ...(myPostings.locum || [])];
+
+  // Posting from the "Mine" tab is ambiguous, so it defaults to a permanent role.
+  const formKind = activeTab === 'locum' ? 'locum' : 'permanent';
 
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
@@ -127,15 +165,15 @@ export default function JobsScreen() {
         <View style={[styles.wideTitleRow, isMobile && styles.titleRowMobile]}>
           <View style={styles.wideTitleText}>
             <Text style={styles.wideTitle} accessibilityRole="header">
-              {isHospital ? 'My Postings' : 'Jobs & Locum Shifts'}
+              {activeTab === 'mine' ? 'My postings' : 'Jobs & locum shifts'}
             </Text>
             <Text style={styles.wideSubtitle}>
-              {isHospital
-                ? 'Roles and shifts your organisation has published.'
+              {activeTab === 'mine'
+                ? 'Roles and shifts you have published.'
                 : 'Permanent roles and single shifts open to your specialty.'}
             </Text>
           </View>
-          {isHospital && (
+          {canPost && (
             <Hoverable
               testID="add-job-btn"
               onPress={() => setShowForm(true)}
@@ -147,7 +185,7 @@ export default function JobsScreen() {
             >
               <Ionicons name="add" size={18} color={colors.white} />
               <Text style={styles.widePostBtnText}>
-                {isMobile ? 'Post' : `Post a ${activeTab === 'permanent' ? 'job' : 'shift'}`}
+                {isMobile ? 'Post' : `Post a ${formKind === 'locum' ? 'shift' : 'job'}`}
               </Text>
             </Hoverable>
           )}
@@ -160,10 +198,15 @@ export default function JobsScreen() {
           <TouchableOpacity testID="tab-locum" style={[styles.tab, activeTab === 'locum' && styles.tabActive]} onPress={() => setActiveTab('locum')} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'locum' }}>
             <Text style={[styles.tabText, activeTab === 'locum' && styles.tabTextActive]}>Locum Shifts</Text>
           </TouchableOpacity>
+          {canPost && (
+            <TouchableOpacity testID="tab-mine" style={[styles.tab, activeTab === 'mine' && styles.tabActive]} onPress={() => setActiveTab('mine')} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'mine' }}>
+              <Text style={[styles.tabText, activeTab === 'mine' && styles.tabTextActive]}>My postings</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={[styles.noticeWrap, !isMobile && styles.noticeWrapWide]}>
-          <KycNotice action={isHospital ? 'post jobs and shifts' : 'apply for jobs and shifts'} />
+          <KycNotice action={canApply ? 'apply for or post jobs and shifts' : 'post jobs and shifts'} />
           <ErrorBanner message={actionError} />
         </View>
 
@@ -177,16 +220,16 @@ export default function JobsScreen() {
             numColumns={numColumns}
             columnWrapperStyle={numColumns > 1 ? styles.columnWrapper : undefined}
             data={jobs}
-            renderItem={activeTab === 'permanent' ? renderJobCard : renderLocumCard}
+            renderItem={(row: any) => (row.item?.shift_date ? renderLocumCard(row) : renderJobCard(row))}
             keyExtractor={(item: any) => item.id}
             contentContainerStyle={[styles.list, !isMobile && styles.listWide]}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadJobs(); }} tintColor={colors.navy} />}
-            ListEmptyComponent={<View style={styles.center}><Ionicons name="briefcase-outline" size={48} color="#CBD5E1" /><Text style={styles.emptyText}>No {activeTab === 'permanent' ? 'jobs' : 'shifts'} found</Text></View>}
+            ListEmptyComponent={<View style={styles.center}><Ionicons name="briefcase-outline" size={48} color="#CBD5E1" /><Text style={styles.emptyText}>{activeTab === 'mine' ? 'You have not posted anything yet' : `No ${activeTab === 'permanent' ? 'jobs' : 'shifts'} found`}</Text></View>}
           />
         )}
       </PageGrid>
 
-      {isHospital && <JobFormModal visible={showForm} onClose={() => setShowForm(false)} token={token} activeTab={activeTab} onCreated={() => { setShowForm(false); loadJobs(); }} />}
+      {canPost && <JobFormModal visible={showForm} onClose={() => setShowForm(false)} token={token} activeTab={formKind} onCreated={() => { setShowForm(false); setActiveTab('mine'); loadJobs(); }} />}
     </SafeAreaView>
   );
 }

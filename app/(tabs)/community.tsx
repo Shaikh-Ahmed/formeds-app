@@ -1,7 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-
-const FEED_PAGE_SIZE = 20;
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, RefreshControl, Share, Image, Platform } from 'react-native';
+import React, { useState, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Pressable, TextInput, ActivityIndicator, RefreshControl, Share, Image, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
@@ -9,9 +7,11 @@ import { apiFetch, API_URL } from '../../src/utils/api';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { timeAgo } from '../../src/utils/time';
-import { Avatar, RoleBadge, KycNotice, CasesList } from '../../src/components';
+import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer } from '../../src/components';
 import { PageGrid, ProfileRail, FeedRail, Hoverable } from '../../src/components/web';
-import { colors, spacing, radius, typography, useBreakpoint } from '../../src/theme';
+import { colors, spacing, radius, typography, compactAction, useBreakpoint } from '../../src/theme';
+
+const FEED_PAGE_SIZE = 20;
 
 interface Post {
   id: string;
@@ -41,6 +41,8 @@ export default function FeedScreen() {
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMorePosts, setHasMorePosts] = useState(true);
+  /** Post whose image is open in the lightbox; null when it is closed. */
+  const [viewerPost, setViewerPost] = useState<Post | null>(null);
   const pageRef = useRef(1);
 
   // Unread counts moved to the layouts that own the persistent bars, which
@@ -159,37 +161,65 @@ export default function FeedScreen() {
             </View>
           </View>
         </Hoverable>
-        <Text style={styles.postContent}>{item.content}</Text>
+        <ExpandableText
+          testID={`post-body-${item.id}`}
+          text={item.content}
+          numberOfLines={3}
+          style={styles.postContent}
+        />
         {item.image_url ? (
-          <Image source={{ uri: item.image_url }} style={styles.postImage} resizeMode="cover" />
+          <Pressable
+            testID={`post-image-${item.id}`}
+            onPress={() => setViewerPost(item)}
+            accessibilityRole="imagebutton"
+            accessibilityLabel="Open image full screen"
+            style={({ pressed }) => [styles.postImageWrap, pressed && styles.postImagePressed]}
+          >
+            {/* Cropped on purpose so every card is the same height; the
+                uncropped version is one tap away in MediaViewer. */}
+            <Image source={{ uri: item.image_url }} style={styles.postImage} resizeMode="cover" />
+            <View style={styles.expandHint} pointerEvents="none">
+              <Ionicons name="expand-outline" size={14} color={colors.white} />
+            </View>
+          </Pressable>
         ) : null}
+        {/* Compact action row: the buttons are drawn at 32px but carry
+            the shared compactAction hit slop, so the area a finger actually has to hit stays 44px.
+            Shrinking the painted box instead of the target is what buys the
+            height back without making the row harder to use. */}
         <View style={styles.postActions}>
           <Hoverable
             testID={`like-btn-${item.id}`}
             style={styles.actionBtn}
             hoverStyle={styles.actionBtnHover}
+            hitSlop={compactAction.hitSlop}
             onPress={() => handleLike(item.id)}
             accessibilityLabel={`${isLiked ? 'Unlike' : 'Like'}, ${item.like_count} likes`}
           >
-            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={22} color={isLiked ? colors.red : colors.textMuted} />
-            <Text style={[styles.actionText, isLiked && { color: colors.red }]}>{item.like_count}</Text>
+            {/* redText, not red: the bright brand red is only 3.9:1 on the
+                card, which is fine for a glyph but below the minimum for the
+                count beside it. One colour for both keeps the pair matched. */}
+            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? colors.redText : colors.textSecondary} />
+            <Text style={[styles.actionText, isLiked && { color: colors.redText }]}>{item.like_count}</Text>
           </Hoverable>
           <Hoverable
             style={styles.actionBtn}
             hoverStyle={styles.actionBtnHover}
+            hitSlop={compactAction.hitSlop}
             onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id } } as any)}
             accessibilityLabel={`Comments, ${item.comment_count}`}
           >
-            <Ionicons name="chatbubble-outline" size={20} color={colors.textMuted} />
+            <Ionicons name="chatbubble-outline" size={18} color={colors.textSecondary} />
             <Text style={styles.actionText}>{item.comment_count}</Text>
           </Hoverable>
           <Hoverable
             style={styles.actionBtn}
             hoverStyle={styles.actionBtnHover}
+            hitSlop={compactAction.hitSlop}
             onPress={() => handleShare(item)}
             accessibilityLabel="Share this post"
           >
-            <Ionicons name="share-social-outline" size={20} color={colors.textMuted} />
+            <Ionicons name="share-social-outline" size={18} color={colors.textSecondary} />
           </Hoverable>
         </View>
       </View>
@@ -293,6 +323,18 @@ export default function FeedScreen() {
           ListEmptyComponent={<View style={styles.center}><Ionicons name="newspaper-outline" size={48} color="#CBD5E1" /><Text style={styles.emptyText}>No posts yet</Text></View>} />
       )}
       </PageGrid>
+
+      {viewerPost?.image_url ? (
+        <MediaViewer
+          visible
+          imageUri={viewerPost.image_url}
+          post={viewerPost}
+          onClose={() => setViewerPost(null)}
+          onOpenPost={() =>
+            router.push({ pathname: '/post/[id]', params: { id: viewerPost.id } } as any)
+          }
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -370,22 +412,45 @@ const styles = StyleSheet.create({
   roleTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginRight: 8 },
   roleTagText: { fontSize: 11, fontWeight: '600' },
   timeText: { fontSize: 12, color: '#94A3B8' },
-  postContent: { fontSize: 15, color: '#334155', lineHeight: 22, marginBottom: 12 },
-  postImage: { width: '100%', height: 250, borderRadius: 12, marginBottom: 12 },
-  postActions: { flexDirection: 'row', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 8 },
-  // Padding rather than bare icons: gives the hover tint something to fill and
-  // keeps every action at the 44px minimum target.
+  postContent: { fontSize: 15, color: '#334155', lineHeight: 22 },
+  postImageWrap: { marginTop: 12, borderRadius: 12, overflow: 'hidden' },
+  postImagePressed: { opacity: 0.9 },
+  postImage: { width: '100%', height: 250 },
+  // Small affordance so the image reads as openable rather than decorative.
+  expandHint: {
+    position: 'absolute',
+    right: spacing.sm,
+    bottom: spacing.sm,
+    width: 26,
+    height: 26,
+    borderRadius: radius.sm,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  postActions: {
+    flexDirection: 'row',
+    // No divider rule and minimal lead-in: the reference treatment separates
+    // actions from body with whitespace alone. A rule plus padding was costing
+    // ~10px per card for a boundary the eye already reads.
+    marginTop: spacing.xs,
+    marginLeft: -spacing.sm,
+    gap: spacing.xs,
+  },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    minHeight: 44,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
+    // 32 painted + 6 hit-slop top and bottom = the 44 a finger needs.
+    height: compactAction.height,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
   },
   actionBtnHover: { backgroundColor: colors.bgMuted },
-  actionText: { fontSize: 14, color: '#94A3B8', fontWeight: '500' },
+  // textMuted reaches only 2.6:1 on white — fine for a placeholder, not for a
+  // count that carries meaning.
+  actionText: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   emptyText: { fontSize: 16, color: '#94A3B8', marginTop: 12 },
 });

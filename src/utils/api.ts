@@ -1,4 +1,77 @@
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+import Constants from 'expo-constants';
+
+/**
+ * Hosts that belong to a development machine rather than a deployed server.
+ * Only these get their address rewritten below; anything public is respected
+ * verbatim so pointing dev at a staging or Render backend keeps working.
+ */
+function isLocalHost(host: string): boolean {
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+  );
+}
+
+/**
+ * Works out the API base URL.
+ *
+ * In development the host is taken from the address the app was actually served
+ * from rather than from EXPO_PUBLIC_BACKEND_URL. The env var pins a LAN IP, but
+ * DHCP reassigns that address regularly — every time it moved, the app spent 15
+ * seconds timing out against a machine that no longer existed and reported it as
+ * "check your connection". The scheme, port and path still come from the env
+ * var, so only the volatile part is derived.
+ *
+ * `browserHost` wins over `hostUri` when present, and that ordering is the
+ * whole point. Metro advertises the LAN IP it saw when IT started, which goes
+ * stale the moment DHCP moves the machine — a browser can then be loading the
+ * bundle happily over `localhost:8081` while `hostUri` still claims
+ * `192.168.1.3:8081`, sending every API call to an address that no longer
+ * exists. `window.location.hostname` cannot be stale: it is literally where the
+ * page came from. On a physical device there is no `window`, so Metro's
+ * hostUri remains the right answer and is used unchanged.
+ *
+ * Exported for tests; prefer API_URL at call sites.
+ */
+export function deriveApiBase(
+  configured: string,
+  hostUri: string | undefined,
+  isDev: boolean,
+  browserHost?: string,
+): string {
+  if (!isDev) return configured;
+
+  // hostUri looks like "192.168.1.3:8081" or occasionally "exp://host:port".
+  const metroHost =
+    browserHost || hostUri?.split('://').pop()?.split('/')[0]?.split(':')[0];
+  if (!metroHost) return configured;
+
+  const base = configured || 'http://localhost:8000';
+  const parts = base.match(/^(https?:\/\/)([^/:]+)(:\d+)?(\/.*)?$/);
+  if (!parts) return configured;
+
+  const [, scheme, host, port = '', path = ''] = parts;
+  // A deployed backend is a deliberate choice — never repoint it at Metro.
+  if (!isLocalHost(host)) return configured;
+
+  return `${scheme}${metroHost}${port}${path}`;
+}
+
+/** Undefined on native, where there is no document to have been served. */
+const browserHost =
+  typeof window !== 'undefined' && window.location?.hostname
+    ? window.location.hostname
+    : undefined;
+
+const BACKEND_URL = deriveApiBase(
+  process.env.EXPO_PUBLIC_BACKEND_URL || '',
+  Constants.expoConfig?.hostUri,
+  __DEV__,
+  browserHost,
+);
 export const API_URL = BACKEND_URL;
 
 const REQUEST_TIMEOUT_MS = 15000;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { AppDrawer } from '../components/mobile/AppDrawer';
 import { MobileTopBar } from '../components/mobile/MobileTopBar';
 
@@ -36,6 +36,10 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 beforeEach(() => {
+  // Fake timers make the drawer's open/close animation complete on demand
+  // rather than on wall-clock time, which is what made these tests flaky
+  // under CPU contention.
+  jest.useFakeTimers();
   mockPush.mockClear();
   mockReplace.mockClear();
   mockLogout.mockClear();
@@ -44,6 +48,13 @@ beforeEach(() => {
     isKycApproved: true,
     logout: mockLogout,
   };
+});
+
+afterEach(() => {
+  // Flush anything still queued before handing the clock back, so a pending
+  // animation callback can't fire against a torn-down environment.
+  act(() => { jest.runOnlyPendingTimers(); });
+  jest.useRealTimers();
 });
 
 describe('MobileTopBar', () => {
@@ -98,10 +109,22 @@ describe('MobileTopBar', () => {
 });
 
 describe('AppDrawer', () => {
+  /**
+   * Opens the drawer and drains both async tails deterministically: the
+   * AccessibilityInfo.isReduceMotionEnabled() promise and the Animated.timing
+   * completion callback that flips `mounted`.
+   *
+   * An earlier version slept a fixed 300ms of real time, which flaked when the
+   * suite ran alongside a Metro bundle — the animation callback then landed
+   * after teardown. Draining explicitly removes the dependence on wall-clock
+   * timing entirely.
+   */
   const openDrawer = async (onClose = jest.fn()) => {
     render(<AppDrawer visible onClose={onClose} />);
-    // Let the open animation settle so the panel is interactive.
-    await act(async () => { await new Promise(r => setTimeout(r, 300)); });
+    await act(async () => {
+      await Promise.resolve();
+      jest.advanceTimersByTime(500);
+    });
     return onClose;
   };
 
@@ -144,8 +167,12 @@ describe('AppDrawer', () => {
   it('signs out and returns to the gateway', async () => {
     await openDrawer();
     fireEvent.press(screen.getByTestId('drawer-logout'));
-    await waitFor(() => expect(mockLogout).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'));
+    // The handler awaits logout() then replaces the route, so one microtask
+    // flush is enough. waitFor would poll against the fake clock installed
+    // above and only pass depending on how the suites interleave.
+    await act(async () => {});
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 
   it('renders nothing while closed', () => {

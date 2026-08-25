@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Share, Image } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Pressable, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Share, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
 import { timeAgo } from '../../src/utils/time';
-import { Avatar, RoleBadge } from '../../src/components';
+import { Avatar, RoleBadge, MediaViewer } from '../../src/components';
 import { PageColumn } from '../../src/components/web';
+import { colors, spacing, radius, compactAction } from '../../src/theme';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -19,6 +20,7 @@ export default function PostDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -97,20 +99,49 @@ export default function PostDetailScreen() {
         </View>
         <Text style={styles.postContent}>{post.content}</Text>
         {post.image_url ? (
-          <Image source={{ uri: post.image_url }} style={styles.postImage} resizeMode="cover" />
+          <Pressable
+            testID="post-detail-image"
+            onPress={() => setViewerOpen(true)}
+            accessibilityRole="imagebutton"
+            accessibilityLabel="Open image full screen"
+            style={({ pressed }) => [styles.postImageWrap, pressed && { opacity: 0.9 }]}
+          >
+            <Image source={{ uri: post.image_url }} style={styles.postImage} resizeMode="cover" />
+            <View style={styles.expandHint} pointerEvents="none">
+              <Ionicons name="expand-outline" size={14} color={colors.white} />
+            </View>
+          </Pressable>
         ) : null}
+        {/* Matches the feed's compact row: 32px painted, 44px effective via
+            hit slop. Previously these were bare icon+text with no minimum
+            target at all. */}
         <View style={styles.postActions}>
-          <TouchableOpacity testID="post-like-btn" style={styles.actionBtn} onPress={handleLike}>
-            <Ionicons name={isLiked ? "heart" : "heart-outline"} size={22} color={isLiked ? "#E84545" : "#94A3B8"} />
-            <Text style={[styles.actionText, isLiked && { color: '#E84545' }]}>{post.like_count}</Text>
-          </TouchableOpacity>
-          <View style={styles.actionBtn}>
-            <Ionicons name="chatbubble" size={20} color="#1A3A5C" />
-            <Text style={[styles.actionText, { color: '#1A3A5C' }]}>{post.comment_count}</Text>
+          <Pressable
+            testID="post-like-btn"
+            style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
+            onPress={handleLike}
+            hitSlop={compactAction.hitSlop}
+            accessibilityRole="button"
+            accessibilityLabel={`${isLiked ? 'Unlike' : 'Like'}, ${post.like_count} likes`}
+          >
+            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? colors.redText : colors.textSecondary} />
+            <Text style={[styles.actionText, isLiked && { color: colors.redText }]}>{post.like_count}</Text>
+          </Pressable>
+          {/* Not pressable — you are already on the post; this is a count. */}
+          <View style={styles.actionBtn} accessible accessibilityLabel={`${post.comment_count} comments`}>
+            <Ionicons name="chatbubble" size={18} color={colors.navy} />
+            <Text style={[styles.actionText, { color: colors.navy }]}>{post.comment_count}</Text>
           </View>
-          <TouchableOpacity testID="post-share-btn" style={styles.actionBtn} onPress={handleShare}>
-            <Ionicons name="share-social-outline" size={20} color="#94A3B8" />
-          </TouchableOpacity>
+          <Pressable
+            testID="post-share-btn"
+            style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
+            onPress={handleShare}
+            hitSlop={compactAction.hitSlop}
+            accessibilityRole="button"
+            accessibilityLabel="Share this post"
+          >
+            <Ionicons name="share-social-outline" size={18} color={colors.textSecondary} />
+          </Pressable>
         </View>
         <View style={styles.commentsHeader}>
           <Text style={styles.commentsTitle}>Comments</Text>
@@ -184,6 +215,16 @@ export default function PostDetailScreen() {
         </View>
       </KeyboardAvoidingView>
       </PageColumn>
+
+      {viewerOpen && post?.image_url ? (
+        // No onOpenPost here — this already is the post.
+        <MediaViewer
+          visible
+          imageUri={post.image_url}
+          post={post}
+          onClose={() => setViewerOpen(false)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -207,10 +248,37 @@ const styles = StyleSheet.create({
   roleTagText: { fontSize: 11, fontWeight: '600' },
   timeText: { fontSize: 12, color: '#94A3B8' },
   postContent: { fontSize: 16, color: '#334155', lineHeight: 24, marginBottom: 16 },
-  postImage: { width: '100%', height: 250, borderRadius: 12, marginBottom: 16 },
-  postActions: { flexDirection: 'row', paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 24, paddingBottom: 16 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  actionText: { fontSize: 14, color: '#94A3B8', fontWeight: '500' },
+  postImageWrap: { marginBottom: 16, borderRadius: 12, overflow: 'hidden' },
+  postImage: { width: '100%', height: 250 },
+  expandHint: {
+    position: 'absolute',
+    right: spacing.sm,
+    bottom: spacing.sm,
+    width: 26,
+    height: 26,
+    borderRadius: radius.sm,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  postActions: {
+    flexDirection: 'row',
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+    marginLeft: -spacing.sm,
+    gap: spacing.xs,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: compactAction.height,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
+  },
+  actionBtnPressed: { backgroundColor: colors.bgMuted },
+  actionText: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   
   commentsHeader: { borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16 },
   commentsTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },

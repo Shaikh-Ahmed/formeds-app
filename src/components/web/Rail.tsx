@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { colors, spacing, radius, typography, shadow, getRoleMeta } from '../../theme';
+import { colors, spacing, radius, typography, fonts, shadow, getRoleMeta } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../Avatar';
 import { Hoverable } from './Hoverable';
@@ -161,5 +161,5 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   shortcutHover: { backgroundColor: colors.bgMuted },
-  shortcutLabel: { ...typography.body, color: colors.textSecondary, fontWeight: '500' },
+  shortcutLabel: { ...typography.body, color: colors.textSecondary, fontFamily: fonts.body.medium },
 });

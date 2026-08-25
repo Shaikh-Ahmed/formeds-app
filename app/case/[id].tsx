@@ -13,7 +13,7 @@ import {
   Avatar, RoleBadge, VoteControl, TagChip, KycNotice,
   LoadingState, ErrorState, ErrorBanner, Button,
 } from '../../src/components';
-import { colors, radius, spacing, typography, MIN_TOUCH_TARGET } from '../../src/theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../src/theme';
 import {
   ANSWER_SORTS, REPORT_REASONS,
   type AnswerSort, type CaseAnswer, type CaseThread, type VoteValue,
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
   authorText: { flex: 1, gap: 2 },
   authorLine: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  authorName: { ...typography.small, fontWeight: '700', color: colors.text, flexShrink: 1 },
+  authorName: { ...typography.small, fontFamily: fonts.body.bold, color: colors.text, flexShrink: 1 },
   meta: { ...typography.small, color: colors.textMuted },
 
   answersHeader: { marginTop: spacing.xl, marginBottom: spacing.md, gap: spacing.sm },
@@ -594,7 +594,7 @@ const styles = StyleSheet.create({
   sortRow: { flexDirection: 'row', gap: spacing.sm },
   sortChip: { backgroundColor: colors.bgMuted, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2 },
   sortChipActive: { backgroundColor: colors.navy },
-  sortText: { ...typography.small, fontWeight: '600', color: colors.textSecondary },
+  sortText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   sortTextActive: { color: colors.white },
 
   answerCard: {
@@ -603,10 +603,10 @@ const styles = StyleSheet.create({
   },
   answerAccepted: { borderColor: colors.teal, borderWidth: 1.5 },
   acceptedBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
-  acceptedText: { ...typography.small, fontWeight: '700', color: colors.teal },
+  acceptedText: { ...typography.small, fontFamily: fonts.body.bold, color: colors.teal },
   postActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.md, flexWrap: 'wrap' },
   textAction: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 30 },
-  textActionLabel: { ...typography.small, fontWeight: '600', color: colors.textSecondary },
+  textActionLabel: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.textSecondary },
 
   replies: {
     marginTop: spacing.md, paddingLeft: spacing.md,

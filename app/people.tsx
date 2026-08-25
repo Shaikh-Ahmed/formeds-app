@@ -65,16 +65,28 @@ export default function PeopleScreen() {
     } catch (e: any) { alert(e.message); }
   };
 
+  /** Opens someone's professional profile. */
+  const openProfile = (id: string) =>
+    router.push({ pathname: '/profile/[id]', params: { id } } as any);
+
   const renderSearchUser = ({ item }: any) => {
     return (
       <View testID={`search-user-${item.id}`} style={styles.userCard}>
-        <Avatar name={item.name} role={item.role} size={48} />
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>{item.name}</Text>
-          <RoleBadge role={item.role} />
-          {item.specialty && <Text style={styles.userDetail}>{item.specialty}</Text>}
-          {item.city && <Text style={styles.userDetail}>{item.city}{item.state ? `, ${item.state}` : ''}</Text>}
-        </View>
+        <TouchableOpacity
+          testID={`view-profile-${item.id}`}
+          style={styles.identity}
+          onPress={() => openProfile(item.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${item.name}'s profile`}
+        >
+          <Avatar name={item.name} role={item.role} size={48} />
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{item.name}</Text>
+            <RoleBadge role={item.role} />
+            {item.specialty && <Text style={styles.userDetail}>{item.specialty}</Text>}
+            {item.city && <Text style={styles.userDetail}>{item.city}{item.state ? `, ${item.state}` : ''}</Text>}
+          </View>
+        </TouchableOpacity>
         <TouchableOpacity testID={`connect-btn-${item.id}`} style={[styles.connectBtn, item.requested && styles.requestedBtn]} onPress={() => sendRequest(item.id)} disabled={item.requested}>
           <Ionicons name={item.requested ? "checkmark" : "person-add"} size={18} color={item.requested ? "#94A3B8" : "#FFF"} />
           <Text style={[styles.connectText, item.requested && styles.requestedText]}>{item.requested ? 'Sent' : 'Connect'}</Text>
@@ -85,15 +97,31 @@ export default function PeopleScreen() {
 
   const renderConnection = ({ item }: any) => {
     return (
-      <TouchableOpacity testID={`connection-${item.id}`} style={styles.userCard} onPress={() => router.push({ pathname: '/conversation', params: { userId: item.id, userName: item.name } })} accessibilityRole="button" accessibilityLabel={`Open conversation with ${item.name}`}>
-        <Avatar name={item.name} role={item.role} size={48} />
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>{item.name}</Text>
-          {item.specialty && <Text style={styles.userDetail}>{item.specialty}</Text>}
-          {item.city && <Text style={styles.userDetail}>{item.city}{item.state ? `, ${item.state}` : ''}</Text>}
-        </View>
-        <View style={styles.msgIcon}><Ionicons name="chatbubble-outline" size={20} color="#1A3A5C" /></View>
-      </TouchableOpacity>
+      <View testID={`connection-${item.id}`} style={styles.userCard}>
+        <TouchableOpacity
+          testID={`view-profile-${item.id}`}
+          style={styles.identity}
+          onPress={() => openProfile(item.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${item.name}'s profile`}
+        >
+          <Avatar name={item.name} role={item.role} size={48} />
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{item.name}</Text>
+            {item.specialty && <Text style={styles.userDetail}>{item.specialty}</Text>}
+            {item.city && <Text style={styles.userDetail}>{item.city}{item.state ? `, ${item.state}` : ''}</Text>}
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID={`message-${item.id}`}
+          style={styles.msgIcon}
+          onPress={() => router.push({ pathname: '/conversation', params: { userId: item.id, userName: item.name } })}
+          accessibilityRole="button"
+          accessibilityLabel={`Message ${item.name}`}
+        >
+          <Ionicons name="chatbubble-outline" size={20} color="#1A3A5C" />
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -101,12 +129,23 @@ export default function PeopleScreen() {
     const req = item.requester || {};
     return (
       <View testID={`pending-${item.id}`} style={styles.userCard}>
-        <View style={[styles.avatar, { backgroundColor: '#1A3A5C' }]}><Text style={styles.avatarText}>{req.name?.charAt(0)}</Text></View>
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>{req.name}</Text>
-          {req.specialty && <Text style={styles.userDetail}>{req.specialty}</Text>}
-          <Text style={styles.pendingTime}>Wants to connect</Text>
-        </View>
+        <TouchableOpacity
+          testID={`view-profile-${req.id}`}
+          style={styles.identity}
+          onPress={() => req.id && openProfile(req.id)}
+          disabled={!req.id}
+          accessibilityRole="button"
+          accessibilityLabel={`View ${req.name}'s profile`}
+        >
+          {/* Shared Avatar rather than a hand-rolled initial circle, so a
+              requester looks the same here as everywhere else in the app. */}
+          <Avatar name={req.name} role={req.role} size={48} />
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{req.name}</Text>
+            {req.specialty && <Text style={styles.userDetail}>{req.specialty}</Text>}
+            <Text style={styles.pendingTime}>Wants to connect</Text>
+          </View>
+        </TouchableOpacity>
         <View style={styles.pendingActions}>
           <TouchableOpacity testID={`accept-${item.id}`} style={styles.acceptBtn} onPress={() => acceptRequest(item.id)}>
             <Ionicons name="checkmark" size={20} color="#FFF" />
@@ -192,9 +231,8 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 15, color: '#0F172A', height: 44 },
   searchBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#1A3A5C', alignItems: 'center', justifyContent: 'center' },
   list: { paddingVertical: 4 },
+  identity: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
   userCard: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  avatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
-  avatarText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
   userInfo: { flex: 1 },
   userName: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
   roleBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 2 },
@@ -204,7 +242,7 @@ const styles = StyleSheet.create({
   requestedBtn: { backgroundColor: '#F1F5F9' },
   connectText: { color: '#FFF', fontSize: 13, fontWeight: '600' },
   requestedText: { color: '#94A3B8' },
-  msgIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
+  msgIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
   pendingTime: { fontSize: 12, color: '#D97706', marginTop: 2 },
   pendingActions: { flexDirection: 'row', gap: 8 },
   acceptBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0F766E', alignItems: 'center', justifyContent: 'center' },

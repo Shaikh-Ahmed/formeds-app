@@ -9,7 +9,7 @@ import { timeAgo } from '../utils/time';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { LoadingState, EmptyState, ErrorState } from './States';
 import { PageColumn } from './web';
-import { colors, spacing, radius, typography, MIN_TOUCH_TARGET } from '../theme';
+import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET } from '../theme';
 
 /**
  * The notifications screen, rendered by two routes.
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     minHeight: 34,
     justifyContent: 'center',
   },
-  markAllText: { ...typography.caption, fontWeight: '700', color: colors.navy },
+  markAllText: { ...typography.caption, fontFamily: fonts.body.bold, color: colors.navy },
 
   filterRow: {
     flexDirection: 'row',
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipActive: { backgroundColor: colors.navy, borderColor: colors.navy },
-  chipText: { ...typography.caption, fontWeight: '600', color: colors.textSecondary },
+  chipText: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   chipTextActive: { color: colors.white },
 
   list: { paddingBottom: spacing.xxxl },
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.md,
   },
   notifContent: { flex: 1 },
-  notifTitle: { ...typography.body, fontWeight: '500', color: colors.textSecondary, marginBottom: 2 },
+  notifTitle: { ...typography.body, fontFamily: fonts.body.medium, color: colors.textSecondary, marginBottom: 2 },
   unreadTitle: { fontWeight: '700', color: colors.text },
   notifMessage: { ...typography.body, fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 4 },
   notifTime: { ...typography.small, color: colors.textSecondary },

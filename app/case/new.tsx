@@ -12,7 +12,7 @@ import { apiFetch, API_URL } from '../../src/utils/api';
 import {
   Button, ErrorBanner, KycNotice, LoadingState, ScreenHeader, TagChip,
 } from '../../src/components';
-import { colors, radius, spacing, typography, MIN_TOUCH_TARGET } from '../../src/theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../src/theme';
 import { PageColumn } from '../../src/components/web';
 
 // Mirrors the server's validators (models/schemas.py). Enforced here too so the
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border,
     borderRadius: radius.lg, paddingVertical: spacing.lg, minHeight: MIN_TOUCH_TARGET + 12,
   },
-  attachText: { ...typography.caption, color: colors.navy, fontWeight: '600' },
+  attachText: { ...typography.caption, color: colors.navy, fontFamily: fonts.body.semibold },
   imageWrap: { position: 'relative', alignSelf: 'flex-start' },
   image: { width: 160, height: 160, borderRadius: radius.lg },
   removeImage: { position: 'absolute', top: -10, right: -10, backgroundColor: 'rgba(15,23,42,0.65)', borderRadius: 13 },

@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, spacing, radius, typography, getRoleMeta, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, spacing, radius, typography, fonts, getRoleMeta, MIN_TOUCH_TARGET } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../Avatar';
 
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
   name: { ...typography.h3, color: colors.text, marginTop: spacing.md },
   role: { fontSize: 12, fontWeight: '700', marginTop: 2 },
   meta: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  viewProfile: { ...typography.caption, color: colors.navy, fontWeight: '700', marginTop: spacing.sm },
+  viewProfile: { ...typography.caption, color: colors.navy, fontFamily: fonts.body.bold, marginTop: spacing.sm },
 
   kyc: {
     flexDirection: 'row',
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     minHeight: MIN_TOUCH_TARGET + 4,
   },
   rowPressed: { backgroundColor: colors.bgMuted },
-  rowLabel: { ...typography.body, fontWeight: '500' },
+  rowLabel: { ...typography.body, fontFamily: fonts.body.medium },
 
   version: {
     ...typography.small,
