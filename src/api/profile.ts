@@ -1,5 +1,5 @@
-import { Platform } from 'react-native';
 import { apiFetch, API_URL } from '../utils/api';
+import { appendFile } from '../utils/upload';
 import {
   EntryKind,
   Profile,
@@ -103,27 +103,17 @@ export async function requestEntryVerification(token: string, entryId: string) {
  * Uploads bytes; the server validates them and writes the column itself, so the
  * client never supplies an image URL.
  *
- * The web/native fork is required: on web RN gives a blob: URI that FormData
- * cannot take by reference, and on native the `{uri, name, type}` shape is what
- * lets RN set its own multipart boundary. `apiFetch` detects FormData and omits
- * the JSON content-type so that boundary survives.
+ * `appendFile` owns the platform fork — a browser needs a Blob while React
+ * Native needs a { uri, name, type } descriptor. `apiFetch` detects FormData
+ * and omits the JSON content-type so the multipart boundary survives.
  */
 async function uploadImage(
   token: string,
   path: string,
   uri: string,
 ): Promise<Record<string, string>> {
-  const name = uri.split('/').pop() || 'upload.jpg';
-  const match = /\.(\w+)$/.exec(name);
-  const type = match ? `image/${match[1].toLowerCase()}` : 'image/jpeg';
-
   const formData = new FormData();
-  if (Platform.OS === 'web') {
-    const blob = await (await fetch(uri)).blob();
-    formData.append('file', blob, name);
-  } else {
-    formData.append('file', { uri, name, type } as any);
-  }
+  await appendFile(formData, 'file', { uri });
   return apiFetch(path, token, { method: 'POST', body: formData });
 }
 

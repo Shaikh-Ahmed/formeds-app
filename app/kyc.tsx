@@ -10,6 +10,7 @@ import { API_URL, detailToMessage } from '../src/utils/api';
 import { Button, FormInput, ErrorBanner, LoadingState, ScreenHeader } from '../src/components';
 import { colors, radius, spacing, typography } from '../src/theme';
 import { validateRequired, firstError } from '../src/utils/validation';
+import { appendFile } from '../src/utils/upload';
 import { PageColumn } from '../src/components/web';
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // mirrors services/files.py
@@ -83,11 +84,10 @@ export default function KycScreen() {
       const form = new FormData();
       form.append('registration_number', registrationNumber.trim());
       if (isProfessional) form.append('state_council', stateCouncil.trim());
-      form.append('document', {
-        uri: document!.uri,
-        name: document!.name,
-        type: document!.mimeType,
-      } as any);
+      // Platform-correct: a browser's FormData stringifies the React Native
+      // { uri, name, type } descriptor into "[object Object]", which the API
+      // rejects as `Expected UploadFile, received: <class 'str'>`.
+      await appendFile(form, 'document', document!);
 
       // Sent with fetch rather than apiFetch: React Native must set its own
       // multipart boundary, which apiFetch's JSON default would clobber.
