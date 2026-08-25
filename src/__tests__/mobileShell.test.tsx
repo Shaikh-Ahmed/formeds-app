@@ -1,4 +1,5 @@
 import React from 'react';
+import { AccessibilityInfo } from 'react-native';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { AppDrawer } from '../components/mobile/AppDrawer';
 import { MobileTopBar } from '../components/mobile/MobileTopBar';
@@ -35,11 +36,41 @@ jest.mock('react-native-safe-area-context', () => {
   return { ...actual, useSafeAreaInsets: () => mockInsets };
 });
 
+/**
+ * Render icons synchronously.
+ *
+ * @expo/vector-icons' createIconSet awaits Font.loadAsync in componentDidMount
+ * and then setStates, which lands outside act and floods the output with
+ * warnings. Mocking it removes that unflushed work; these assertions are all on
+ * testIDs, never on glyphs, so nothing is lost.
+ *
+ * A Proxy so any icon family resolves, not just the ones these two components
+ * happen to import today.
+ */
+jest.mock('@expo/vector-icons', () => {
+  // require, not import: jest.mock factories are hoisted above the imports.
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const ReactModule = require('react');
+  const { Text } = require('react-native');
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  const Icon = ({ name, ...rest }: any) => ReactModule.createElement(Text, rest, name);
+  return new Proxy(
+    {},
+    { get: (_t, key) => (key === '__esModule' ? true : Icon) },
+  );
+});
+
 beforeEach(() => {
   // Fake timers make the drawer's open/close animation complete on demand
   // rather than on wall-clock time, which is what made these tests flaky
   // under CPU contention.
   jest.useFakeTimers();
+
+  // AppDrawer probes AccessibilityInfo.isReduceMotionEnabled() and setStates
+  // when it resolves — an async tail fake timers do not control. Pinning it
+  // makes the tail one predictable tick. These tests cover drawer routing, not
+  // motion preferences.
+  jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
   mockPush.mockClear();
   mockReplace.mockClear();
   mockLogout.mockClear();
@@ -55,6 +86,7 @@ afterEach(() => {
   // animation callback can't fire against a torn-down environment.
   act(() => { jest.runOnlyPendingTimers(); });
   jest.useRealTimers();
+  jest.restoreAllMocks();
 });
 
 describe('MobileTopBar', () => {
@@ -110,21 +142,25 @@ describe('MobileTopBar', () => {
 
 describe('AppDrawer', () => {
   /**
-   * Opens the drawer and drains both async tails deterministically: the
-   * AccessibilityInfo.isReduceMotionEnabled() promise and the Animated.timing
-   * completion callback that flips `mounted`.
+   * Opens the drawer.
    *
-   * An earlier version slept a fixed 300ms of real time, which flaked when the
-   * suite ran alongside a Metro bundle — the animation callback then landed
-   * after teardown. Draining explicitly removes the dependence on wall-clock
-   * timing entirely.
+   * Deliberately synchronous. Every assertion below reads a row, and the rows
+   * exist as soon as `visible` flips `mounted` in the mount effect that
+   * render() already flushes — the open animation changes only opacity and
+   * translation, which nothing here inspects.
+   *
+   * Two earlier versions tried to wait for the animation instead: first a fixed
+   * 300ms real sleep, then `await act(async () => ...)` draining microtasks
+   * before advancing the clock. Both were attempts to settle async work whose
+   * timing the test does not control, and the second deadlocked on CI —
+   * `await openDrawer()` simply never returned and the test hit its 5s timeout.
+   *
+   * A synchronous act() cannot wait on anything, so it cannot hang. Advancing
+   * the clock still settles the animation for teardown.
    */
-  const openDrawer = async (onClose = jest.fn()) => {
+  const openDrawer = (onClose = jest.fn()) => {
     render(<AppDrawer visible onClose={onClose} />);
-    await act(async () => {
-      await Promise.resolve();
-      jest.advanceTimersByTime(500);
-    });
+    act(() => { jest.advanceTimersByTime(500); });
     return onClose;
   };
 
