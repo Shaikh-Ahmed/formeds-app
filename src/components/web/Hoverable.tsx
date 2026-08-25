@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import type { StyleProp, ViewStyle } from 'react-native';
+import type { PressableProps, StyleProp, ViewStyle } from 'react-native';
 
 /**
  * Hover + focus affordances, which a phone-only UI never needed.
@@ -25,6 +25,12 @@ export function Hoverable({
   accessibilityRole = 'button',
   accessibilityState,
   testID,
+  /**
+   * Extends the touch area beyond the painted box. Lets a control be drawn
+   * compactly while still meeting the 44px minimum target — the supported way
+   * to slim a dense action row without shrinking what a finger has to hit.
+   */
+  hitSlop,
   /** Render as a plain View when there is no press handler (e.g. static cards). */
   as,
 }: {
@@ -37,6 +43,7 @@ export function Hoverable({
   accessibilityRole?: 'button' | 'link' | 'tab' | 'none';
   accessibilityState?: { selected?: boolean; disabled?: boolean };
   testID?: string;
+  hitSlop?: PressableProps['hitSlop'];
   as?: 'view';
 }) {
   const [hovered, setHovered] = useState(false);
@@ -58,6 +65,7 @@ export function Hoverable({
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel}
       accessibilityState={accessibilityState}
+      hitSlop={hitSlop}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
       style={({ pressed }) => [

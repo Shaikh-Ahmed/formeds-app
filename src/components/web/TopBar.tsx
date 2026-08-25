@@ -49,9 +49,7 @@ export function TopBar({
   // so the two can't silently disagree about who sees what.
   const items: NavItem[] = [
     { key: 'community', label: 'Community', href: '/(tabs)/community', icon: 'chatbubbles-outline', iconActive: 'chatbubbles' },
-    ...(role !== 'clinic'
-      ? [{ key: 'jobs', label: role === 'hospital' ? 'Postings' : 'Jobs', href: '/(tabs)/jobs', icon: 'briefcase-outline', iconActive: 'briefcase' } as NavItem]
-      : []),
+    { key: 'jobs', label: 'Jobs', href: '/(tabs)/jobs', icon: 'briefcase-outline', iconActive: 'briefcase' },
     ...(role === 'healthcare_professional'
       ? [{ key: 'learning', label: 'Learning', href: '/(tabs)/learning', icon: 'book-outline', iconActive: 'book' } as NavItem]
       : []),

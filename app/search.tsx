@@ -16,7 +16,7 @@ import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
 import { Avatar, RoleBadge, CaseCard } from '../src/components';
 import { PageColumn } from '../src/components/web';
-import { colors, spacing, radius, typography, MIN_TOUCH_TARGET, getRoleMeta } from '../src/theme';
+import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET, getRoleMeta } from '../src/theme';
 import type { CaseThread } from '../src/types/cases';
 
 type Scope = 'all' | 'people' | 'cases' | 'jobs';
@@ -215,7 +215,11 @@ export default function SearchScreen() {
               {showPeople && (
                 <Section title="People" count={people.length}>
                   {people.slice(0, scope === 'all' ? 4 : undefined).map(p => (
-                    <PersonRow key={p.id} person={p} onPress={() => router.push('/people')} />
+                    <PersonRow
+                      key={p.id}
+                      person={p}
+                      onPress={() => router.push({ pathname: '/profile/[id]', params: { id: p.id } } as any)}
+                    />
                   ))}
                 </Section>
               )}
@@ -434,7 +438,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chipActive: { backgroundColor: colors.navy, borderColor: colors.navy },
-  chipText: { ...typography.caption, fontWeight: '600', color: colors.textSecondary },
+  chipText: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   chipTextActive: { color: colors.white },
 
   body: { padding: spacing.lg, paddingBottom: spacing.xxxl },

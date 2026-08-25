@@ -4,6 +4,7 @@ import { View, ActivityIndicator } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
+import { useBrandFonts } from '../src/hooks/useBrandFonts';
 import { StatusBar } from 'expo-status-bar';
 import { TopBar } from '../src/components/web';
 import { colors, useBreakpoint } from '../src/theme';
@@ -115,6 +116,9 @@ function RootNavigator() {
       <Stack.Screen name="messages" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="conversation" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="people" options={{ animation: 'slide_from_right' }} />
+      {/* Another professional's profile. Distinct from /(tabs)/profile,
+          which is the signed-in user's own. */}
+      <Stack.Screen name="profile/[id]" options={{ animation: 'slide_from_right' }} />
       {/* Fades rather than slides: search is a mode you enter from the header,
           not a place further along the stack. */}
       <Stack.Screen name="search" options={{ animation: 'fade' }} />
@@ -124,6 +128,20 @@ function RootNavigator() {
 }
 
 function RootLayout() {
+  // Gate on fonts so the first paint is already in the brand face rather than
+  // visibly reflowing from the system one. `useBrandFonts` self-releases if the
+  // load is slow or fails, so this can never become a permanent blank screen.
+  const fontsReady = useBrandFonts();
+
+  if (!fontsReady) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.navy }}>
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color={colors.white} />
+      </View>
+    );
+  }
+
   return (
     <AuthProvider>
       {/*

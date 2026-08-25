@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { usePaginatedList } from '../hooks/usePaginatedList';
-import { colors, radius, spacing, typography, MIN_TOUCH_TARGET } from '../theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../theme';
 import { CaseCard } from './CaseCard';
 import { TagChip } from './TagChip';
 import { LoadingState, EmptyState, ErrorState } from './States';
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm - 2,
   },
   chipActive: { backgroundColor: colors.navy },
-  chipText: { ...typography.small, fontWeight: '600', color: colors.textSecondary },
+  chipText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   chipTextActive: { color: colors.white },
   list: { padding: spacing.lg, paddingBottom: 100 },
   footer: { paddingVertical: spacing.xl },

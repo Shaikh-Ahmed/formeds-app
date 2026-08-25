@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
 import { Button, ScreenHeader, LoadingState, ErrorState, ErrorBanner } from '../../src/components';
-import { colors, spacing, typography, radius } from '../../src/theme';
+import { colors, spacing, typography, fonts, radius } from '../../src/theme';
 import { PageColumn } from '../../src/components/web';
 
 interface Lesson {
@@ -133,7 +133,7 @@ function Meta({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: stri
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: spacing.xl, paddingBottom: spacing.xxxl },
-  specialty: { ...typography.small, color: colors.teal, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  specialty: { ...typography.small, color: colors.teal, fontFamily: fonts.body.bold, textTransform: 'uppercase', letterSpacing: 1 },
   title: { ...typography.h2, color: colors.text, marginTop: spacing.xs, marginBottom: spacing.md },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, marginBottom: spacing.xl },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 4 },

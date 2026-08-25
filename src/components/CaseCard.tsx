@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography } from '../theme';
+import { colors, radius, spacing, typography, fonts } from '../theme';
 import { timeAgo } from '../utils/time';
 import { Avatar } from './Avatar';
 import { RoleBadge } from './RoleBadge';
@@ -106,12 +106,12 @@ const styles = StyleSheet.create({
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
   footer: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
   authorMeta: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  authorName: { ...typography.small, fontWeight: '600', color: colors.textSecondary, flexShrink: 1 },
+  authorName: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.textSecondary, flexShrink: 1 },
   time: { ...typography.small, color: colors.textMuted },
   stats: {
     flexDirection: 'row', gap: spacing.xl, marginTop: spacing.md,
     paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderLight,
   },
   stat: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  statText: { ...typography.small, color: colors.textMuted, fontWeight: '600' },
+  statText: { ...typography.small, color: colors.textMuted, fontFamily: fonts.body.semibold },
 });
