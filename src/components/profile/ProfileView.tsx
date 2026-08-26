@@ -37,7 +37,7 @@ const VISIBILITY_OPTIONS: Visibility[] = [
 ];
 
 export function ProfileView({ userId }: Props) {
-  const { token, refreshUser } = useAuth();
+  const { token, user, refreshUser } = useAuth();
   const { isMobile, isDesktop } = useBreakpoint();
   const router = useRouter();
 
@@ -444,6 +444,16 @@ export function ProfileView({ userId }: Props) {
             badge: 'Soon',
             onPress: () => { setOverflowOpen(false); setComingSoon(RESUME_SOON); },
           },
+          // Restores the entry point this screen lost when its Account/Admin
+          // menu moved to the drawer: the drawer is unreachable above 768px,
+          // so an admin had no route to the review queue on desktop.
+          ...(user?.is_admin
+            ? [{
+                label: 'KYC review queue',
+                icon: 'shield-checkmark-outline' as const,
+                onPress: () => { setOverflowOpen(false); router.push('/admin/kyc' as any); },
+              }]
+            : []),
           ...(editable
             ? [{
                 label: 'Privacy settings',
