@@ -48,7 +48,7 @@ export function TopBar({
   // Mirrors the href gating in app/(tabs)/_layout.tsx. Kept in the same shape
   // so the two can't silently disagree about who sees what.
   const items: NavItem[] = [
-    { key: 'community', label: 'Community', href: '/(tabs)/community', icon: 'chatbubbles-outline', iconActive: 'chatbubbles' },
+    { key: 'community', label: 'Home', href: '/(tabs)/community', icon: 'chatbubbles-outline', iconActive: 'chatbubbles' },
     { key: 'jobs', label: 'Jobs', href: '/(tabs)/jobs', icon: 'briefcase-outline', iconActive: 'briefcase' },
     ...(role === 'healthcare_professional'
       ? [{ key: 'learning', label: 'Learning', href: '/(tabs)/learning', icon: 'book-outline', iconActive: 'book' } as NavItem]

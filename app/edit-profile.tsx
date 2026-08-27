@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
-import { Button, FormInput, ScreenHeader, ErrorBanner } from '../src/components';
+import { Button, FormInput, SelectField, ScreenHeader, ErrorBanner } from '../src/components';
+import { STATE_NAMES, citiesForState, isCustomCity, OTHER_CITY } from '../src/data/indiaLocations';
 import { colors, spacing, typography } from '../src/theme';
 import { PageColumn } from '../src/components/web';
 
@@ -15,8 +16,15 @@ export default function EditProfileScreen() {
   const [name, setName] = useState(user?.name ?? '');
   const [specialty, setSpecialty] = useState(user?.specialty ?? '');
   const [professionalRole, setProfessionalRole] = useState(user?.professional_role ?? '');
-  const [city, setCity] = useState(user?.city ?? '');
   const [state, setState] = useState(user?.state ?? '');
+  // A stored city outside its state's list predates these pickers, or was
+  // typed through "Other". Either way it re-opens as "Other" with the text
+  // intact, rather than showing an empty field over saved data.
+  const storedCityIsCustom = isCustomCity(user?.state ?? '', user?.city ?? '');
+  const [citySelection, setCitySelection] = useState(
+    storedCityIsCustom ? OTHER_CITY : (user?.city ?? ''),
+  );
+  const [cityOther, setCityOther] = useState(storedCityIsCustom ? (user?.city ?? '') : '');
   const [experience, setExperience] = useState(user?.years_experience != null ? String(user.years_experience) : '');
   const [location, setLocation] = useState(user?.location ?? '');
   const [contactPerson, setContactPerson] = useState(user?.contact_person ?? '');
@@ -24,6 +32,18 @@ export default function EditProfileScreen() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const cityOptions = [...citiesForState(state), OTHER_CITY];
+  const cityIsOther = citySelection === OTHER_CITY;
+  const cityValue = cityIsOther ? cityOther : citySelection;
+
+  const changeState = (next: string) => {
+    setState(next);
+    // A city picked under the old state is almost never in the new one, so drop
+    // it rather than save "Mumbai, Kerala". A typed "Other" city survives: the
+    // member entered it deliberately and it stays visible right below.
+    if (!cityIsOther && !citiesForState(next).includes(citySelection)) setCitySelection('');
+  };
 
   const isProfessional = user?.role === 'healthcare_professional';
   const isHospital = user?.role === 'hospital';
@@ -37,7 +57,7 @@ export default function EditProfileScreen() {
       if (isProfessional) {
         payload.professional_role = professionalRole.trim();
         payload.specialty = specialty.trim();
-        payload.city = city.trim();
+        payload.city = cityValue.trim();
         payload.state = state.trim();
         const years = parseInt(experience, 10);
         if (!Number.isNaN(years)) payload.years_experience = years;
@@ -73,8 +93,42 @@ export default function EditProfileScreen() {
             <>
               <FormInput label="Professional role" icon="medkit-outline" value={professionalRole} onChangeText={setProfessionalRole} placeholder="Doctor, Nurse, Allied Health" />
               <FormInput label="Specialty" icon="medical-outline" value={specialty} onChangeText={setSpecialty} placeholder="e.g. Cardiology" />
-              <FormInput label="City" icon="location-outline" value={city} onChangeText={setCity} placeholder="e.g. Mumbai" />
-              <FormInput label="State" icon="map-outline" value={state} onChangeText={setState} placeholder="e.g. Maharashtra" />
+              {/* State first: it is what narrows the city list, and a city
+                  picker with nothing in it reads as broken. */}
+              <SelectField
+                testID="edit-state"
+                label="State"
+                icon="map-outline"
+                value={state}
+                onChange={changeState}
+                options={STATE_NAMES}
+                placeholder="Select your state"
+                title="State or union territory"
+                searchPlaceholder="Search states…"
+              />
+              <SelectField
+                testID="edit-city"
+                label="City"
+                icon="location-outline"
+                value={citySelection}
+                onChange={setCitySelection}
+                options={cityOptions}
+                placeholder="Select your city"
+                disabled={!state}
+                disabledHint="Choose a state first"
+                searchPlaceholder="Search cities…"
+              />
+              {cityIsOther ? (
+                <FormInput
+                  testID="edit-city-other"
+                  label="City name"
+                  icon="create-outline"
+                  value={cityOther}
+                  onChangeText={setCityOther}
+                  placeholder="Type your city or town"
+                  maxLength={80}
+                />
+              ) : null}
               <FormInput label="Years of experience" icon="time-outline" value={experience} onChangeText={setExperience} placeholder="e.g. 8" keyboardType="number-pad" />
             </>
           )}

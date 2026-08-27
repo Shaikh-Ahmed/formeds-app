@@ -10,7 +10,8 @@ import {
 import { Button, ErrorBanner } from '../index';
 import { Chip } from '../Chip';
 import { EntryKind } from '../../types/profile';
-import { ENTRY_FORMS, EntryForm, FieldDef, pruneEmpty } from './entryForms';
+import { ENTRY_FORMS, EntryForm, FieldDef, OTHER_OPTION, pruneEmpty } from './entryForms';
+import { SelectField } from '../SelectField';
 
 interface Props {
   visible: boolean;
@@ -65,7 +66,16 @@ export function EntrySheet({
 
   if (!form) return null;
 
-  const set = (key: string, value: any) => setValues((v) => ({ ...v, [key]: value }));
+  const set = (key: string, value: any) =>
+    setValues((v) => {
+      const next = { ...v, [key]: value };
+      // A city chosen under the old state is almost never in the new one, so
+      // any lookup scoped to the field just changed starts over.
+      for (const f of form.fields) {
+        if (f.lookup?.clearedBy === key) next[f.key] = '';
+      }
+      return next;
+    });
 
   const submit = () => {
     setTouched(true);
@@ -121,6 +131,7 @@ export function EntrySheet({
                   key={field.key}
                   field={field}
                   value={values[field.key]}
+                  draft={values}
                   onChange={(v) => set(field.key, v)}
                   showError={touched && missing.includes(field.key)}
                 />
@@ -157,15 +168,92 @@ export function EntrySheet({
   );
 }
 
-function Field({
-  field, value, onChange, showError,
+/**
+ * A `lookup` field: `SelectField` plus the free-text escape behind "Other".
+ *
+ * The form stores one string either way, so "Other" cannot be a stored value —
+ * it is inferred. A value that is not in the list came from free text, which is
+ * also how a city saved before these lists existed re-opens with its text
+ * intact instead of showing an empty field over saved data.
+ */
+function Lookup({
+  field, value, draft, onChange,
 }: {
   field: FieldDef;
   value: any;
+  draft: Record<string, any>;
+  onChange: (v: any) => void;
+}) {
+  const config = field.lookup!;
+  const options = typeof config.options === 'function' ? config.options(draft) : config.options;
+  const stored = String(value ?? '');
+
+  // "Other" chosen but nothing typed yet is indistinguishable from "unset" in
+  // the stored value, so that one transient state is tracked here.
+  const [pickedOther, setPickedOther] = useState(false);
+  const dependency = config.clearedBy ? String(draft[config.clearedBy] ?? '') : '';
+  useEffect(() => { setPickedOther(false); }, [dependency]);
+
+  const isOther = config.allowOther && (pickedOther || (!!stored && !options.includes(stored)));
+  const blocked = !!config.clearedBy && !dependency.trim();
+
+  const choose = (picked: string) => {
+    if (picked === OTHER_OPTION) {
+      setPickedOther(true);
+      onChange('');
+      return;
+    }
+    setPickedOther(false);
+    onChange(picked);
+  };
+
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{field.label}</Text>
+      <SelectField
+        testID={`entry-${field.key}`}
+        label={field.label}
+        hideLabel
+        containerStyle={styles.lookupField}
+        value={isOther ? OTHER_OPTION : stored}
+        onChange={choose}
+        options={config.allowOther ? [...options, OTHER_OPTION] : options}
+        placeholder={field.placeholder || 'Select…'}
+        disabled={blocked}
+        disabledHint={config.requiresHint}
+        helper={field.helper}
+        searchPlaceholder={config.searchPlaceholder}
+      />
+      {isOther ? (
+        <TextInput
+          testID={`entry-${field.key}-other`}
+          value={stored}
+          onChangeText={onChange}
+          placeholder={`Type your ${field.label.toLowerCase()}`}
+          placeholderTextColor={colors.textMuted}
+          style={styles.input}
+          accessibilityLabel={`${field.label}, other`}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function Field({
+  field, value, draft, onChange, showError,
+}: {
+  field: FieldDef;
+  value: any;
+  /** The whole payload, so a lookup can scope itself to another field. */
+  draft: Record<string, any>;
   onChange: (v: any) => void;
   showError?: boolean;
 }) {
-  const [draft, setDraft] = useState('');
+  const [tagDraft, setTagDraft] = useState('');
+
+  if (field.type === 'lookup' && field.lookup) {
+    return <Lookup field={field} value={value} draft={draft} onChange={onChange} />;
+  }
 
   if (field.type === 'switch') {
     return (
@@ -236,18 +324,18 @@ function Field({
   if (field.type === 'tags') {
     const items: string[] = Array.isArray(value) ? value : [];
     const add = () => {
-      const next = draft.trim();
-      if (!next || items.includes(next)) return setDraft('');
+      const next = tagDraft.trim();
+      if (!next || items.includes(next)) return setTagDraft('');
       onChange([...items, next]);
-      setDraft('');
+      setTagDraft('');
     };
     return (
       <View style={styles.field}>
         <Text style={styles.label}>{field.label}</Text>
         <View style={styles.tagInputRow}>
           <TextInput
-            value={draft}
-            onChangeText={setDraft}
+            value={tagDraft}
+            onChangeText={setTagDraft}
             onSubmitEditing={add}
             placeholder={field.placeholder}
             placeholderTextColor={colors.textMuted}
@@ -343,6 +431,9 @@ const styles = StyleSheet.create({
 
   body: { padding: spacing.xl, gap: spacing.lg, paddingBottom: spacing.xxl },
   field: { gap: spacing.sm },
+  // The sheet spaces its own fields; SelectField's default margin would
+  // double it and push lookups out of rhythm with the inputs around them.
+  lookupField: { marginBottom: 0 },
   label: { ...typography.label, color: colors.text },
   required: { color: colors.redText },
   helper: { ...typography.small, color: colors.textMuted, lineHeight: 16 },

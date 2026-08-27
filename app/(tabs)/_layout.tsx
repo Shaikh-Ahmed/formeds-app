@@ -117,7 +117,7 @@ export default function TabLayout() {
       >
         {/* "chatbubbles", not "people" — the Specialists tab already owns the
             people glyph, and these read as the same shape at tab-bar size. */}
-        <Tabs.Screen name="community" options={{ title: 'Community', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} /> }} />
+        <Tabs.Screen name="community" options={{ title: 'Home', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} /> }} />
         {/* Every account type can now browse AND advertise work, so this tab
             is no longer role-gated and no longer renames itself. */}
         <Tabs.Screen name="jobs" options={{

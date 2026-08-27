@@ -10,8 +10,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch, API_URL } from '../../src/utils/api';
 import {
-  Button, ErrorBanner, KycNotice, LoadingState, ScreenHeader, TagChip,
+  Button, ErrorBanner, KycNotice, LoadingState, ScreenHeader, TagChip, SelectField,
 } from '../../src/components';
+import { SPECIALTY_OPTIONS, OTHER_SPECIALTY, isCustomSpecialty } from '../../src/data/specialties';
 import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../src/theme';
 import { PageColumn } from '../../src/components/web';
 
@@ -21,6 +22,7 @@ const TITLE_MIN = 10;
 const TITLE_MAX = 200;
 const BODY_MIN = 20;
 const MAX_TAGS = 5;
+const SPECIALTY_MAX = 100;
 
 const BODY_PROMPT = `Presentation, relevant history, what you have already tried, and the specific question you want answered.
 
@@ -36,7 +38,10 @@ export default function CaseComposerScreen() {
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  // Split so "Other" can keep its own text: the server stores one free-text
+  // column either way, and `specialtyValue` is what gets sent.
   const [specialty, setSpecialty] = useState('');
+  const [specialtyOther, setSpecialtyOther] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -52,7 +57,15 @@ export default function CaseComposerScreen() {
       const existing = await apiFetch(`/api/cases/${id}`, token);
       setTitle(existing.title);
       setBody(existing.body);
-      setSpecialty(existing.specialty || '');
+      // A saved specialty that is not in the list came from free text, so it
+      // re-opens as "Other" with the words the author chose still in place.
+      const saved = existing.specialty || '';
+      if (isCustomSpecialty(saved)) {
+        setSpecialty(OTHER_SPECIALTY);
+        setSpecialtyOther(saved);
+      } else {
+        setSpecialty(saved);
+      }
       setTags(existing.tags || []);
       setImageUrl(existing.image_url || '');
       setAnonymous(!!existing.is_anonymous);
@@ -106,6 +119,9 @@ export default function CaseComposerScreen() {
     }
   };
 
+  const specialtyIsOther = specialty === OTHER_SPECIALTY;
+  const specialtyValue = specialtyIsOther ? specialtyOther : specialty;
+
   const titleShort = title.trim().length > 0 && title.trim().length < TITLE_MIN;
   const bodyShort = body.trim().length > 0 && body.trim().length < BODY_MIN;
   const ready = title.trim().length >= TITLE_MIN && body.trim().length >= BODY_MIN && isKycApproved;
@@ -118,7 +134,7 @@ export default function CaseComposerScreen() {
       const payload = {
         title: title.trim(),
         body: body.trim(),
-        specialty: specialty.trim(),
+        specialty: specialtyValue.trim(),
         tags,
         image_url: imageUrl,
         ...(editing ? {} : { is_anonymous: anonymous }),
@@ -194,17 +210,31 @@ export default function CaseComposerScreen() {
           />
           {bodyShort ? <Text style={[styles.hint, styles.hintWarn]}>At least {BODY_MIN} characters</Text> : null}
 
-          <Text style={styles.label}>Specialty</Text>
-          <TextInput
-            testID="case-specialty-input"
-            style={styles.input}
-            placeholder="e.g. Anaesthesiology"
-            placeholderTextColor={colors.textMuted}
-            value={specialty}
-            onChangeText={setSpecialty}
-            editable={isKycApproved}
-            accessibilityLabel="Specialty"
-          />
+          <View style={styles.selectBlock}>
+            <SelectField
+              testID="case-specialty-select"
+              label="Specialty"
+              value={specialty}
+              onChange={setSpecialty}
+              options={SPECIALTY_OPTIONS}
+              placeholder="Select a specialty"
+              disabled={!isKycApproved}
+              searchPlaceholder="Search specialties…"
+            />
+            {specialtyIsOther ? (
+              <TextInput
+                testID="case-specialty-other-input"
+                style={styles.input}
+                placeholder="Which specialty?"
+                placeholderTextColor={colors.textMuted}
+                value={specialtyOther}
+                onChangeText={setSpecialtyOther}
+                editable={isKycApproved}
+                maxLength={SPECIALTY_MAX}
+                accessibilityLabel="Specialty, other"
+              />
+            ) : null}
+          </View>
 
           <Text style={styles.label}>Tags</Text>
           <Text style={styles.hint}>Up to {MAX_TAGS}. These are how colleagues find your case.</Text>
@@ -316,6 +346,9 @@ const styles = StyleSheet.create({
   },
   privacyText: { ...typography.caption, color: colors.textSecondary, flex: 1, lineHeight: 18 },
   label: { ...typography.label, color: colors.text, marginBottom: spacing.sm, marginTop: spacing.lg },
+  // SelectField carries its own label and bottom margin, so the block only
+  // needs the lead-in the hand-rolled labels above it get.
+  selectBlock: { marginTop: spacing.lg },
   input: {
     backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg,
     paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
