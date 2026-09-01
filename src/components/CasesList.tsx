@@ -10,6 +10,7 @@ import { CaseCard } from './CaseCard';
 import { TagChip } from './TagChip';
 import { LoadingState, EmptyState, ErrorState } from './States';
 import { CASE_SORTS, type CaseSort, type CaseTag, type CaseThread } from '../types/cases';
+import { focusScrollInset, type CollapsibleScrollProps } from '../hooks/useCollapsibleHeader';
 
 const SEARCH_DEBOUNCE_MS = 400;
 
@@ -19,7 +20,15 @@ const SEARCH_DEBOUNCE_MS = 400;
  * Lives here rather than in `app/(tabs)/community.tsx` because everything under
  * `app/` is a route — this is a panel, not a screen.
  */
-export function CasesList() {
+export function CasesList({
+  scrollProps,
+  contentInsetTop = 0,
+}: {
+  /** Lets the parent screen's collapsing header ride this list's scrolling. */
+  scrollProps?: CollapsibleScrollProps;
+  /** Height of the overlaying header, so the first card clears it. */
+  contentInsetTop?: number;
+} = {}) {
   const { token } = useAuth();
   const router = useRouter();
 
@@ -62,102 +71,119 @@ export function CasesList() {
     ? 'Nothing matches these filters yet. Try clearing them.'
     : 'Post the first one — a question with the workup so far gets answers fastest.';
 
-  return (
-    <View style={styles.flex}>
-      <View style={styles.controls}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={colors.textMuted} />
-          <TextInput
-            testID="case-search-input"
-            style={styles.searchInput}
-            placeholder="Search cases…"
-            placeholderTextColor={colors.textMuted}
-            value={search}
-            onChangeText={setSearch}
-            returnKeyType="search"
-            accessibilityLabel="Search cases"
-          />
-          {search ? (
-            <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel="Clear search">
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {CASE_SORTS.map(option => {
-            const active = !savedOnly && sort === option.key;
-            return (
-              <TouchableOpacity
-                key={option.key}
-                testID={`case-sort-${option.key}`}
-                onPress={() => { setSavedOnly(false); setSort(option.key); }}
-                style={[styles.chip, active && styles.chipActive]}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-          {/* Saved is a per-account list, so it only exists for a signed-in
-              reader — offering it signed-out would just buy a 401. */}
-          {token ? (
-            <TouchableOpacity
-              testID="case-sort-saved"
-              onPress={() => setSavedOnly(v => !v)}
-              style={[styles.chip, savedOnly && styles.chipActive]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: savedOnly }}
-            >
-              <Ionicons
-                name={savedOnly ? 'bookmark' : 'bookmark-outline'}
-                size={13}
-                color={savedOnly ? colors.white : colors.textSecondary}
-              />
-              <Text style={[styles.chipText, savedOnly && styles.chipTextActive]}>Saved</Text>
-            </TouchableOpacity>
-          ) : null}
-        </ScrollView>
-
-        {!savedOnly && tags.length > 0 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-            {tags.map(t => (
-              <TagChip
-                key={t.tag}
-                testID={`case-tag-${t.tag}`}
-                label={t.tag}
-                count={t.count}
-                selected={tag === t.tag}
-                onPress={() => selectTag(t.tag)}
-              />
-            ))}
-          </ScrollView>
+  // The filter strip scrolls with the results instead of sitting above them:
+  // the screen's collapsing header already owns the top edge, and a second
+  // pinned bar beneath it would leave a blank strip whenever the header slid
+  // away. Passed as an element, not a component, so typing in the search box
+  // reconciles the input rather than remounting it and dropping focus.
+  const controls = (
+    <View style={[styles.controls, styles.controlsInList]}>
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={18} color={colors.textMuted} />
+        <TextInput
+          testID="case-search-input"
+          style={styles.searchInput}
+          placeholder="Search cases…"
+          placeholderTextColor={colors.textMuted}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+          accessibilityLabel="Search cases"
+        />
+        {search ? (
+          <TouchableOpacity onPress={() => setSearch('')} accessibilityRole="button" accessibilityLabel="Clear search">
+            <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
         ) : null}
       </View>
 
-      {loading ? (
-        <LoadingState label="Loading cases…" />
-      ) : error && items.length === 0 ? (
-        <ErrorState message={error} onRetry={load} />
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <CaseCard
-              item={item}
-              onPress={() => router.push({ pathname: '/case/[id]', params: { id: item.id } } as any)}
-              onTagPress={savedOnly ? undefined : selectTag}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+        {CASE_SORTS.map(option => {
+          const active = !savedOnly && sort === option.key;
+          return (
+            <TouchableOpacity
+              key={option.key}
+              testID={`case-sort-${option.key}`}
+              onPress={() => { setSavedOnly(false); setSort(option.key); }}
+              style={[styles.chip, active && styles.chipActive]}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+        {/* Saved is a per-account list, so it only exists for a signed-in
+            reader — offering it signed-out would just buy a 401. */}
+        {token ? (
+          <TouchableOpacity
+            testID="case-sort-saved"
+            onPress={() => setSavedOnly(v => !v)}
+            style={[styles.chip, savedOnly && styles.chipActive]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: savedOnly }}
+          >
+            <Ionicons
+              name={savedOnly ? 'bookmark' : 'bookmark-outline'}
+              size={13}
+              color={savedOnly ? colors.white : colors.textSecondary}
             />
-          )}
-          contentContainerStyle={styles.list}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.navy} />}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.footer} color={colors.navy} /> : null}
-          ListEmptyComponent={
+            <Text style={[styles.chipText, savedOnly && styles.chipTextActive]}>Saved</Text>
+          </TouchableOpacity>
+        ) : null}
+      </ScrollView>
+
+      {!savedOnly && tags.length > 0 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+          {tags.map(t => (
+            <TagChip
+              key={t.tag}
+              testID={`case-tag-${t.tag}`}
+              label={t.tag}
+              count={t.count}
+              selected={tag === t.tag}
+              onPress={() => selectTag(t.tag)}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
+    </View>
+  );
+
+  return (
+    <View style={styles.flex}>
+      <FlatList
+        data={loading ? [] : items}
+        {...scrollProps}
+        style={focusScrollInset(contentInsetTop)}
+        keyExtractor={item => item.id}
+        renderItem={({ item }) => (
+          <CaseCard
+            item={item}
+            onPress={() => router.push({ pathname: '/case/[id]', params: { id: item.id } } as any)}
+            onTagPress={savedOnly ? undefined : selectTag}
+          />
+        )}
+        contentContainerStyle={[styles.list, { paddingTop: contentInsetTop + spacing.lg }]}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={controls}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            tintColor={colors.navy}
+            progressViewOffset={contentInsetTop}
+          />
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.footer} color={colors.navy} /> : null}
+        ListEmptyComponent={
+          loading ? (
+            <LoadingState label="Loading cases…" />
+          ) : error ? (
+            <ErrorState message={error} onRetry={load} />
+          ) : (
             <EmptyState
               icon={savedOnly ? 'bookmark-outline' : 'help-buoy-outline'}
               title={savedOnly ? 'Nothing saved yet' : 'No cases here yet'}
@@ -169,12 +195,13 @@ export function CasesList() {
                   : () => router.push('/case/new' as any)
               }
             />
-          }
-        />
-      )}
+          )
+        }
+      />
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
@@ -212,5 +239,14 @@ const styles = StyleSheet.create({
   chipText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   chipTextActive: { color: colors.white },
   list: { padding: spacing.lg, paddingBottom: 100 },
+  // Cancels the content container's own padding so the strip stays full-bleed,
+  // exactly as it looked when it sat outside the list. The negative top eats
+  // only the container's spacing.lg, leaving the header inset intact above it.
+  controlsInList: {
+    marginHorizontal: -spacing.lg,
+    marginTop: -spacing.lg,
+    marginBottom: spacing.lg,
+    paddingTop: spacing.md,
+  },
   footer: { paddingVertical: spacing.xl },
 });

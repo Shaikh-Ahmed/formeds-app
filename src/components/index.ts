@@ -1,5 +1,7 @@
 export { Button } from './Button';
 export { FormInput } from './FormInput';
+export { SelectField } from './SelectField';
+export type { SelectFieldProps } from './SelectField';
 export { Avatar } from './Avatar';
 export { RoleBadge } from './RoleBadge';
 export { LoadingState, EmptyState, ErrorState, ErrorBanner } from './States';
@@ -9,6 +11,8 @@ export { ComingSoon } from './ComingSoon';
 export { VoteControl } from './VoteControl';
 export { TagChip } from './TagChip';
 export { Chip } from './Chip';
+export { Sheet } from './Sheet';
+export { Skeleton, SkeletonText } from './Skeleton';
 export type { ChipTone } from './Chip';
 export { CaseCard } from './CaseCard';
 export { CasesList } from './CasesList';

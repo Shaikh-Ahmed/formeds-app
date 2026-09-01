@@ -9,18 +9,39 @@ interface Props extends Omit<TextInputProps, 'style'> {
   error?: string;
   /** Renders a show/hide toggle and masks input. */
   secure?: boolean;
+  /**
+   * Visible rows for a multiline field. `style` is deliberately not accepted --
+   * this component owns its appearance so a form cannot drift off the design
+   * system -- but a paragraph field genuinely needs to be taller than a
+   * single-line one, and the absence of any way to say so is why a duplicate
+   * copy of this component grew inside the old jobs screen.
+   */
+  rows?: number;
 }
 
-export function FormInput({ label, icon, error, secure, testID, ...inputProps }: Props) {
+const ROW_HEIGHT = 22;
+
+export function FormInput({ label, icon, error, secure, rows, testID, ...inputProps }: Props) {
+  const multiline = !!inputProps.multiline;
+  const minHeight = multiline ? ROW_HEIGHT * (rows ?? 4) : undefined;
   const [hidden, setHidden] = useState(true);
   return (
     <View style={styles.group}>
       <Text style={styles.label}>{label}</Text>
-      <View style={[styles.wrap, error ? styles.wrapError : null]}>
+      <View
+        style={[
+          styles.wrap,
+          multiline ? styles.wrapMultiline : null,
+          error ? styles.wrapError : null,
+        ]}
+      >
         {icon ? <Ionicons name={icon} size={20} color={colors.textMuted} style={styles.icon} /> : null}
         <TextInput
           testID={testID}
-          style={styles.input}
+          style={[styles.input, multiline ? { minHeight } : null]}
+          // Without this the cursor starts vertically centred on Android,
+          // which looks like the field is misaligned rather than empty.
+          textAlignVertical={multiline ? 'top' : undefined}
           placeholderTextColor={colors.textMuted}
           secureTextEntry={secure && hidden}
           accessibilityLabel={label}
@@ -56,6 +77,8 @@ const styles = StyleSheet.create({
     minHeight: Math.max(MIN_TOUCH_TARGET, 52),
   },
   wrapError: { borderColor: colors.red },
+  // A tall field aligns its icon and toggle to the first line, not the middle.
+  wrapMultiline: { alignItems: 'flex-start', paddingVertical: spacing.sm },
   icon: { marginRight: spacing.sm + 2 },
   input: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: spacing.md },
   error: { color: colors.red, fontSize: 13, marginTop: 4 },

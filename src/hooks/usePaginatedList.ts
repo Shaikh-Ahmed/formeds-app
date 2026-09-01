@@ -17,6 +17,12 @@ interface Options {
  * Handles first load, pull-to-refresh, and append-on-scroll while guarding
  * against overlapping requests and stale responses.
  */
+/** Whatever an enveloped endpoint reported alongside its page of items. */
+export interface ListMeta {
+  total?: number;
+  total_capped?: boolean;
+}
+
 export function usePaginatedList<T = any>({ path, token, extract, enabled = true }: Options) {
   const [items, setItems] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +30,9 @@ export function usePaginatedList<T = any>({ path, token, extract, enabled = true
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
+  // Endpoints returning a bare array simply never populate this, so every
+  // existing caller is unaffected.
+  const [meta, setMeta] = useState<ListMeta>({});
 
   const pageRef = useRef(1);
   const inFlight = useRef(false);
@@ -51,7 +60,15 @@ export function usePaginatedList<T = any>({ path, token, extract, enabled = true
         if (gen !== generation.current) return; // superseded
         const batch: T[] = extract ? extract(raw) : Array.isArray(raw) ? raw : (raw?.items ?? []);
         setItems(prev => (mode === 'more' ? [...prev, ...batch] : batch));
-        setHasMore(batch.length >= PAGE_SIZE);
+        if (raw && !Array.isArray(raw)) {
+          setMeta({ total: raw.total, total_capped: raw.total_capped });
+        }
+        // Trust an explicit has_more when the endpoint sends one; a short page
+        // is only a proxy for the end of the list, and it guesses wrong when
+        // the last page happens to be exactly PAGE_SIZE long.
+        setHasMore(
+          typeof raw?.has_more === 'boolean' ? raw.has_more : batch.length >= PAGE_SIZE,
+        );
         pageRef.current = page;
       } catch (e: any) {
         if (gen === generation.current) setError(e?.message || 'Could not load. Pull to retry.');
@@ -71,5 +88,5 @@ export function usePaginatedList<T = any>({ path, token, extract, enabled = true
     if (hasMore && !inFlight.current && !loading) fetchPage(pageRef.current + 1, 'more');
   }, [hasMore, loading, fetchPage]);
 
-  return { items, setItems, loading, refreshing, loadingMore, error, hasMore, load, refresh, loadMore };
+  return { items, setItems, loading, refreshing, loadingMore, error, hasMore, meta, load, refresh, loadMore };
 }

@@ -3,6 +3,7 @@ import {
   EMPLOYMENT_TYPE_LABELS,
   EntryKind,
 } from '../../types/profile';
+import { STATE_NAMES, citiesForState } from '../../data/indiaLocations';
 
 /**
  * Field layout per entry kind, as data.
@@ -16,6 +17,7 @@ import {
 
 export type FieldType =
   | 'text'
+  | 'lookup'
   | 'textarea'
   | 'month'
   | 'year'
@@ -25,6 +27,29 @@ export type FieldType =
   | 'tags'
   | 'multiselect';
 
+/**
+ * Config for a `lookup` field — the searchable single-select.
+ *
+ * `select` renders its options as chips, which is right for the five or six an
+ * employment type has and useless at the ~900 of an Indian city list. A lookup
+ * puts the same choice behind `SelectField` instead.
+ */
+export interface LookupConfig {
+  /** A fixed list, or one derived from the rest of the draft (city ← state). */
+  options: string[] | ((draft: Record<string, any>) => string[]);
+  /** Appends OTHER_OPTION; choosing it reveals a free-text box. */
+  allowOther?: boolean;
+  /** This field is disabled until the named field has a value, and is cleared
+   *  whenever that field changes — how a city stays inside its state. */
+  clearedBy?: string;
+  /** Shown in place of the placeholder while `clearedBy` is still empty. */
+  requiresHint?: string;
+  searchPlaceholder?: string;
+}
+
+/** The free-text escape in a lookup; same string as OTHER_CITY/OTHER_SPECIALTY. */
+export const OTHER_OPTION = 'Other';
+
 export interface FieldDef {
   key: string;
   label: string;
@@ -33,6 +58,8 @@ export interface FieldDef {
   placeholder?: string;
   helper?: string;
   options?: { value: string; label: string }[];
+  /** Required when `type` is 'lookup'. */
+  lookup?: LookupConfig;
   /** Hidden while the named boolean field is true (e.g. end date vs "current"). */
   hiddenWhen?: string;
 }
@@ -217,8 +244,28 @@ export const SCALAR_FORMS: Record<ScalarFormKey, EntryForm> = {
         helper: 'The one line that appears under your name.',
       },
       { key: 'current_organization', label: 'Current organization', type: 'text', placeholder: 'Apollo Hospitals' },
-      { key: 'city', label: 'City', type: 'text' },
-      { key: 'state', label: 'State', type: 'text' },
+      // State before city: it is what narrows the city list, and a city picker
+      // with nothing in it reads as broken.
+      {
+        key: 'state',
+        label: 'State',
+        type: 'lookup',
+        placeholder: 'Select your state',
+        lookup: { options: STATE_NAMES, searchPlaceholder: 'Search states…' },
+      },
+      {
+        key: 'city',
+        label: 'City',
+        type: 'lookup',
+        placeholder: 'Select your city',
+        lookup: {
+          options: (draft) => citiesForState(draft.state),
+          allowOther: true,
+          clearedBy: 'state',
+          requiresHint: 'Choose a state first',
+          searchPlaceholder: 'Search cities…',
+        },
+      },
       { key: 'preferred_location', label: 'Preferred location', type: 'text' },
       { key: 'years_experience', label: 'Years of experience', type: 'number' },
     ],

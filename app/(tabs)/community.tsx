@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Pressable, TextInput, ActivityIndicator, RefreshControl, Share, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Pressable, TextInput, ActivityIndicator, RefreshControl, Share, Image, Platform, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
@@ -10,6 +10,7 @@ import { timeAgo } from '../../src/utils/time';
 import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer } from '../../src/components';
 import { PageGrid, ProfileRail, FeedRail, Hoverable } from '../../src/components/web';
 import { colors, spacing, radius, typography, compactAction, useBreakpoint } from '../../src/theme';
+import { useCollapsibleHeader, focusScrollInset } from '../../src/hooks/useCollapsibleHeader';
 
 const FEED_PAGE_SIZE = 20;
 
@@ -44,6 +45,15 @@ export default function FeedScreen() {
   /** Post whose image is open in the lightbox; null when it is closed. */
   const [viewerPost, setViewerPost] = useState<Post | null>(null);
   const pageRef = useRef(1);
+
+  // The tab switcher and the composer row ride above the list and slide out of
+  // the way as the reader moves down it, giving the feed the whole screen.
+  // They stay pinned while the composer is expanded — pulling a field someone
+  // is typing into off the screen is never the right call — and only the feed
+  // renders that composer, so Cases keeps collapsing even with a draft open.
+  const composerOpen = showCompose && activeTab === 'feed';
+  const { headerHeight, headerStyle, onHeaderLayout, scrollProps, reveal } =
+    useCollapsibleHeader({ enabled: !composerOpen });
 
   // Unread counts moved to the layouts that own the persistent bars, which
   // also drops two requests from every feed load and refresh.
@@ -233,95 +243,111 @@ export default function FeedScreen() {
     // two navigation systems stacked on top of each other.
     <SafeAreaView style={styles.safe} edges={[]}>
       <PageGrid left={<ProfileRail />} right={<FeedRail />} testID="community-grid">
-      <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
-        <TouchableOpacity testID="tab-feed" style={[styles.tab, activeTab === 'feed' && styles.tabActive]} onPress={() => setActiveTab('feed')} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'feed' }}>
-          <Ionicons name="newspaper-outline" size={16} color={activeTab === 'feed' ? '#FFF' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Feed</Text>
-        </TouchableOpacity>
-        <TouchableOpacity testID="tab-cases" style={[styles.tab, activeTab === 'cases' && styles.tabActive]} onPress={() => setActiveTab('cases')} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'cases' }}>
-          <Ionicons name="help-buoy-outline" size={16} color={activeTab === 'cases' ? '#FFF' : '#64748B'} />
-          <Text style={[styles.tabText, activeTab === 'cases' && styles.tabTextActive]}>Cases</Text>
-        </TouchableOpacity>
-      </View>
+      {/* The collapsing header is an overlay, so it needs a clipping host:
+          without one it slides up over the app's top bar instead of out of
+          the screen. The list renders first and the header after it so the
+          header paints on top at every width. */}
+      <View style={styles.scrollHost}>
+        {activeTab === 'cases' ? (
+          <CasesList scrollProps={scrollProps} contentInsetTop={headerHeight} />
+        ) : loading ? (
+          <View style={styles.center}><ActivityIndicator size="large" color={colors.navy} /></View>
+        ) : (
+          <FlatList data={posts} renderItem={renderPost} keyExtractor={item => item.id}
+            {...scrollProps}
+            style={focusScrollInset(headerHeight)}
+            contentContainerStyle={[styles.list, !isMobile && styles.listWide, { paddingTop: headerHeight + spacing.lg }]}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={colors.navy} progressViewOffset={headerHeight} />}
+            onEndReached={loadMorePosts}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={loadingMore ? <ActivityIndicator style={{ paddingVertical: 20 }} color={colors.navy} /> : null}
+            ListEmptyComponent={<View style={styles.center}><Ionicons name="newspaper-outline" size={48} color="#CBD5E1" /><Text style={styles.emptyText}>No posts yet</Text></View>} />
+        )}
 
-      {/* A persistent "start a post" row at every width. It replaced the
-          header icon on mobile: a labelled row with your own avatar reads as
-          an invitation, where a bare pencil glyph in a header did not. On the
-          Cases tab it routes to the full composer, which needs a title and
-          tags and so can't expand inline. */}
-      {!showCompose && (
-        <Hoverable
-          testID="compose-trigger"
-          onPress={() =>
-            activeTab === 'cases' ? router.push('/case/new' as any) : setShowCompose(true)
-          }
-          accessibilityLabel={activeTab === 'cases' ? 'Post a case' : 'Write a post'}
-          style={[styles.composeTrigger, isMobile && styles.composeTriggerMobile]}
-          hoverStyle={styles.composeTriggerHover}
+        <Animated.View
+          testID="community-header"
+          onLayout={onHeaderLayout}
+          style={[styles.header, headerStyle]}
         >
-          <Avatar name={user?.name} role={user?.role} uri={user?.avatar} size={40} />
-          <Text style={styles.composeTriggerText} numberOfLines={1}>
-            {activeTab === 'cases' ? 'Ask the community about a case…' : 'Share something with the community…'}
-          </Text>
-          <Ionicons name="create-outline" size={20} color={colors.navy} />
-        </Hoverable>
-      )}
+        <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
+          <TouchableOpacity testID="tab-feed" style={[styles.tab, activeTab === 'feed' && styles.tabActive]} onPress={() => { setActiveTab('feed'); reveal(); }} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'feed' }}>
+            <Ionicons name="newspaper-outline" size={16} color={activeTab === 'feed' ? '#FFF' : '#64748B'} />
+            <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Feed</Text>
+          </TouchableOpacity>
+          <TouchableOpacity testID="tab-cases" style={[styles.tab, activeTab === 'cases' && styles.tabActive]} onPress={() => { setActiveTab('cases'); reveal(); }} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'cases' }}>
+            <Ionicons name="help-buoy-outline" size={16} color={activeTab === 'cases' ? '#FFF' : '#64748B'} />
+            <Text style={[styles.tabText, activeTab === 'cases' && styles.tabTextActive]}>Cases</Text>
+          </TouchableOpacity>
+        </View>
 
-      {showCompose && activeTab === 'feed' && (
-        <View style={[styles.composeBox, !isMobile && styles.composeBoxWide]}>
-          {/* Posting is KYC-gated server-side; explain that instead of letting
-              the user write a post and only then hit a 403. */}
-          <KycNotice action="post to the community" />
-          <TextInput testID="post-input" style={styles.composeInput} placeholder="Share something with the community..." placeholderTextColor="#94A3B8" value={newPost} onChangeText={setNewPost} multiline editable={isKycApproved} />
+        {/* A persistent "start a post" row at every width. It replaced the
+            header icon on mobile: a labelled row with your own avatar reads as
+            an invitation, where a bare pencil glyph in a header did not. On the
+            Cases tab it routes to the full composer, which needs a title and
+            tags and so can't expand inline. */}
+        {!showCompose && (
+          <Hoverable
+            testID="compose-trigger"
+            onPress={() =>
+              activeTab === 'cases' ? router.push('/case/new' as any) : setShowCompose(true)
+            }
+            accessibilityLabel={activeTab === 'cases' ? 'Post a case' : 'Write a post'}
+            style={[styles.composeTrigger, isMobile && styles.composeTriggerMobile]}
+            hoverStyle={styles.composeTriggerHover}
+          >
+            <Avatar name={user?.name} role={user?.role} uri={user?.avatar} size={40} />
+            <Text style={styles.composeTriggerText} numberOfLines={1}>
+              {activeTab === 'cases' ? 'Ask the community about a case…' : 'Share something with the community…'}
+            </Text>
+            <Ionicons name="create-outline" size={20} color={colors.navy} />
+          </Hoverable>
+        )}
+
+        {composerOpen && (
+          <View style={[styles.composeBox, !isMobile && styles.composeBoxWide]}>
+            {/* Posting is KYC-gated server-side; explain that instead of letting
+                the user write a post and only then hit a 403. */}
+            <KycNotice action="post to the community" />
+            <TextInput testID="post-input" style={styles.composeInput} placeholder="Share something with the community..." placeholderTextColor="#94A3B8" value={newPost} onChangeText={setNewPost} multiline editable={isKycApproved} />
           
-          {attachedImage && (
-            <View style={styles.attachedImageWrap}>
-              <Image source={{ uri: attachedImage }} style={styles.attachedImagePreview} />
-              <TouchableOpacity style={styles.removeImageBtn} onPress={() => setAttachedImage(null)}>
-                <Ionicons name="close-circle" size={24} color="#FFF" />
-              </TouchableOpacity>
-            </View>
-          )}
+            {attachedImage && (
+              <View style={styles.attachedImageWrap}>
+                <Image source={{ uri: attachedImage }} style={styles.attachedImagePreview} />
+                <TouchableOpacity style={styles.removeImageBtn} onPress={() => setAttachedImage(null)}>
+                  <Ionicons name="close-circle" size={24} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            )}
 
-          <View style={styles.composeActions}>
-            <TouchableOpacity testID="attach-image-btn" style={styles.attachBtn} onPress={pickImage} disabled={uploadingImage || !isKycApproved} accessibilityRole="button" accessibilityLabel="Attach an image">
-              {uploadingImage ? <ActivityIndicator size="small" color={colors.navy} /> : <Ionicons name="image-outline" size={24} color={isKycApproved ? colors.navy : colors.textMuted} />}
-            </TouchableOpacity>
-            <View style={styles.composeRight}>
-              {/* Desktop has no header close button to fall back on, so the
-                  composer carries its own way out. */}
-              {!isMobile && (
-                <Hoverable
-                  testID="compose-cancel-btn"
-                  onPress={() => { setShowCompose(false); setNewPost(''); setAttachedImage(null); }}
-                  accessibilityLabel="Cancel post"
-                  style={styles.cancelBtn}
-                  hoverStyle={styles.cancelBtnHover}
-                >
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </Hoverable>
-              )}
-              <TouchableOpacity testID="submit-post-btn" style={[styles.postBtn, (!isKycApproved || (!newPost.trim() && !attachedImage)) && styles.postBtnDisabled]} onPress={handlePost} disabled={posting || !isKycApproved || (!newPost.trim() && !attachedImage)} accessibilityRole="button" accessibilityLabel="Publish post">
-                {posting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.postBtnText}>Post</Text>}
+            <View style={styles.composeActions}>
+              <TouchableOpacity testID="attach-image-btn" style={styles.attachBtn} onPress={pickImage} disabled={uploadingImage || !isKycApproved} accessibilityRole="button" accessibilityLabel="Attach an image">
+                {uploadingImage ? <ActivityIndicator size="small" color={colors.navy} /> : <Ionicons name="image-outline" size={24} color={isKycApproved ? colors.navy : colors.textMuted} />}
               </TouchableOpacity>
+              <View style={styles.composeRight}>
+                {/* Desktop has no header close button to fall back on, so the
+                    composer carries its own way out. */}
+                {!isMobile && (
+                  <Hoverable
+                    testID="compose-cancel-btn"
+                    onPress={() => { setShowCompose(false); setNewPost(''); setAttachedImage(null); }}
+                    accessibilityLabel="Cancel post"
+                    style={styles.cancelBtn}
+                    hoverStyle={styles.cancelBtnHover}
+                  >
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </Hoverable>
+                )}
+                <TouchableOpacity testID="submit-post-btn" style={[styles.postBtn, (!isKycApproved || (!newPost.trim() && !attachedImage)) && styles.postBtnDisabled]} onPress={handlePost} disabled={posting || !isKycApproved || (!newPost.trim() && !attachedImage)} accessibilityRole="button" accessibilityLabel="Publish post">
+                  {posting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.postBtnText}>Post</Text>}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      )}
+        )}
 
-      {activeTab === 'cases' ? (
-        <CasesList />
-      ) : loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={colors.navy} /></View>
-      ) : (
-        <FlatList data={posts} renderItem={renderPost} keyExtractor={item => item.id}
-          contentContainerStyle={[styles.list, !isMobile && styles.listWide]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={colors.navy} />}
-          onEndReached={loadMorePosts}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ paddingVertical: 20 }} color={colors.navy} /> : null}
-          ListEmptyComponent={<View style={styles.center}><Ionicons name="newspaper-outline" size={48} color="#CBD5E1" /><Text style={styles.emptyText}>No posts yet</Text></View>} />
-      )}
+        </Animated.View>
+      </View>
+
       </PageGrid>
 
       {viewerPost?.image_url ? (
@@ -341,6 +367,18 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F8FAFC' },
+  // Clips the header at the top edge as it slides away.
+  scrollHost: { flex: 1, overflow: 'hidden' },
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+    // Opaque: posts pass underneath, and the gap between the tab strip and the
+    // composer row would otherwise let them show through.
+    backgroundColor: colors.bg,
+  },
   // The header row, its icon buttons and their badges were removed with the
   // in-screen header — MobileTopBar and the Alerts tab own those now.
   tabBar: { flexDirection: 'row', backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 8, gap: 8 },

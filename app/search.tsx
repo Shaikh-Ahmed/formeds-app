@@ -51,7 +51,8 @@ interface PersonResult {
  * Scope is bounded by what the API can actually answer:
  *   People — /api/users/search?q=       free text over name
  *   Cases  — /api/cases/?q=             free text over title and body
- *   Jobs   — /api/jobs/permanent?specialty=  the only text filter jobs exposes
+ *   Jobs   — /api/jobs/?q=              free text over title, specialty,
+ *                                        skills, employer and location
  *
  * Feed posts have no search endpoint at all, so there is no Posts tab. An
  * empty tab that always returns nothing would read as a broken search rather
@@ -88,7 +89,9 @@ export default function SearchScreen() {
           apiFetch(`/api/cases/?q=${encodeURIComponent(q)}&limit=10`, token).catch(() => []),
           // Jobs has no free-text param; specialty is the closest thing it
           // exposes, so a query only matches when it names a specialty.
-          apiFetch(`/api/jobs/permanent?specialty=${encodeURIComponent(q)}`, token).catch(() => []),
+          apiFetch(`/api/jobs/?q=${encodeURIComponent(q)}`, token)
+            .then((r: any) => r?.items ?? [])
+            .catch(() => []),
         ]);
         if (signal.cancelled) return;
         setPeople(Array.isArray(p) ? p : []);
@@ -237,9 +240,9 @@ export default function SearchScreen() {
               )}
 
               {showJobs && (
-                <Section title="Jobs" count={jobs.length} note="Matched by specialty">
+                <Section title="Jobs" count={jobs.length}>
                   {jobs.slice(0, scope === 'all' ? 3 : undefined).map(j => (
-                    <JobRow key={j.id} job={j} onPress={() => router.push('/(tabs)/jobs')} />
+                    <JobRow key={j.id} job={j} onPress={() => router.push(`/jobs/${j.id}` as any)} />
                   ))}
                 </Section>
               )}
@@ -288,7 +291,7 @@ function NoResults({ query, scope }: { query: string; scope: Scope }) {
     all: 'Try a colleague’s full name, a clinical term, or a specialty like “Cardiology”.',
     people: 'People are matched on their full name. Try a first or last name on its own.',
     cases: 'Cases are matched on title and body. Try a broader clinical term.',
-    jobs: 'Jobs are matched by specialty only. Try “Cardiology”, “Radiology” or “Emergency Medicine”.',
+    jobs: 'Try a role, a specialty or a city — “ICU nurse”, “Cardiology” or “Hyderabad”.',
   };
 
   return (
@@ -369,7 +372,7 @@ function JobRow({ job, onPress }: { job: any; onPress: () => void }) {
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle} numberOfLines={1}>{job.title}</Text>
-        <Text style={styles.cardSub} numberOfLines={1}>{job.hospital_name || job.specialty}</Text>
+        <Text style={styles.cardSub} numberOfLines={1}>{job.employer_name || job.specialty}</Text>
         {job.location ? <Text style={styles.cardMeta} numberOfLines={1}>{job.location}</Text> : null}
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
