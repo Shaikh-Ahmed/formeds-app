@@ -158,6 +158,14 @@ export default function PostedJobsScreen() {
                 </Pressable>
 
                 <View style={styles.cardActions}>
+                  {item.applicant_count > 0 ? (
+                    <CardAction
+                      icon="people-outline"
+                      label={`${item.applicant_count} applicant${item.applicant_count === 1 ? '' : 's'}`}
+                      onPress={() => router.push(`/jobs/applicants/${item.id}` as any)}
+                      testID={`applicants-${item.id}`}
+                    />
+                  ) : null}
                   {item.status === 'active' ? (
                     <CardAction
                       icon="pause-outline"

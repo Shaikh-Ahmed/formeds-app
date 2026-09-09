@@ -21,6 +21,7 @@ export default function JobsLayout() {
       <Stack.Screen name="applications" />
       <Stack.Screen name="posted" />
       <Stack.Screen name="[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="applicants/[id]" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }
