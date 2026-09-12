@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -13,8 +13,9 @@ import { JobsList } from './JobsList';
 import { JobDetailPanel } from './JobDetailPanel';
 import { JobsSegmentedNav, type JobsSegment } from './JobsSegmentedNav';
 import { ApplySheet } from './ApplySheet';
-import { applyToJob, fetchJob, toggleSaveJob } from '../../api/jobs';
-import type { Job } from '../../types/jobs';
+import { applyToJob, createJobAlert, fetchJob, toggleSaveJob } from '../../api/jobs';
+import { useCollapsibleHeader } from '../../hooks/useCollapsibleHeader';
+import type { Job, JobFilters } from '../../types/jobs';
 
 /** Width of the list pane in the split view. See the arithmetic below. */
 const LIST_PANE = 400;
@@ -63,6 +64,18 @@ export function JobsScreen({
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  /**
+   * The title and segmented control slide away as the list scrolls down and
+   * come back on the first scroll up.
+   *
+   * On a phone the persistent top bar, this heading and the segmented control
+   * together cost most of a card before the feed even starts — and the heading
+   * is a thing you read once. Disabled on desktop, where the split view has the
+   * room and a moving header beside a static detail pane reads as a glitch.
+   */
+  const { headerHeight, headerStyle, onHeaderLayout, scrollProps } =
+    useCollapsibleHeader({ enabled: mounted && !isDesktop });
 
   const split = mounted && isDesktop;
 
@@ -133,6 +146,21 @@ export function JobsScreen({
     }
   }, [token, applyFor]);
 
+  /**
+   * Turns the filters that just returned nothing into a saved search, so the
+   * dead end becomes "we will tell you" rather than "try again later".
+   */
+  const saveSearch = useCallback(async (filters: JobFilters) => {
+    if (!token) return;
+    setActionError(null);
+    try {
+      await createJobAlert(token, filters.specialty || filters.q || 'Saved search', filters);
+      router.push('/jobs/saved' as any);
+    } catch (e: any) {
+      setActionError(e?.message || 'Could not save that search.');
+    }
+  }, [token, router]);
+
   const list = (
     <JobsList
       selectedId={split ? selectedId : null}
@@ -149,16 +177,19 @@ export function JobsScreen({
   return (
     <View style={styles.flex}>
       <PageGrid fluid testID="jobs-grid">
-        <View style={styles.header}>
-          <Text style={styles.h1} accessibilityRole="header">
-            Find your next healthcare opportunity
-          </Text>
-          <Text style={styles.sub}>
-            Roles, locum shifts, fellowships and training posts, matched to your expertise.
-          </Text>
-        </View>
-
-        <JobsSegmentedNav active={segment} />
+        {split ? (
+          <>
+            <View style={styles.header}>
+              <Text style={styles.h1} accessibilityRole="header">
+                Find your next healthcare opportunity
+              </Text>
+              <Text style={styles.sub}>
+                Roles, locum shifts, fellowships and training posts, matched to your expertise.
+              </Text>
+            </View>
+            <JobsSegmentedNav active={segment} />
+          </>
+        ) : null}
         <ErrorBanner message={actionError} />
 
         {!mounted ? (
@@ -179,7 +210,33 @@ export function JobsScreen({
             </View>
           </View>
         ) : (
-          list
+          <View style={styles.scrollHost}>
+            <Animated.View
+              style={[styles.floatingHeader, headerStyle]}
+              onLayout={onHeaderLayout}
+            >
+              <View style={styles.header}>
+                <Text style={styles.h1} accessibilityRole="header">
+                  Find your next healthcare opportunity
+                </Text>
+                <Text style={styles.sub}>
+                  Roles, locum shifts, fellowships and training posts, matched to your expertise.
+                </Text>
+              </View>
+              <JobsSegmentedNav active={segment} />
+            </Animated.View>
+            <JobsList
+              onSelect={openJob}
+              scrollProps={scrollProps}
+              contentInsetTop={headerHeight}
+              onSaveSearch={saveSearch}
+              emptyAction={
+                user?.role
+                  ? { label: 'Post an opportunity', onPress: () => router.push('/jobs/new' as any) }
+                  : undefined
+              }
+            />
+          </View>
         )}
       </PageGrid>
 
@@ -249,6 +306,17 @@ const styles = StyleSheet.create({
   h1: { ...typography.h2, color: colors.text },
   sub: { ...typography.caption, color: colors.textSecondary, lineHeight: 20 },
 
+  // overflow hidden is what lets the header slide out of view rather than
+  // over the tab bar; the list scrolls underneath it.
+  scrollHost: { flex: 1, overflow: 'hidden' },
+  floatingHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+    backgroundColor: colors.bg,
+  },
   split: { flex: 1, flexDirection: 'row', gap: layout.gutter, minHeight: 0 },
   // flexShrink 0: the list must hold its width so the card layout inside it
   // stays stable while the detail pane absorbs the remaining space.

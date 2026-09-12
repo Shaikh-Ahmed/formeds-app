@@ -187,3 +187,26 @@ export const SHIFT_TYPES: EmploymentType[] = ['locum', 'temporary'];
 
 export const isShiftRole = (t?: EmploymentType | null): boolean =>
   !!t && SHIFT_TYPES.includes(t);
+
+/** One bucket of the filter sheet's counts. */
+export interface Facet {
+  value: string;
+  count: number;
+}
+
+export interface JobFacets {
+  specialty: Facet[];
+  city: Facet[];
+  employment_type: Facet[];
+}
+
+export interface JobAlert {
+  id: string;
+  name: string;
+  filters: JobFilters;
+  frequency: 'off' | 'daily' | 'weekly';
+  last_seen_at?: string;
+  created_at: string;
+  /** Matches that appeared since this alert was last opened. */
+  new_count: number;
+}
