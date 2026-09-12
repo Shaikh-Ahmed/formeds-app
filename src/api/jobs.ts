@@ -85,6 +85,17 @@ export const fetchMyPostings = (token: string, status?: string): Promise<Job[]> 
 export const fetchMyApplications = (token: string): Promise<Application[]> =>
   apiFetch('/api/jobs/applications/my', token);
 
+/** The employer inbox: applications across everything this account advertises. */
+export const fetchReceivedApplications = (
+  token: string, params: { status?: string; job_id?: string } = {},
+): Promise<Application[]> => {
+  const query = new URLSearchParams();
+  if (params.status) query.append('status', params.status);
+  if (params.job_id) query.append('job_id', params.job_id);
+  const qs = query.toString();
+  return apiFetch(`/api/jobs/applications/received${qs ? `?${qs}` : ''}`, token);
+};
+
 export const fetchApplicants = (
   token: string, jobId: string, status?: string,
 ): Promise<Application[]> =>
@@ -119,6 +130,16 @@ export const applyToJob = (
   apiFetch(`/api/jobs/${jobId}/apply`, token, {
     method: 'POST', body: JSON.stringify({ cover_note: coverNote }),
   });
+
+/**
+ * Taken out by the candidate. Separate from setApplicationStatus because that
+ * endpoint is guarded by job ownership, and the whole point here is that the
+ * person withdrawing is the applicant, who does not own the posting.
+ */
+export const withdrawApplication = (
+  token: string, applicationId: string,
+): Promise<{ status: string }> =>
+  apiFetch(`/api/jobs/applications/${applicationId}/withdraw`, token, { method: 'POST' });
 
 export const setApplicationStatus = (
   token: string, applicationId: string, status: string, note = '',

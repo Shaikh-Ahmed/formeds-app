@@ -32,6 +32,7 @@ export function JobDetailPanel({
   onToggleSave,
   onShare,
   applying,
+  onViewOrganization,
   /** Renders inside a split pane, which has its own scroll container. */
   embedded = false,
 }: {
@@ -41,6 +42,8 @@ export function JobDetailPanel({
   onToggleSave: () => void;
   onShare: () => void;
   applying?: boolean;
+  /** Opens the employer page. Absent for an individual poster. */
+  onViewOrganization?: (orgId: string) => void;
   embedded?: boolean;
 }) {
   if (loading) return <JobDetailSkeleton />;
@@ -75,9 +78,11 @@ export function JobDetailPanel({
         <Text style={styles.title} accessibilityRole="header">{job.title}</Text>
 
         <Pressable
-          onPress={() => { /* organisation profiles arrive with the org phase */ }}
-          disabled
-          style={styles.employerRow}
+          onPress={() => job.org_id && onViewOrganization?.(job.org_id)}
+          disabled={!job.org_id || !onViewOrganization}
+          accessibilityRole={job.org_id ? 'link' : 'none'}
+          accessibilityLabel={job.org_id ? `View ${job.employer_name}` : undefined}
+          style={({ pressed }) => [styles.employerRow, pressed && styles.pressed]}
         >
           <Avatar
             name={job.employer_name}
@@ -200,7 +205,13 @@ export function JobDetailPanel({
       ) : null}
 
       <Section title="About the employer">
-        <View style={styles.employerCard}>
+        <Pressable
+          onPress={() => job.org_id && onViewOrganization?.(job.org_id)}
+          disabled={!job.org_id || !onViewOrganization}
+          accessibilityRole={job.org_id ? 'link' : 'none'}
+          accessibilityLabel={job.org_id ? `View ${job.employer_name}` : undefined}
+          style={({ pressed }) => [styles.employerCard, pressed && styles.pressed]}
+        >
           <Avatar
             name={job.employer_name}
             uri={job.employer_avatar || undefined}
@@ -217,7 +228,10 @@ export function JobDetailPanel({
                   : 'Healthcare employer'}
             </Text>
           </View>
-        </View>
+          {job.org_id && onViewOrganization ? (
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          ) : null}
+        </Pressable>
       </Section>
 
       {!embedded ? <View style={styles.bottomPad} /> : null}

@@ -21,6 +21,10 @@ export default function JobsLayout() {
       <Stack.Screen name="applications" />
       <Stack.Screen name="posted" />
       <Stack.Screen name="[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="applicants/[id]" options={{ animation: 'slide_from_right' }} />
+      {/* Composition surfaces slide up, matching case/new elsewhere in the app. */}
+      <Stack.Screen name="new" options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="edit/[id]" options={{ animation: 'slide_from_bottom' }} />
     </Stack>
   );
 }

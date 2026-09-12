@@ -131,6 +131,7 @@ export default function JobDetailScreen() {
             onApply={() => setApplyOpen(true)}
             onToggleSave={onToggleSave}
             onShare={onShare}
+            onViewOrganization={orgId => router.push(`/org/${orgId}` as any)}
           />
         )}
       </PageColumn>
