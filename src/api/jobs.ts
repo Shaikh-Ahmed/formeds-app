@@ -14,7 +14,7 @@
 
 import { apiFetch } from '../utils/api';
 import type {
-  Application, Job, JobFilters, JobsPage,
+  Application, Job, JobAlert, JobFacets, JobFilters, JobsPage,
 } from '../types/jobs';
 
 /**
@@ -101,6 +101,18 @@ export const fetchApplicants = (
 ): Promise<Application[]> =>
   apiFetch(`/api/jobs/${jobId}/applicants${status ? `?status=${encodeURIComponent(status)}` : ''}`, token);
 
+/**
+ * Counts per specialty, city and type, for the filter sheet.
+ *
+ * Sampled and cached server-side, so these are indicative rather than exact on
+ * a large board — which is all a filter chip needs to be.
+ */
+export const fetchJobFacets = (token: string | null): Promise<JobFacets> =>
+  apiFetch('/api/jobs/facets', token);
+
+export const fetchJobAlerts = (token: string): Promise<JobAlert[]> =>
+  apiFetch('/api/jobs/alerts', token);
+
 // ── Writes ───────────────────────────────────────────────────────────────────
 
 export const createJob = (token: string, data: Record<string, unknown>): Promise<Job> =>
@@ -147,3 +159,22 @@ export const setApplicationStatus = (
   apiFetch(`/api/jobs/applications/${applicationId}`, token, {
     method: 'PATCH', body: JSON.stringify({ status, note }),
   });
+
+export const createJobAlert = (
+  token: string, name: string, filters: JobFilters,
+): Promise<JobAlert> =>
+  apiFetch('/api/jobs/alerts', token, {
+    method: 'POST', body: JSON.stringify({ name, filters }),
+  });
+
+/** Resets the new-match badge. Separate from reading the list, so opening the
+ *  screen does not silently clear every badge on it. */
+export const markAlertSeen = (
+  token: string, alertId: string,
+): Promise<{ message: string }> =>
+  apiFetch(`/api/jobs/alerts/${alertId}/seen`, token, { method: 'POST' });
+
+export const deleteJobAlert = (
+  token: string, alertId: string,
+): Promise<{ message: string }> =>
+  apiFetch(`/api/jobs/alerts/${alertId}`, token, { method: 'DELETE' });

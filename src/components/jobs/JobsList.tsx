@@ -7,6 +7,7 @@ import { useDebounced } from '../../hooks/useDebounced';
 import { focusScrollInset, type CollapsibleScrollProps } from '../../hooks/useCollapsibleHeader';
 import { colors, spacing } from '../../theme';
 import { EmptyState, ErrorState } from '../States';
+import { Button } from '../Button';
 import { JobCard } from './JobCard';
 import { JobListSkeleton } from './JobCardSkeleton';
 import { JobFilterBar } from './JobFilterBar';
@@ -36,6 +37,7 @@ export function JobsList({
   onSelect,
   compact = false,
   emptyAction,
+  onSaveSearch,
 }: {
   scrollProps?: CollapsibleScrollProps;
   contentInsetTop?: number;
@@ -44,6 +46,8 @@ export function JobsList({
   onSelect: (job: Job) => void;
   compact?: boolean;
   emptyAction?: { label: string; onPress: () => void };
+  /** Offered when a search returns nothing worth waiting for. */
+  onSaveSearch?: (filters: JobFilters) => void;
 }) {
   const { token } = useAuth();
 
@@ -146,23 +150,18 @@ export function JobsList({
           ) : error ? (
             <ErrorState message={error} onRetry={load} />
           ) : (
-            // Never a dead end. If filters are the reason nothing matched,
-            // the way out is the action; if the board is genuinely empty,
-            // the action is whatever the host screen offers instead.
-            <EmptyState
-              icon={filtering ? 'search-outline' : 'briefcase-outline'}
-              title={filtering ? 'No matching opportunities' : 'No opportunities yet'}
-              hint={
-                filtering
-                  ? 'Try a broader search, or widen the location and pay filters.'
-                  : 'New roles and locum shifts will appear here as they are posted.'
-              }
-              actionLabel={filtering ? 'Clear filters' : emptyAction?.label}
-              onAction={
-                filtering
-                  ? () => { setFilters({ sort: filters.sort }); setSearch(''); }
-                  : emptyAction?.onPress
-              }
+            // Never a dead end, and the way out depends on why nothing
+            // matched. Offering "search nearby" to somebody who set no city
+            // would be noise; offering "clear everything" to somebody who set
+            // one filter throws away work they meant.
+            <NoResults
+              filtering={filtering}
+              canBroaden={!!effective.city}
+              city={effective.city}
+              onBroaden={() => setFilters(prev => ({ ...prev, city: undefined }))}
+              onClear={() => { setFilters({ sort: filters.sort }); setSearch(''); }}
+              onSaveSearch={token && filtering ? () => onSaveSearch?.(effective) : undefined}
+              emptyAction={emptyAction}
             />
           )
         }
@@ -184,7 +183,80 @@ export function JobsList({
   );
 }
 
+/**
+ * What to offer when nothing matched.
+ *
+ * Three different situations, three different ways out. Widening the city is
+ * the single most effective one — most empty results in a young marketplace are
+ * a location filter on a board that has nothing in that city yet — so it leads
+ * when it applies.
+ */
+function NoResults({
+  filtering, canBroaden, city, onBroaden, onClear, onSaveSearch, emptyAction,
+}: {
+  filtering: boolean;
+  canBroaden: boolean;
+  city?: string;
+  onBroaden: () => void;
+  onClear: () => void;
+  onSaveSearch?: () => void;
+  emptyAction?: { label: string; onPress: () => void };
+}) {
+  if (!filtering) {
+    return (
+      <EmptyState
+        icon="briefcase-outline"
+        title="No opportunities yet"
+        hint="New roles and locum shifts will appear here as they are posted."
+        actionLabel={emptyAction?.label}
+        onAction={emptyAction?.onPress}
+      />
+    );
+  }
+
+  return (
+    <View style={styles.noResults} testID="jobs-no-results">
+      <EmptyState
+        icon="search-outline"
+        title="No matching opportunities"
+        hint={
+          canBroaden
+            ? `Nothing in ${city} right now. Widening the search usually helps.`
+            : 'Try fewer filters, or a broader search term.'
+        }
+      />
+      <View style={styles.recovery}>
+        {canBroaden ? (
+          <Button
+            label="Search the whole state"
+            onPress={onBroaden}
+            testID="jobs-broaden"
+          />
+        ) : null}
+        <Button
+          label="Clear filters"
+          variant="outline"
+          onPress={onClear}
+          testID="jobs-clear-filters"
+        />
+        {onSaveSearch ? (
+          // The honest option when the board genuinely has nothing: stop
+          // looking, and be told when something arrives.
+          <Button
+            label="Tell me when one appears"
+            variant="outline"
+            onPress={onSaveSearch}
+            testID="jobs-save-search"
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  noResults: { gap: spacing.md },
+  recovery: { gap: spacing.sm, paddingHorizontal: spacing.xl },
   flex: { flex: 1 },
   list: { padding: spacing.lg, paddingBottom: spacing.xxxl * 2, gap: spacing.md },
   listCompact: { padding: spacing.md, gap: spacing.sm },
