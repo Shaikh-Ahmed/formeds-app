@@ -10,8 +10,7 @@ import { Button, EmptyState, ErrorBanner, ErrorState, KycNotice } from '../../..
 import { Skeleton } from '../../../src/components/Skeleton';
 import { JobsSegmentedNav } from '../../../src/components/jobs/JobsSegmentedNav';
 import { JobBadge, formatPay, formatTypeLine } from '../../../src/components/jobs/JobMeta';
-import { PostJobSheet } from '../../../src/components/jobs/PostJobSheet';
-import { createJob, fetchMyPostings, setJobStatus } from '../../../src/api/jobs';
+import { fetchMyPostings, setJobStatus } from '../../../src/api/jobs';
 import { postedAgo } from '../../../src/utils/time';
 import type { Job } from '../../../src/types/jobs';
 
@@ -45,8 +44,6 @@ export default function PostedJobsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [posting, setPosting] = useState(false);
-  const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) { setLoading(false); return; }
@@ -76,21 +73,6 @@ export default function PostedJobsScreen() {
     }
   }, [token, jobs]);
 
-  const submitNewJob = useCallback(async (payload: Record<string, unknown>) => {
-    if (!token) return;
-    setPosting(true);
-    setActionError(null);
-    try {
-      await createJob(token, payload);
-      setShowForm(false);
-      await load();
-    } catch (e: any) {
-      setActionError(e?.message || 'Could not publish this posting.');
-    } finally {
-      setPosting(false);
-    }
-  }, [token, load]);
-
   const stats = useMemo(() => ({
     live: jobs.filter(j => j.status === 'active').length,
     applicants: jobs.reduce((sum, j) => sum + (j.applicant_count || 0), 0),
@@ -110,7 +92,7 @@ export default function PostedJobsScreen() {
           ) : <View style={styles.flex} />}
           <Button
             label="Post an opportunity"
-            onPress={() => setShowForm(true)}
+            onPress={() => router.push('/jobs/new' as any)}
             disabled={!isKycApproved}
             testID="post-job-open"
           />
@@ -158,6 +140,12 @@ export default function PostedJobsScreen() {
                 </Pressable>
 
                 <View style={styles.cardActions}>
+                  <CardAction
+                    icon="create-outline"
+                    label={item.status === 'draft' ? 'Finish' : 'Edit'}
+                    onPress={() => router.push(`/jobs/edit/${item.id}` as any)}
+                    testID={`edit-${item.id}`}
+                  />
                   {item.applicant_count > 0 ? (
                     <CardAction
                       icon="people-outline"
@@ -226,20 +214,13 @@ export default function PostedJobsScreen() {
                     : 'Post a role and reach verified healthcare professionals directly.'
                 }
                 actionLabel={isKycApproved ? 'Post an opportunity' : undefined}
-                onAction={isKycApproved ? () => setShowForm(true) : undefined}
+                onAction={isKycApproved ? () => router.push('/jobs/new' as any) : undefined}
               />
             )
           }
         />
       </PageGrid>
 
-      <PostJobSheet
-        visible={showForm}
-        onClose={() => setShowForm(false)}
-        onSubmit={submitNewJob}
-        submitting={posting}
-        error={actionError}
-      />
     </SafeAreaView>
   );
 }

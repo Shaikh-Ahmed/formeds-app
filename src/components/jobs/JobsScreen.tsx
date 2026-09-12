@@ -174,6 +174,7 @@ export function JobsScreen({
                 onApply={() => setApplyFor(detail)}
                 onToggleSave={onToggleSave}
                 onShare={onShare}
+                onViewOrganization={orgId => router.push(`/org/${orgId}` as any)}
               />
             </View>
           </View>
