@@ -12,6 +12,7 @@ import {
 } from '../../types/profile';
 import * as profileApi from '../../api/profile';
 import { openBlob } from '../../utils/download';
+import { apiFetch } from '../../utils/api';
 import { ProfileHeader } from './ProfileHeader';
 import { ProfessionalIdentity } from './ProfessionalIdentity';
 import { AboutSection } from './AboutSection';
@@ -52,6 +53,8 @@ export function ProfileView({ userId }: Props) {
   const [saving, setSaving] = useState(false);
   const [sheetError, setSheetError] = useState<string | null>(null);
   const [resumeBusy, setResumeBusy] = useState(false);
+  const [connectionState, setConnectionState] = useState<'none' | 'pending' | 'accepted' | null>(null);
+  const [connectBusy, setConnectBusy] = useState(false);
 
   const editable = !!profile?.is_self;
 
@@ -63,12 +66,37 @@ export function ProfileView({ userId }: Props) {
         ? await profileApi.fetchProfile(token, userId)
         : await profileApi.fetchMyProfile(token);
       setProfile(data);
+      if (!data.is_self) {
+        // Best-effort: a visitor still gets a usable page — just without a
+        // Connect button — if this lookup fails.
+        try {
+          const status = await apiFetch(`/api/connections/status/${data.id}`, token);
+          setConnectionState(status?.status ?? 'none');
+        } catch {
+          setConnectionState(null);
+        }
+      } else {
+        setConnectionState(null);
+      }
     } catch (e: any) {
       setLoadError(e?.message || 'Could not load this profile.');
     } finally {
       setLoading(false);
     }
   }, [token, userId]);
+
+  const handleConnect = async () => {
+    if (!token || !profile || connectBusy || connectionState !== 'none') return;
+    setConnectBusy(true);
+    try {
+      const res = await apiFetch(`/api/connections/request?target_id=${profile.id}`, token, { method: 'POST' });
+      setConnectionState((res?.status as typeof connectionState) || 'pending');
+    } catch (e: any) {
+      setComingSoon(e?.message || 'Could not send that connection request. Please try again.');
+    } finally {
+      setConnectBusy(false);
+    }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -238,6 +266,8 @@ export function ProfileView({ userId }: Props) {
         isMobile={isMobile}
         onEdit={() => setScalarSheet('identity')}
         onShare={share}
+        connectionState={connectionState}
+        onConnect={!editable && connectionState !== null ? handleConnect : undefined}
       />
     </>
   );
