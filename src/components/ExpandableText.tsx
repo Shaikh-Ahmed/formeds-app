@@ -97,18 +97,26 @@ export function ExpandableText({
   );
 
   return (
-    <View
-      testID={testID}
-      style={!expanded && clampLines < numberOfLines ? { maxHeight: lineHeight * clampLines, overflow: 'hidden' } : undefined}
-    >
-      <Text
-        ref={nodeRef}
-        style={[styles.body, { lineHeight }, style]}
-        numberOfLines={expanded ? undefined : numberOfLines}
-        onTextLayout={onTextLayout}
+    <View testID={testID}>
+      {/* The clip lives on its own wrapper around only the Text — never
+          around the toggle too. numberOfLines can lay the Text out taller
+          than clampLines allows (that gap is the whole point of a fractional
+          clamp), and a shared clip box would cut the toggle off along with
+          the extra text, leaving "…more" in the tree but invisible and
+          unreachable. */}
+      <View
+        testID={testID ? `${testID}-clip` : undefined}
+        style={!expanded && clampLines < numberOfLines ? { maxHeight: lineHeight * clampLines, overflow: 'hidden' } : undefined}
       >
-        {text}
-      </Text>
+        <Text
+          ref={nodeRef}
+          style={[styles.body, { lineHeight }, style]}
+          numberOfLines={expanded ? undefined : numberOfLines}
+          onTextLayout={onTextLayout}
+        >
+          {text}
+        </Text>
+      </View>
 
       {canExpand && (
         <Pressable
