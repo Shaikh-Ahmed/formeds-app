@@ -26,12 +26,26 @@ import { colors, spacing, typography, fonts } from '../theme';
 export function ExpandableText({
   text,
   numberOfLines = 3,
+  clampLines = numberOfLines,
+  lineHeight = 22,
   style,
   testID,
 }: {
   text: string;
-  /** Lines shown while collapsed. */
+  /** Lines the overflow check allows before offering "…more". Kept a whole
+   *  number because the cross-platform detection above depends on it. */
   numberOfLines?: number;
+  /**
+   * Visual clip height while collapsed, in line-heights — allowed to be
+   * fractional (e.g. 2.5), independent of `numberOfLines`. A fractional
+   * value clips mid-line, which reads as "there's more" more honestly than
+   * a clean cutoff at a whole line. Defaults to `numberOfLines` (no clip
+   * beyond what the line limit already produces).
+   */
+  clampLines?: number;
+  /** Must match the line-height the passed `style` actually renders at —
+   *  the clip height is computed from it. */
+  lineHeight?: number;
   style?: StyleProp<TextStyle>;
   testID?: string;
 }) {
@@ -83,10 +97,13 @@ export function ExpandableText({
   );
 
   return (
-    <View testID={testID}>
+    <View
+      testID={testID}
+      style={!expanded && clampLines < numberOfLines ? { maxHeight: lineHeight * clampLines, overflow: 'hidden' } : undefined}
+    >
       <Text
         ref={nodeRef}
-        style={[styles.body, style]}
+        style={[styles.body, { lineHeight }, style]}
         numberOfLines={expanded ? undefined : numberOfLines}
         onTextLayout={onTextLayout}
       >

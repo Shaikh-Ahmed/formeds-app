@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Pressable, TextInput, ActivityIndicator, RefreshControl, Share, Image, Platform, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,17 +7,21 @@ import { apiFetch, API_URL } from '../../src/utils/api';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { timeAgo } from '../../src/utils/time';
-import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer } from '../../src/components';
+import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer, ActionSheet } from '../../src/components';
 import { PageGrid, ProfileRail, FeedRail, Hoverable } from '../../src/components/web';
-import { colors, spacing, radius, typography, compactAction, useBreakpoint } from '../../src/theme';
+import { colors, spacing, radius, typography, compactAction, useBreakpoint, MIN_TOUCH_TARGET } from '../../src/theme';
 import { useCollapsibleHeader, focusScrollInset } from '../../src/hooks/useCollapsibleHeader';
 
 const FEED_PAGE_SIZE = 20;
 
 interface Post {
   id: string;
+  author_id: string;
   author_name: string;
   author_role: string;
+  /** Looked up live server-side, so it reflects the poster's CURRENT KYC
+   *  status even on an old post — never assume it was true when posted. */
+  author_verified?: boolean;
   content: string;
   post_type: string;
   image_url?: string;
@@ -25,6 +29,28 @@ interface Post {
   comment_count: number;
   likes: string[];
   created_at: string;
+}
+
+interface Comment {
+  id: string;
+  author_name: string;
+  content: string;
+  created_at: string;
+}
+
+/**
+ * Standard media shapes, so a card's height is one of three predictable
+ * values instead of whatever an uploader's phone happened to produce.
+ * Chosen by nearest ratio to the image's real dimensions — never a crop that
+ * disagrees with what the photo actually is.
+ */
+export const MEDIA_RATIOS = { square: 1, portrait: 4 / 5, landscape: 16 / 9 } as const;
+
+export function nearestMediaRatio(width: number, height: number): number {
+  if (!width || !height) return MEDIA_RATIOS.landscape;
+  const actual = width / height;
+  const options = Object.values(MEDIA_RATIOS);
+  return options.reduce((best, r) => (Math.abs(r - actual) < Math.abs(best - actual) ? r : best), options[0]);
 }
 
 export default function FeedScreen() {
@@ -149,92 +175,29 @@ export default function FeedScreen() {
     }
   };
 
-  const renderPost = ({ item }: { item: Post }) => {
-    const isLiked = item.likes?.includes(user?.id || '');
-    return (
-      <View testID={`feed-post-${item.id}`} style={[styles.postCard, !isMobile && styles.postCardWide]}>
-        {/* The author block opens the post on desktop, where a pointer user
-            expects the header to be clickable; on mobile the dedicated
-            comment button stays the only route in. */}
-        <Hoverable
-          onPress={isMobile ? undefined : () => router.push({ pathname: '/post/[id]', params: { id: item.id } } as any)}
-          accessibilityLabel={`Post by ${item.author_name}`}
-          style={styles.postHeader}
-          hoverStyle={styles.postHeaderHover}
-        >
-          <Avatar name={item.author_name} role={item.author_role} size={44} />
-          <View style={styles.postMeta}>
-            <Text style={styles.authorName}>{item.author_name}</Text>
-            <View style={styles.metaRow}>
-              <RoleBadge role={item.author_role} />
-              <Text style={styles.timeText}>{timeAgo(item.created_at)}</Text>
-            </View>
-          </View>
-        </Hoverable>
-        <ExpandableText
-          testID={`post-body-${item.id}`}
-          text={item.content}
-          numberOfLines={3}
-          style={styles.postContent}
-        />
-        {item.image_url ? (
-          <Pressable
-            testID={`post-image-${item.id}`}
-            onPress={() => setViewerPost(item)}
-            accessibilityRole="imagebutton"
-            accessibilityLabel="Open image full screen"
-            style={({ pressed }) => [styles.postImageWrap, pressed && styles.postImagePressed]}
-          >
-            {/* Cropped on purpose so every card is the same height; the
-                uncropped version is one tap away in MediaViewer. */}
-            <Image source={{ uri: item.image_url }} style={styles.postImage} resizeMode="cover" />
-            <View style={styles.expandHint} pointerEvents="none">
-              <Ionicons name="expand-outline" size={14} color={colors.white} />
-            </View>
-          </Pressable>
-        ) : null}
-        {/* Compact action row: the buttons are drawn at 32px but carry
-            the shared compactAction hit slop, so the area a finger actually has to hit stays 44px.
-            Shrinking the painted box instead of the target is what buys the
-            height back without making the row harder to use. */}
-        <View style={styles.postActions}>
-          <Hoverable
-            testID={`like-btn-${item.id}`}
-            style={styles.actionBtn}
-            hoverStyle={styles.actionBtnHover}
-            hitSlop={compactAction.hitSlop}
-            onPress={() => handleLike(item.id)}
-            accessibilityLabel={`${isLiked ? 'Unlike' : 'Like'}, ${item.like_count} likes`}
-          >
-            {/* redText, not red: the bright brand red is only 3.9:1 on the
-                card, which is fine for a glyph but below the minimum for the
-                count beside it. One colour for both keeps the pair matched. */}
-            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? colors.redText : colors.textSecondary} />
-            <Text style={[styles.actionText, isLiked && { color: colors.redText }]}>{item.like_count}</Text>
-          </Hoverable>
-          <Hoverable
-            style={styles.actionBtn}
-            hoverStyle={styles.actionBtnHover}
-            hitSlop={compactAction.hitSlop}
-            onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id } } as any)}
-            accessibilityLabel={`Comments, ${item.comment_count}`}
-          >
-            <Ionicons name="chatbubble-outline" size={18} color={colors.textSecondary} />
-            <Text style={styles.actionText}>{item.comment_count}</Text>
-          </Hoverable>
-          <Hoverable
-            style={styles.actionBtn}
-            hoverStyle={styles.actionBtnHover}
-            hitSlop={compactAction.hitSlop}
-            onPress={() => handleShare(item)}
-            accessibilityLabel="Share this post"
-          >
-            <Ionicons name="share-social-outline" size={18} color={colors.textSecondary} />
-          </Hoverable>
-        </View>
-      </View>
-    );
-  };
+  const handleDeleted = useCallback((postId: string) => {
+    setPosts(prev => prev.filter(p => p.id !== postId));
+  }, []);
+
+  // A repost is a new post of its own (see PostCard.handleRepost), so the
+  // simplest correct way to show it is the same refresh a pull-to-refresh
+  // already does — it lands at the top because the feed sorts by recency.
+  const handleReposted = useCallback(() => { loadData(); }, [loadData]);
+
+  const renderPost = ({ item }: { item: Post }) => (
+    <PostCard
+      item={item}
+      isMobile={isMobile}
+      token={token}
+      currentUserId={user?.id}
+      onOpenProfile={() => router.push({ pathname: '/post/[id]', params: { id: item.id } } as any)}
+      onLike={() => handleLike(item.id)}
+      onShare={() => handleShare(item)}
+      onOpenImage={() => setViewerPost(item)}
+      onDeleted={handleDeleted}
+      onReposted={handleReposted}
+    />
+  );
 
   return (
     // No page title and no header icon row: the persistent top bar already
@@ -365,6 +328,334 @@ export default function FeedScreen() {
   );
 }
 
+/**
+ * One post: author, body, media, actions, an expand-in-place comment
+ * thread, and an overflow menu for repost/delete/report.
+ *
+ * Pulled out of FeedScreen's render loop because it needed per-card state
+ * (measured image ratio, whether comments are open, the comment list
+ * itself, the overflow menu) — none of which belongs on the screen that
+ * renders potentially twenty of these at once.
+ */
+function PostCard({
+  item, isMobile, token, currentUserId,
+  onOpenProfile, onLike, onShare, onOpenImage, onDeleted, onReposted,
+}: {
+  item: Post;
+  isMobile: boolean;
+  token: string | null;
+  currentUserId?: string;
+  onOpenProfile: () => void;
+  onLike: () => void;
+  onShare: () => void;
+  onOpenImage: () => void;
+  onDeleted: (postId: string) => void;
+  onReposted: () => void;
+}) {
+  const isLiked = item.likes?.includes(currentUserId || '');
+  const isOwn = !!currentUserId && item.author_id === currentUserId;
+
+  const [mediaRatio, setMediaRatio] = useState<number>(MEDIA_RATIOS.landscape);
+  useEffect(() => {
+    if (!item.image_url) return;
+    let cancelled = false;
+    Image.getSize(
+      item.image_url,
+      (w, h) => { if (!cancelled) setMediaRatio(nearestMediaRatio(w, h)); },
+      () => {}, // Keeps the landscape default; a failed measurement is not worth a retry loop.
+    );
+    return () => { cancelled = true; };
+  }, [item.image_url]);
+
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [comments, setComments] = useState<Comment[] | null>(null);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState(item.comment_count);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const toggleComments = async () => {
+    setCommentsOpen(v => !v);
+    if (comments !== null) return; // Already loaded once; don't refetch on every toggle.
+    setCommentsLoading(true);
+    try {
+      const data = await apiFetch(`/api/feed/${item.id}/comments`, token);
+      setComments(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.log('Comments load error:', e);
+      setActionError('Could not load comments.');
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const submitComment = async () => {
+    const content = commentText.trim();
+    if (!content || commentSubmitting) return;
+    setCommentSubmitting(true);
+    setActionError(null);
+    try {
+      await apiFetch(`/api/feed/${item.id}/comment`, token, {
+        method: 'POST', body: JSON.stringify({ content }),
+      });
+      setCommentText('');
+      setLocalCommentCount(c => c + 1);
+      const data = await apiFetch(`/api/feed/${item.id}/comments`, token);
+      setComments(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      setActionError(e?.message || 'Could not post your comment.');
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const handleRepost = async () => {
+    setMenuOpen(false);
+    setBusy(true);
+    setActionError(null);
+    try {
+      await apiFetch('/api/feed', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          content: `Reposted from ${item.author_name}:\n\n${item.content}`,
+          post_type: item.image_url ? 'image' : 'text',
+          image_url: item.image_url || '',
+        }),
+      });
+      onReposted();
+    } catch (e: any) {
+      setActionError(e?.message || 'Could not repost.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setMenuOpen(false);
+    setBusy(true);
+    setActionError(null);
+    try {
+      await apiFetch(`/api/feed/${item.id}`, token, { method: 'DELETE' });
+      onDeleted(item.id);
+    } catch (e: any) {
+      setActionError(e?.message || 'Could not delete this post.');
+      setBusy(false);
+    }
+    // No `finally` reset on success: the card is about to unmount.
+  };
+
+  const handleReport = async () => {
+    setMenuOpen(false);
+    setActionError(null);
+    try {
+      await apiFetch(`/api/feed/${item.id}/report`, token, {
+        method: 'POST', body: JSON.stringify({ reason: 'spam' }),
+      });
+    } catch (e: any) {
+      setActionError(e?.message || 'Could not submit your report.');
+    }
+  };
+
+  return (
+    <View testID={`feed-post-${item.id}`} style={[styles.postCard, !isMobile && styles.postCardWide]}>
+      <View style={styles.postHeadRow}>
+        {/* The author block opens the post on desktop, where a pointer user
+            expects the header to be clickable; on mobile the dedicated
+            comment button stays the only route in. */}
+        <Hoverable
+          onPress={isMobile ? undefined : onOpenProfile}
+          accessibilityLabel={`Post by ${item.author_name}`}
+          style={styles.postHeader}
+          hoverStyle={styles.postHeaderHover}
+        >
+          <Avatar name={item.author_name} role={item.author_role} size={44} />
+          <View style={styles.postMeta}>
+            <View style={styles.nameRow}>
+              <Text style={styles.authorName}>{item.author_name}</Text>
+              {item.author_verified ? (
+                <Ionicons
+                  name="checkmark-circle"
+                  size={14}
+                  color={colors.teal}
+                  accessibilityLabel="Verified healthcare professional"
+                />
+              ) : null}
+            </View>
+            <View style={styles.metaRow}>
+              <RoleBadge role={item.author_role} />
+              <Text style={styles.timeText}>{timeAgo(item.created_at)}</Text>
+            </View>
+          </View>
+        </Hoverable>
+
+        <Pressable
+          testID={`post-menu-${item.id}`}
+          onPress={() => setMenuOpen(true)}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel="More options for this post"
+          hitSlop={8}
+          style={({ pressed }) => [styles.menuBtn, (pressed || busy) && styles.pressed]}
+        >
+          <Ionicons name="ellipsis-horizontal" size={18} color={colors.textSecondary} />
+        </Pressable>
+      </View>
+
+      <ExpandableText
+        testID={`post-body-${item.id}`}
+        text={item.content}
+        numberOfLines={3}
+        clampLines={2.5}
+        lineHeight={22}
+        style={styles.postContent}
+      />
+      {item.image_url ? (
+        <Pressable
+          testID={`post-image-${item.id}`}
+          onPress={onOpenImage}
+          accessibilityRole="imagebutton"
+          accessibilityLabel="Open image full screen"
+          style={({ pressed }) => [styles.postImageWrap, pressed && styles.postImagePressed]}
+        >
+          {/* Ratio-matched, never cropped to an arbitrary fixed height — the
+              nearest of 1:1 / 4:5 / 16:9 to the image's real shape, so a
+              portrait photo doesn't lose its top and bottom to a landscape
+              frame. */}
+          <Image
+            source={{ uri: item.image_url }}
+            style={[styles.postImage, { aspectRatio: mediaRatio }]}
+            resizeMode="cover"
+          />
+          <View style={styles.expandHint} pointerEvents="none">
+            <Ionicons name="expand-outline" size={14} color={colors.white} />
+          </View>
+        </Pressable>
+      ) : null}
+
+      <ErrorRow message={actionError} />
+
+      {/* Compact action row: the buttons are drawn at 32px but carry
+          the shared compactAction hit slop, so the area a finger actually has to hit stays 44px.
+          Shrinking the painted box instead of the target is what buys the
+          height back without making the row harder to use. All three icons
+          are the same size (18) and share one row style, so the row reads
+          as one balanced unit rather than three unrelated controls. */}
+      <View style={styles.postActions}>
+        <Hoverable
+          testID={`like-btn-${item.id}`}
+          style={styles.actionBtn}
+          hoverStyle={styles.actionBtnHover}
+          hitSlop={compactAction.hitSlop}
+          onPress={onLike}
+          accessibilityLabel={`${isLiked ? 'Unlike' : 'Like'}, ${item.like_count} likes`}
+        >
+          {/* redText, not red: the bright brand red is only 3.9:1 on the
+              card, which is fine for a glyph but below the minimum for the
+              count beside it. One colour for both keeps the pair matched. */}
+          <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? colors.redText : colors.textSecondary} />
+          <Text style={[styles.actionText, isLiked && { color: colors.redText }]}>{item.like_count}</Text>
+        </Hoverable>
+        <Hoverable
+          testID={`comment-btn-${item.id}`}
+          style={styles.actionBtn}
+          hoverStyle={styles.actionBtnHover}
+          hitSlop={compactAction.hitSlop}
+          onPress={toggleComments}
+          accessibilityLabel={`Comments, ${localCommentCount}`}
+        >
+          <Ionicons name="chatbubble-outline" size={18} color={colors.textSecondary} />
+          <Text style={styles.actionText}>{localCommentCount}</Text>
+        </Hoverable>
+        <Hoverable
+          style={styles.actionBtn}
+          hoverStyle={styles.actionBtnHover}
+          hitSlop={compactAction.hitSlop}
+          onPress={onShare}
+          accessibilityLabel="Share this post"
+        >
+          <Ionicons name="share-social-outline" size={18} color={colors.textSecondary} />
+        </Hoverable>
+      </View>
+
+      {/* Expands within the card, rather than the old navigation to a
+          separate screen — a reader stays where they were scrolling. */}
+      {commentsOpen ? (
+        <View style={styles.commentsBlock} testID={`comments-${item.id}`}>
+          {commentsLoading ? (
+            <ActivityIndicator color={colors.navy} style={styles.commentsLoading} />
+          ) : comments && comments.length ? (
+            comments.map(c => (
+              <View key={c.id} style={styles.commentRow}>
+                <Avatar name={c.author_name} size={28} />
+                <View style={styles.commentBody}>
+                  <View style={styles.commentMetaRow}>
+                    <Text style={styles.commentAuthor}>{c.author_name}</Text>
+                    <Text style={styles.commentTime}>{timeAgo(c.created_at)}</Text>
+                  </View>
+                  <Text style={styles.commentText}>{c.content}</Text>
+                </View>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.commentsEmpty}>No comments yet — be the first to reply.</Text>
+          )}
+
+          <View style={styles.commentInputRow}>
+            <TextInput
+              testID={`comment-input-${item.id}`}
+              style={styles.commentInput}
+              value={commentText}
+              onChangeText={setCommentText}
+              placeholder="Write a comment…"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              accessibilityLabel="Write a comment"
+            />
+            <Pressable
+              testID={`comment-submit-${item.id}`}
+              onPress={submitComment}
+              disabled={!commentText.trim() || commentSubmitting}
+              accessibilityRole="button"
+              accessibilityLabel="Post comment"
+              style={({ pressed }) => [
+                styles.commentSendBtn,
+                (!commentText.trim() || commentSubmitting) && styles.commentSendBtnDisabled,
+                pressed && styles.pressed,
+              ]}
+            >
+              {commentSubmitting ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Ionicons name="send" size={16} color={colors.white} />
+              )}
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      <ActionSheet
+        visible={menuOpen}
+        title="Post"
+        onClose={() => setMenuOpen(false)}
+        options={[
+          ...(!isOwn ? [{ label: 'Repost', icon: 'repeat-outline' as const, onPress: handleRepost }] : []),
+          ...(isOwn ? [{ label: 'Delete', icon: 'trash-outline' as const, onPress: handleDelete }] : []),
+          ...(!isOwn ? [{ label: 'Report spam', icon: 'flag-outline' as const, onPress: handleReport }] : []),
+        ]}
+      />
+    </View>
+  );
+}
+
+function ErrorRow({ message }: { message: string | null }) {
+  if (!message) return null;
+  return <Text style={styles.actionError}>{message}</Text>;
+}
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F8FAFC' },
   // Clips the header at the top edge as it slides away.
@@ -440,20 +731,30 @@ const styles = StyleSheet.create({
   listWide: { paddingHorizontal: 0, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
   postCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
   postCardWide: { marginBottom: spacing.lg },
-  postHeader: { flexDirection: 'row', marginBottom: 12, borderRadius: radius.md, marginHorizontal: -4, paddingHorizontal: 4, paddingVertical: 2 },
+  postHeadRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
+  postHeader: { flex: 1, flexDirection: 'row', marginBottom: 12, borderRadius: radius.md, marginHorizontal: -4, paddingHorizontal: 4, paddingVertical: 2 },
   postHeaderHover: { backgroundColor: colors.bgMuted },
   avatarCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1A3A5C', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   avatarText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
   postMeta: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   authorName: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   roleTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginRight: 8 },
   roleTagText: { fontSize: 11, fontWeight: '600' },
   timeText: { fontSize: 12, color: '#94A3B8' },
+  menuBtn: {
+    width: MIN_TOUCH_TARGET, height: MIN_TOUCH_TARGET,
+    alignItems: 'center', justifyContent: 'center', marginTop: -spacing.xs, marginRight: -spacing.xs,
+  },
+  pressed: { opacity: 0.6 },
   postContent: { fontSize: 15, color: '#334155', lineHeight: 22 },
-  postImageWrap: { marginTop: 12, borderRadius: 12, overflow: 'hidden' },
+  postImageWrap: { marginTop: 12, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.bgMuted },
   postImagePressed: { opacity: 0.9 },
-  postImage: { width: '100%', height: 250 },
+  // Height comes from `aspectRatio`, set inline per card to the nearest of
+  // 1:1 / 4:5 / 16:9 — never a fixed pixel height, which is what used to
+  // crop every image to the same box regardless of its real shape.
+  postImage: { width: '100%' },
   // Small affordance so the image reads as openable rather than decorative.
   expandHint: {
     position: 'absolute',
@@ -489,6 +790,34 @@ const styles = StyleSheet.create({
   // textMuted reaches only 2.6:1 on white — fine for a placeholder, not for a
   // count that carries meaning.
   actionText: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
+  actionError: { ...typography.small, color: colors.redText, marginTop: spacing.xs },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   emptyText: { fontSize: 16, color: '#94A3B8', marginTop: 12 },
+
+  commentsBlock: {
+    marginTop: spacing.md, paddingTop: spacing.md,
+    borderTopWidth: 1, borderTopColor: colors.borderLight, gap: spacing.md,
+  },
+  commentsLoading: { paddingVertical: spacing.md },
+  commentsEmpty: { ...typography.caption, color: colors.textSecondary, textAlign: 'center', paddingVertical: spacing.sm },
+  commentRow: { flexDirection: 'row', gap: spacing.sm },
+  commentBody: {
+    flex: 1, backgroundColor: colors.bgMuted, borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: 2,
+  },
+  commentMetaRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
+  commentAuthor: { ...typography.caption, fontWeight: '700', color: colors.text },
+  commentTime: { ...typography.small, color: colors.textMuted },
+  commentText: { ...typography.body, color: colors.text, lineHeight: 20 },
+  commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+  commentInput: {
+    flex: 1, ...typography.body, color: colors.text, backgroundColor: colors.bgMuted,
+    borderRadius: radius.lg, paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    minHeight: 40, maxHeight: 100,
+  },
+  commentSendBtn: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: colors.navy,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  commentSendBtnDisabled: { opacity: 0.4 },
 });
