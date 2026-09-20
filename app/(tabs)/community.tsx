@@ -729,7 +729,17 @@ const styles = StyleSheet.create({
   // The grid already supplies the horizontal gutter; doubling it would push
   // the readable column narrower than the 65–75ch target.
   listWide: { paddingHorizontal: 0, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
-  postCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
+  // Same shell as JobCard's card style — radius.xl + 2, spacing.lg padding,
+  // border-only (no shadow) — so a feed card and a job card read as the same
+  // family of surface rather than two different card systems.
+  postCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.xl + 2,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   postCardWide: { marginBottom: spacing.lg },
   postHeadRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
   postHeader: { flex: 1, flexDirection: 'row', marginBottom: 12, borderRadius: radius.md, marginHorizontal: -4, paddingHorizontal: 4, paddingVertical: 2 },
