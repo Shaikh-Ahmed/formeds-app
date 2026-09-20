@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { colors, radius, spacing, typography } from '../../theme';
+import { colors, radius, spacing, typography, fonts } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { Sheet } from '../Sheet';
 import { Button } from '../Button';
 import { Avatar } from '../Avatar';
 import { ErrorBanner } from '../States';
 import { KycNotice } from '../KycNotice';
-import type { Job } from '../../types/jobs';
+import type { Job, ScreeningAnswer } from '../../types/jobs';
 
 const MAX_NOTE = 1500;
 
@@ -32,17 +32,30 @@ export function ApplySheet({
   visible: boolean;
   job: Job | null;
   onClose: () => void;
-  onSubmit: (coverNote: string) => void;
+  onSubmit: (coverNote: string, screeningAnswers: ScreeningAnswer[]) => void;
   submitting?: boolean;
   error?: string | null;
 }) {
   const { user, isKycApproved } = useAuth();
   const router = useRouter();
   const [note, setNote] = useState('');
+  const [answers, setAnswers] = useState<Record<string, 'yes' | 'no'>>({});
 
-  useEffect(() => { if (visible) setNote(''); }, [visible]);
+  useEffect(() => {
+    if (visible) { setNote(''); setAnswers({}); }
+  }, [visible]);
 
   if (!job) return null;
+
+  const questions = job.screening_questions || [];
+  const allAnswered = questions.every(q => answers[q.id]);
+
+  const submit = () => {
+    onSubmit(
+      note.trim(),
+      questions.map(q => ({ question_id: q.id, answer: answers[q.id] })),
+    );
+  };
 
   // Exactly the fields `public_card` puts on the wire. Anything shown here that
   // the employer does not actually receive would be a lie about the applicant's
@@ -71,9 +84,9 @@ export function ApplySheet({
           <Button label="Cancel" variant="outline" onPress={onClose} style={styles.footerBtn} />
           <Button
             label="Submit application"
-            onPress={() => onSubmit(note.trim())}
+            onPress={submit}
             loading={submitting}
-            disabled={!isKycApproved}
+            disabled={!isKycApproved || !allAnswered}
             style={styles.footerBtn}
             testID="apply-submit"
           />
@@ -142,6 +155,38 @@ export function ApplySheet({
           ) : null}
         </View>
 
+        {questions.length ? (
+          <View style={styles.questionsBlock}>
+            <Text style={styles.noteLabel}>Screening questions</Text>
+            {questions.map(q => (
+              <View key={q.id} style={styles.questionRow} testID={`apply-question-${q.id}`}>
+                <Text style={styles.questionText}>{q.text}</Text>
+                <View style={styles.answerChips}>
+                  {(['yes', 'no'] as const).map(v => (
+                    <Pressable
+                      key={v}
+                      onPress={() => setAnswers(prev => ({ ...prev, [q.id]: v }))}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: answers[q.id] === v }}
+                      accessibilityLabel={`${v === 'yes' ? 'Yes' : 'No'} to: ${q.text}`}
+                      testID={`apply-question-${q.id}-${v}`}
+                      style={({ pressed }) => [
+                        styles.answerChip,
+                        answers[q.id] === v && styles.answerChipOn,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={[styles.answerChipText, answers[q.id] === v && styles.answerChipTextOn]}>
+                        {v === 'yes' ? 'Yes' : 'No'}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         <View style={styles.noteBlock}>
           <Text style={styles.noteLabel}>Add a note (optional)</Text>
           <TextInput
@@ -194,6 +239,25 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   nudgeText: { ...typography.small, color: colors.warning },
+
+  questionsBlock: { gap: spacing.md },
+  questionRow: { gap: spacing.sm },
+  questionText: { ...typography.body, color: colors.text },
+  answerChips: { flexDirection: 'row', gap: spacing.sm },
+  answerChip: {
+    minWidth: 64,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+  },
+  answerChipOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  answerChipText: { ...typography.caption, color: colors.textSecondary },
+  answerChipTextOn: { color: colors.white, fontFamily: fonts.body.semibold },
+  pressed: { opacity: 0.7 },
 
   noteBlock: { gap: spacing.xs },
   noteLabel: { ...typography.label, color: colors.text },

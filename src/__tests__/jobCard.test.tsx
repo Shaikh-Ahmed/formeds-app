@@ -37,6 +37,7 @@ const JOB: Job = {
   skills: ['Angioplasty', 'Echocardiography'],
   is_urgent: false,
   status: 'active',
+  screening_questions: [],
   applicant_count: 0,
   view_count: 0,
   save_count: 0,

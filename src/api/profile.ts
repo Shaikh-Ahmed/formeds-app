@@ -1,4 +1,4 @@
-import { apiFetch, API_URL } from '../utils/api';
+import { apiFetch, apiFetchBlob, API_URL } from '../utils/api';
 import { appendFile } from '../utils/upload';
 import {
   EntryKind,
@@ -25,6 +25,16 @@ export async function fetchMyProfile(token: string): Promise<Profile> {
 
 export async function fetchProfile(token: string | null, userId: string): Promise<Profile> {
   return apiFetch(`/api/profile/${userId}`, token);
+}
+
+/**
+ * Your resume as a PDF Blob, generated fresh from your profile — there is no
+ * uploaded file behind this. Never a bare URL: the endpoint needs the same
+ * bearer token as every other authenticated call, which a plain link has no
+ * way to attach.
+ */
+export async function fetchMyResume(token: string): Promise<Blob> {
+  return apiFetchBlob('/api/profile/resume', token);
 }
 
 /**

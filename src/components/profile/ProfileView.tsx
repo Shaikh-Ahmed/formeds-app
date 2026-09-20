@@ -12,6 +12,7 @@ import {
   VISIBILITY_LABELS, Skills, ProfessionalLinks,
 } from '../../types/profile';
 import * as profileApi from '../../api/profile';
+import { openBlob } from '../../utils/download';
 import { ProfileHeader } from './ProfileHeader';
 import { ProfessionalIdentity } from './ProfessionalIdentity';
 import { AboutSection } from './AboutSection';
@@ -52,6 +53,7 @@ export function ProfileView({ userId }: Props) {
   const [comingSoon, setComingSoon] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [sheetError, setSheetError] = useState<string | null>(null);
+  const [resumeBusy, setResumeBusy] = useState(false);
 
   const editable = !!profile?.is_self;
 
@@ -90,6 +92,20 @@ export function ProfileView({ userId }: Props) {
       setSheetError(e?.message || 'Could not save. Please check the fields and try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const downloadResume = async () => {
+    if (!token || resumeBusy) return;
+    setResumeBusy(true);
+    try {
+      const blob = await profileApi.fetchMyResume(token);
+      const filename = `${(profile?.name || 'resume').trim().replace(/\s+/g, '-')}-resume.pdf`;
+      await openBlob(blob, filename);
+    } catch (e: any) {
+      setComingSoon(e?.message || 'Could not download your resume. Please try again.');
+    } finally {
+      setResumeBusy(false);
     }
   };
 
@@ -432,18 +448,17 @@ export function ProfileView({ userId }: Props) {
         onClose={() => setOverflowOpen(false)}
         options={[
           { label: 'Share profile', icon: 'share-outline', onPress: () => { setOverflowOpen(false); share(); } },
-          {
-            label: 'Download resume',
-            icon: 'download-outline',
-            badge: 'Soon',
-            onPress: () => { setOverflowOpen(false); setComingSoon(RESUME_SOON); },
-          },
-          {
-            label: 'Preview resume',
-            icon: 'document-text-outline',
-            badge: 'Soon',
-            onPress: () => { setOverflowOpen(false); setComingSoon(RESUME_SOON); },
-          },
+          // Only ever your own — this calls the self endpoint, which has no
+          // notion of "whoever's profile is currently on screen". Someone
+          // else's resume is reachable only through their job application,
+          // by whoever they applied to.
+          ...(editable
+            ? [{
+                label: resumeBusy ? 'Preparing resume…' : 'Download resume',
+                icon: 'download-outline' as const,
+                onPress: () => { setOverflowOpen(false); downloadResume(); },
+              }]
+            : []),
           // Restores the entry point this screen lost when its Account/Admin
           // menu moved to the drawer: the drawer is unreachable above 768px,
           // so an admin had no route to the review queue on desktop.
@@ -570,9 +585,6 @@ function RailGroup({ empty, children }: { empty?: boolean; children: React.React
   if (empty) return null;
   return <View style={styles.railGroup}>{children}</View>;
 }
-
-const RESUME_SOON =
-  'Resume export is coming soon. Your profile is already the structured source it will be generated from, so anything you add now carries straight into it.';
 
 function findEntry(entries: ProfileEntry[], id: string) {
   return entries.find((e) => e.id === id);
@@ -769,4 +781,4 @@ const sheetStyles = StyleSheet.create({
   pressed: { opacity: 0.6 },
 });
 
-export { RESUME_SOON, findEntry, isEntryKind, onSuggestion, toPatch, fromProfile, VISIBILITY_OPTIONS };
+export { findEntry, isEntryKind, onSuggestion, toPatch, fromProfile, VISIBILITY_OPTIONS };

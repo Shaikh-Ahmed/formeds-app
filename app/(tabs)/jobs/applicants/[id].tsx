@@ -9,8 +9,9 @@ import { PageColumn } from '../../../../src/components/web';
 import { Avatar, EmptyState, ErrorBanner, ErrorState } from '../../../../src/components';
 import { Skeleton } from '../../../../src/components/Skeleton';
 import { JobBadge } from '../../../../src/components/jobs/JobMeta';
-import { fetchApplicants, fetchJob, setApplicationStatus } from '../../../../src/api/jobs';
+import { fetchApplicantResume, fetchApplicants, fetchJob, setApplicationStatus } from '../../../../src/api/jobs';
 import { postedAgo } from '../../../../src/utils/time';
+import { openBlob } from '../../../../src/utils/download';
 import { APPLICATION_STATUS_META, type Application, type ApplicationStatusKey, type Job } from '../../../../src/types/jobs';
 
 const TONE_FOR_BADGE = {
@@ -158,6 +159,22 @@ export default function ApplicantsScreen() {
     }
   }, [token, apps]);
 
+  const [resumeBusyId, setResumeBusyId] = useState<string | null>(null);
+
+  const downloadResume = useCallback(async (app: Application) => {
+    if (!token || resumeBusyId) return;
+    setActionError(null);
+    setResumeBusyId(app.id);
+    try {
+      const blob = await fetchApplicantResume(token, app.id);
+      await openBlob(blob, `${app.user_name.replace(/\s+/g, '-')}-resume.pdf`);
+    } catch (e: any) {
+      setActionError(e?.message || "Could not download this applicant's resume.");
+    } finally {
+      setResumeBusyId(null);
+    }
+  }, [token, resumeBusyId]);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <PageColumn testID="applicants-column">
@@ -256,6 +273,8 @@ export default function ApplicantsScreen() {
               selectMode={selectMode}
               selected={selected.has(item.id)}
               onToggleSelect={() => toggleSelect(item.id)}
+              onDownloadResume={() => downloadResume(item)}
+              resumeBusy={resumeBusyId === item.id}
             />
           )}
           contentContainerStyle={[styles.list, selectMode && bulkSteps.length > 0 && styles.listWithBulkBar]}
@@ -334,6 +353,7 @@ export default function ApplicantsScreen() {
 
 function ApplicantRow({
   app, busy, onMove, onOpenProfile, onMessage, selectMode, selected, onToggleSelect,
+  onDownloadResume, resumeBusy,
 }: {
   app: Application;
   busy: boolean;
@@ -343,6 +363,8 @@ function ApplicantRow({
   selectMode?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
+  onDownloadResume: () => void;
+  resumeBusy: boolean;
 }) {
   const meta = APPLICATION_STATUS_META[app.status] ?? APPLICATION_STATUS_META.applied;
   const card = (app as any).applicant ?? {};
@@ -394,6 +416,23 @@ function ApplicantRow({
         <Text style={styles.note} numberOfLines={4}>{app.cover_note}</Text>
       ) : null}
 
+      {app.screening_answers?.length ? (
+        <View style={styles.screening}>
+          {app.screening_answers.map(a => (
+            <View key={a.question_id} style={styles.screeningRow}>
+              <Ionicons
+                name={a.answer === 'yes' ? 'checkmark-circle-outline' : 'close-circle-outline'}
+                size={14}
+                color={a.answer === 'yes' ? colors.teal : colors.textSecondary}
+              />
+              <Text style={styles.screeningText} numberOfLines={2}>
+                {a.text} <Text style={styles.screeningAnswer}>{a.answer === 'yes' ? 'Yes' : 'No'}</Text>
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       <View style={styles.statusRow}>
         <JobBadge label={meta.label} icon={meta.icon as any} tone={TONE_FOR_BADGE[meta.tone]} />
         <Text style={styles.applied}>
@@ -434,6 +473,17 @@ function ApplicantRow({
         >
           <Ionicons name="chatbubble-outline" size={14} color={colors.textSecondary} />
           <Text style={styles.actionTextQuiet}>Message</Text>
+        </Pressable>
+        <Pressable
+          testID={`applicant-resume-${app.id}`}
+          onPress={onDownloadResume}
+          disabled={resumeBusy}
+          accessibilityRole="button"
+          accessibilityLabel={`Download ${app.user_name}'s resume`}
+          style={({ pressed }) => [styles.action, styles.actionQuiet, (pressed || resumeBusy) && styles.pressed]}
+        >
+          <Ionicons name="download-outline" size={14} color={colors.textSecondary} />
+          <Text style={styles.actionTextQuiet}>{resumeBusy ? 'Preparing…' : 'Resume'}</Text>
         </Pressable>
       </View>
     </View>
@@ -570,6 +620,11 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: colors.border,
   },
+
+  screening: { gap: spacing.xs },
+  screeningRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
+  screeningText: { ...typography.caption, color: colors.textSecondary, flex: 1, lineHeight: 18 },
+  screeningAnswer: { fontFamily: fonts.body.semibold, color: colors.text },
 
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap' },
   applied: { ...typography.small, color: colors.textSecondary },
