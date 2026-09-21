@@ -47,121 +47,134 @@ export const JobCard = React.memo(function JobCard({
   const skills = item.skills?.slice(0, MAX_SKILL_CHIPS) ?? [];
   const extraSkills = Math.max((item.skills?.length ?? 0) - MAX_SKILL_CHIPS, 0);
 
+  // The save toggle can't be a Pressable nested inside the card's own
+  // Pressable: react-native-web renders `accessibilityRole="button"` as a
+  // literal <button>, and a <button> cannot legally contain another
+  // <button> — browsers un-nest it, which breaks click targeting and trips
+  // up screen readers. So it renders as a sibling, absolutely positioned
+  // over the same top-right corner it always occupied; `titleBlockWithSave`
+  // reserves the space under it that the old flex row used to.
   return (
-    <Pressable
-      testID={`job-card-${item.id}`}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={
-        `${item.title} at ${item.employer_name}. ` +
-        `${formatTypeLine(item)}. ${item.location || 'Location not stated'}. ` +
-        `${pay ? pay + '. ' : ''}${postedAgo(item.created_at)}.`
-      }
-      style={({ pressed }) => [
-        styles.card,
-        compact && styles.cardCompact,
-        selected && styles.cardSelected,
-        pressed && styles.cardPressed,
-      ]}
-    >
-      <View style={styles.topRow}>
-        <View style={styles.titleBlock}>
-          <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+    <View style={styles.cardWrap}>
+      <Pressable
+        testID={`job-card-${item.id}`}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={
+          `${item.title} at ${item.employer_name}. ` +
+          `${formatTypeLine(item)}. ${item.location || 'Location not stated'}. ` +
+          `${pay ? pay + '. ' : ''}${postedAgo(item.created_at)}.`
+        }
+        style={({ pressed }) => [
+          styles.card,
+          compact && styles.cardCompact,
+          selected && styles.cardSelected,
+          pressed && styles.cardPressed,
+        ]}
+      >
+        <View style={styles.topRow}>
+          <View style={[styles.titleBlock, onToggleSave && styles.titleBlockWithSave]}>
+            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
 
-          <View style={styles.employerRow}>
-            <Avatar
-              name={item.employer_name}
-              uri={item.employer_avatar || undefined}
-              role={item.poster_role || undefined}
-              size={20}
-            />
-            <Text style={styles.employer} numberOfLines={1}>{item.employer_name}</Text>
-            {item.employer_verified ? (
-              <Ionicons
-                name="checkmark-circle"
-                size={14}
-                color={colors.teal}
-                // The tick is a claim, so it is announced rather than decorative.
-                accessibilityLabel="Verified organisation"
+            <View style={styles.employerRow}>
+              <Avatar
+                name={item.employer_name}
+                uri={item.employer_avatar || undefined}
+                role={item.poster_role || undefined}
+                size={20}
+              />
+              <Text style={styles.employer} numberOfLines={1}>{item.employer_name}</Text>
+              {item.employer_verified ? (
+                <Ionicons
+                  name="checkmark-circle"
+                  size={14}
+                  color={colors.teal}
+                  // The tick is a claim, so it is announced rather than decorative.
+                  accessibilityLabel="Verified organisation"
+                />
+              ) : null}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.metaRow}>
+          {item.location ? <MetaItem icon="location-outline" text={item.location} /> : null}
+          <MetaItem icon="briefcase-outline" text={formatTypeLine(item)} />
+          {experience ? <MetaItem icon="time-outline" text={experience} /> : null}
+        </View>
+
+        {shiftDates ? (
+          <View style={styles.metaRow}>
+            <MetaItem icon="calendar-outline" text={shiftDates} />
+            {item.shift_time ? <MetaItem icon="moon-outline" text={item.shift_time} /> : null}
+          </View>
+        ) : null}
+
+        {pay ? (
+          <Text style={styles.pay}>{pay}</Text>
+        ) : (
+          <Text style={styles.payHidden}>Pay not disclosed</Text>
+        )}
+
+        {(item.is_urgent || isShiftRole(item.employment_type)) && !compact ? (
+          <View style={styles.badgeRow}>
+            {item.is_urgent ? (
+              <JobBadge label="Urgent" icon="alert-circle" tone="danger" />
+            ) : null}
+            {isShiftRole(item.employment_type) ? (
+              <JobBadge
+                label={EMPLOYMENT_TYPE_LABELS[item.employment_type]}
+                icon="flash-outline"
+                tone="teal"
               />
             ) : null}
           </View>
-        </View>
-
-        {onToggleSave ? (
-          <Pressable
-            testID={`job-save-${item.id}`}
-            onPress={() => onToggleSave(item)}
-            accessibilityRole="button"
-            accessibilityLabel={item.saved ? `Remove ${item.title} from saved` : `Save ${item.title}`}
-            accessibilityState={{ selected: item.saved }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={({ pressed }) => [styles.saveBtn, pressed && styles.cardPressed]}
-          >
-            <Ionicons
-              name={item.saved ? 'bookmark' : 'bookmark-outline'}
-              size={20}
-              color={item.saved ? colors.navy : colors.textSecondary}
-            />
-          </Pressable>
         ) : null}
-      </View>
 
-      <View style={styles.metaRow}>
-        {item.location ? <MetaItem icon="location-outline" text={item.location} /> : null}
-        <MetaItem icon="briefcase-outline" text={formatTypeLine(item)} />
-        {experience ? <MetaItem icon="time-outline" text={experience} /> : null}
-      </View>
-
-      {shiftDates ? (
-        <View style={styles.metaRow}>
-          <MetaItem icon="calendar-outline" text={shiftDates} />
-          {item.shift_time ? <MetaItem icon="moon-outline" text={item.shift_time} /> : null}
-        </View>
-      ) : null}
-
-      {pay ? (
-        <Text style={styles.pay}>{pay}</Text>
-      ) : (
-        <Text style={styles.payHidden}>Pay not disclosed</Text>
-      )}
-
-      {(item.is_urgent || isShiftRole(item.employment_type)) && !compact ? (
-        <View style={styles.badgeRow}>
-          {item.is_urgent ? (
-            <JobBadge label="Urgent" icon="alert-circle" tone="danger" />
-          ) : null}
-          {isShiftRole(item.employment_type) ? (
-            <JobBadge
-              label={EMPLOYMENT_TYPE_LABELS[item.employment_type]}
-              icon="flash-outline"
-              tone="teal"
-            />
-          ) : null}
-        </View>
-      ) : null}
-
-      {skills.length && !compact ? (
-        <View style={styles.skillRow}>
-          {skills.map(s => <Chip key={s} label={s} tone="neutral" />)}
-          {extraSkills ? <Chip label={`+${extraSkills} more`} tone="neutral" /> : null}
-        </View>
-      ) : null}
-
-      <View style={styles.footer}>
-        <Text style={styles.posted}>{postedAgo(item.created_at)}</Text>
-        {item.has_applied ? (
-          <View style={styles.applied}>
-            <Ionicons name="checkmark-circle" size={14} color={colors.teal} />
-            <Text style={styles.appliedText}>Applied</Text>
+        {skills.length && !compact ? (
+          <View style={styles.skillRow}>
+            {skills.map(s => <Chip key={s} label={s} tone="neutral" />)}
+            {extraSkills ? <Chip label={`+${extraSkills} more`} tone="neutral" /> : null}
           </View>
-        ) : item.applicant_count > 0 ? (
-          <Text style={styles.posted}>
-            {item.applicant_count} {item.applicant_count === 1 ? 'applicant' : 'applicants'}
-          </Text>
         ) : null}
-      </View>
-    </Pressable>
+
+        <View style={styles.footer}>
+          <Text style={styles.posted}>{postedAgo(item.created_at)}</Text>
+          {item.has_applied ? (
+            <View style={styles.applied}>
+              <Ionicons name="checkmark-circle" size={14} color={colors.teal} />
+              <Text style={styles.appliedText}>Applied</Text>
+            </View>
+          ) : item.applicant_count > 0 ? (
+            <Text style={styles.posted}>
+              {item.applicant_count} {item.applicant_count === 1 ? 'applicant' : 'applicants'}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+
+      {onToggleSave ? (
+        <Pressable
+          testID={`job-save-${item.id}`}
+          onPress={() => onToggleSave(item)}
+          accessibilityRole="button"
+          accessibilityLabel={item.saved ? `Remove ${item.title} from saved` : `Save ${item.title}`}
+          accessibilityState={{ selected: item.saved }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={({ pressed }) => [
+            styles.saveBtn,
+            compact ? styles.saveBtnCompact : styles.saveBtnRegular,
+            pressed && styles.savePressed,
+          ]}
+        >
+          <Ionicons
+            name={item.saved ? 'bookmark' : 'bookmark-outline'}
+            size={20}
+            color={item.saved ? colors.navy : colors.textSecondary}
+          />
+        </Pressable>
+      ) : null}
+    </View>
   );
 });
 
@@ -180,18 +193,33 @@ const styles = StyleSheet.create({
   cardSelected: { borderColor: colors.navy, backgroundColor: '#EFF6FF' },
   cardPressed: { backgroundColor: colors.bgMuted },
 
-  topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  // Position-only wrapper: `card` carries the actual visual shell (border,
+  // radius, padding), so the save button below has something to anchor an
+  // absolute position against without doubling up the shell itself.
+  cardWrap: { position: 'relative' },
+
+  topRow: { flexDirection: 'row', alignItems: 'flex-start' },
   titleBlock: { flex: 1, gap: spacing.xs },
+  // Reserves the same space the save button used to occupy as a flex
+  // sibling (its 44px width plus the row's old gap), so the title still
+  // wraps clear of it now that it floats above the layout instead.
+  titleBlockWithSave: { paddingRight: MIN_TOUCH_TARGET + spacing.sm },
   title: { ...typography.h3, color: colors.text },
   employerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
   employer: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
 
   saveBtn: {
+    position: 'absolute',
     width: MIN_TOUCH_TARGET,
     height: MIN_TOUCH_TARGET,
     alignItems: 'flex-end',
     justifyContent: 'flex-start',
   },
+  // Matches each card variant's own padding, so the icon lands exactly
+  // where it always sat as a flex child inside that padding.
+  saveBtnRegular: { top: spacing.lg, right: spacing.lg },
+  saveBtnCompact: { top: spacing.md + 2, right: spacing.md + 2 },
+  savePressed: { backgroundColor: colors.bgMuted, borderRadius: radius.sm },
 
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, rowGap: spacing.xs },
   pay: { ...typography.bodyStrong, color: colors.text },
