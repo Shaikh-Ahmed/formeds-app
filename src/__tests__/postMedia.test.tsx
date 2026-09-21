@@ -69,6 +69,36 @@ describe('ExpandableText', () => {
     fireEvent.press(screen.getByTestId('body-toggle'));
     expect(screen.getByLabelText('Show less of this post')).toBeTruthy();
   });
+
+  it('clips mid-line when clampLines is fractional, then lifts the clip once expanded', () => {
+    // The feed card passes numberOfLines=3 (the overflow check) with
+    // clampLines=2.5 (the visual cutoff) — two different numbers doing two
+    // different jobs, which is exactly the case a numberOfLines-only prop
+    // can't express.
+    render(<ExpandableText text={LONG} numberOfLines={3} clampLines={2.5} lineHeight={22} testID="body" />);
+    expect(screen.getByTestId('body-clip').props.style).toEqual({ maxHeight: 55, overflow: 'hidden' });
+
+    layoutWith(6);
+    fireEvent.press(screen.getByTestId('body-toggle'));
+    expect(screen.getByTestId('body-clip').props.style).toBeUndefined();
+  });
+
+  it('keeps the "…more" toggle outside the clip so a fractional clamp never hides it', () => {
+    // A shared clip box around the Text AND the toggle would cut the toggle
+    // off along with the extra text whenever numberOfLines lays the Text out
+    // taller than clampLines allows — leaving it in the tree but invisible
+    // and unreachable. The toggle must sit outside `body-clip` entirely.
+    render(<ExpandableText text={LONG} numberOfLines={3} clampLines={2.5} lineHeight={22} testID="body" />);
+    layoutWith(6);
+    const clip = screen.getByTestId('body-clip');
+    const toggle = screen.getByTestId('body-toggle');
+    const isDescendant = (node: any): boolean => {
+      if (!node) return false;
+      if (node === clip) return true;
+      return isDescendant(node.parent);
+    };
+    expect(isDescendant(toggle.parent)).toBe(false);
+  });
 });
 
 describe('MediaViewer', () => {

@@ -13,7 +13,7 @@ import { ApplySheet } from '../../../src/components/jobs/ApplySheet';
 import { applyToJob, fetchJob, toggleSaveJob } from '../../../src/api/jobs';
 import { API_URL } from '../../../src/utils/api';
 import { shareLink } from '../../../src/utils/share';
-import type { Job } from '../../../src/types/jobs';
+import type { Job, ScreeningAnswer } from '../../../src/types/jobs';
 
 /** The tab bar stays mounted under this route, so the pinned bar clears it. */
 const TAB_BAR_HEIGHT = 60;
@@ -81,12 +81,12 @@ export default function JobDetailScreen() {
     });
   }, [job]);
 
-  const submit = useCallback(async (note: string) => {
+  const submit = useCallback(async (note: string, screeningAnswers: ScreeningAnswer[]) => {
     if (!token || !job) return;
     setApplying(true);
     setActionError(null);
     try {
-      await applyToJob(token, job.id, note);
+      await applyToJob(token, job.id, note, screeningAnswers);
       setApplyOpen(false);
       setJob(prev => (prev ? { ...prev, has_applied: true } : prev));
     } catch (e: any) {

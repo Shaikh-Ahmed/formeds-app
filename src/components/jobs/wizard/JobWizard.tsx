@@ -19,6 +19,19 @@ import type { Organization } from '../../../types/organizations';
 const PAY_PERIODS = Object.keys(PAY_PERIOD_LABELS) as PayPeriod[];
 const WORK_MODES = Object.keys(WORK_MODE_LABELS) as WorkMode[];
 
+const MAX_SCREENING_QUESTIONS = 5;
+
+export interface DraftQuestion {
+  /** Present once the server has assigned one; absent for a question added
+   *  in this session and not yet saved. */
+  id?: string;
+  text: string;
+  required_answer: 'yes' | 'no';
+  /** A "wrong" answer auto-declines the application. Off means the question
+   *  is informational only — the employer still sees the answer. */
+  knockout: boolean;
+}
+
 export interface JobDraft {
   title: string;
   employment_type: EmploymentType;
@@ -43,6 +56,7 @@ export interface JobDraft {
   description: string;
   responsibilities: string;
   is_urgent: boolean;
+  screening_questions: DraftQuestion[];
 }
 
 const EMPTY: JobDraft = {
@@ -52,6 +66,7 @@ const EMPTY: JobDraft = {
   pay_period: 'month', pay_min: '', pay_max: '', pay_disclosed: true,
   experience_min: '', skills: '', requirements: '',
   description: '', responsibilities: '', is_urgent: false,
+  screening_questions: [],
 };
 
 const STEPS = [
@@ -129,6 +144,9 @@ export function JobWizard({
     if (draft.description.trim().length < 40) {
       out[3].description = 'Describe the role in at least a couple of sentences.';
     }
+    if (draft.screening_questions.some(q => q.text.trim().length < 4)) {
+      out[3].screening = 'Give each screening question a full question, or remove it.';
+    }
     return out;
   }, [draft, needsCity, shift]);
 
@@ -170,6 +188,18 @@ export function JobWizard({
       : {}),
     is_urgent: draft.is_urgent,
     ...(draft.org_id ? { org_id: draft.org_id, posted_as: 'organization' } : {}),
+    // Blank rows are dropped rather than sent — a question with no text
+    // would fail server validation anyway, and `problems[3].screening`
+    // already blocks Next on one, so this only ever strips ones nobody
+    // finished typing before backing out.
+    screening_questions: draft.screening_questions
+      .filter(q => q.text.trim().length >= 4)
+      .map(q => ({
+        ...(q.id ? { id: q.id } : {}),
+        text: q.text.trim(),
+        required_answer: q.required_answer,
+        knockout: q.knockout,
+      })),
   });
 
   const finish = (publish: boolean) => {
@@ -465,6 +495,12 @@ export function JobWizard({
               danger
             />
 
+            <ScreeningQuestionsField
+              questions={draft.screening_questions}
+              onChange={v => set('screening_questions', v)}
+              error={err(3, 'screening')}
+            />
+
             <View style={styles.previewBlock} testID="wizard-preview">
               <Text style={styles.previewLabel} accessibilityRole="header">
                 How it will look
@@ -567,6 +603,12 @@ function usePreviewJob(draft: JobDraft, org: Organization | undefined, posterNam
     shift_duration: draft.shift_duration,
     is_urgent: draft.is_urgent,
     status: 'active',
+    // The preview is what a candidate sees, and a candidate never sees
+    // required_answer/knockout — only the question text, same as job_view()
+    // withholds them server-side for anyone but the owner.
+    screening_questions: draft.screening_questions
+      .filter(q => q.text.trim().length >= 4)
+      .map((q, i) => ({ id: q.id || `preview-${i}`, text: q.text.trim() })),
     applicant_count: 0,
     view_count: 0,
     save_count: 0,
@@ -661,6 +703,107 @@ function SwitchRow({
   );
 }
 
+/**
+ * Up to five yes/no questions, each optionally a knockout.
+ *
+ * Deliberately not folded into `Field`/`ChipRow`: each row needs its own text
+ * input plus two independent controls (which answer counts, and whether a
+ * miss auto-declines), which is enough state that a generic wrapper would
+ * just be an extra layer between this and the JSX it renders.
+ */
+function ScreeningQuestionsField({
+  questions, onChange, error,
+}: {
+  questions: DraftQuestion[];
+  onChange: (next: DraftQuestion[]) => void;
+  error?: string;
+}) {
+  const update = (i: number, patch: Partial<DraftQuestion>) =>
+    onChange(questions.map((q, idx) => (idx === i ? { ...q, ...patch } : q)));
+
+  const remove = (i: number) => onChange(questions.filter((_, idx) => idx !== i));
+
+  const add = () =>
+    onChange([...questions, { text: '', required_answer: 'yes', knockout: true }]);
+
+  return (
+    <Field label="Screening questions (optional)">
+      <Text style={styles.hint}>
+        Ask up to {MAX_SCREENING_QUESTIONS} yes/no questions before someone can apply. Mark one as
+        required and a &quot;wrong&quot; answer declines the application automatically, before it
+        reaches your inbox.
+      </Text>
+
+      {questions.map((q, i) => (
+        <View key={i} style={styles.questionCard} testID={`wizard-question-${i}`}>
+          <View style={styles.questionHead}>
+            <Text style={styles.questionIndex}>Question {i + 1}</Text>
+            <Pressable
+              onPress={() => remove(i)}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove question ${i + 1}`}
+              style={({ pressed }) => [styles.questionRemove, pressed && styles.pressed]}
+              testID={`wizard-question-${i}-remove`}
+            >
+              <Text style={styles.link}>Remove</Text>
+            </Pressable>
+          </View>
+
+          <FormInput
+            label="Question"
+            value={q.text}
+            onChangeText={v => update(i, { text: v })}
+            placeholder="e.g. Do you have an active nursing license?"
+            testID={`wizard-question-${i}-text`}
+          />
+
+          <View style={styles.row}>
+            <View style={styles.flex}>
+              <Text style={styles.questionSubLabel}>Qualifying answer</Text>
+              <ChipRow>
+                <Choice
+                  label="Yes"
+                  selected={q.required_answer === 'yes'}
+                  onPress={() => update(i, { required_answer: 'yes' })}
+                  testID={`wizard-question-${i}-answer-yes`}
+                />
+                <Choice
+                  label="No"
+                  selected={q.required_answer === 'no'}
+                  onPress={() => update(i, { required_answer: 'no' })}
+                  testID={`wizard-question-${i}-answer-no`}
+                />
+              </ChipRow>
+            </View>
+          </View>
+
+          <SwitchRow
+            label="Required to apply"
+            hint="On: a different answer auto-declines the application. Off: the answer is shown to you, but never blocks anyone."
+            value={q.knockout}
+            onValueChange={v => update(i, { knockout: v })}
+            danger={q.knockout}
+          />
+        </View>
+      ))}
+
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      {questions.length < MAX_SCREENING_QUESTIONS ? (
+        <Pressable
+          onPress={add}
+          accessibilityRole="button"
+          accessibilityLabel="Add a screening question"
+          style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
+          testID="wizard-add-question"
+        >
+          <Text style={styles.link}>+ Add a question</Text>
+        </Pressable>
+      ) : null}
+    </Field>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   progress: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.xs },
@@ -718,6 +861,20 @@ const styles = StyleSheet.create({
 
   linkRow: { alignSelf: 'flex-start', minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
   link: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.navy },
+
+  questionCard: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.bgMuted,
+    marginBottom: spacing.md,
+  },
+  questionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  questionIndex: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.textSecondary },
+  questionRemove: { minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
+  questionSubLabel: { ...typography.small, color: colors.textSecondary, marginBottom: spacing.xs },
 
   footer: {
     flexDirection: 'row',

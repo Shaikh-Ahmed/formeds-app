@@ -1,17 +1,18 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Modal, Pressable, Share, Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, StyleSheet, ScrollView, Share, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { colors, spacing, radius, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, spacing, radius, useBreakpoint } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { LoadingState, ErrorState } from '../States';
+import { ActionSheet } from '../ActionSheet';
 import { PageGrid } from '../web';
 import {
   EntryKind, Profile, ProfileEntry, SectionKey, Visibility,
   VISIBILITY_LABELS, Skills, ProfessionalLinks,
 } from '../../types/profile';
 import * as profileApi from '../../api/profile';
+import { openBlob } from '../../utils/download';
+import { apiFetch } from '../../utils/api';
 import { ProfileHeader } from './ProfileHeader';
 import { ProfessionalIdentity } from './ProfessionalIdentity';
 import { AboutSection } from './AboutSection';
@@ -37,9 +38,8 @@ const VISIBILITY_OPTIONS: Visibility[] = [
 ];
 
 export function ProfileView({ userId }: Props) {
-  const { token, user, refreshUser } = useAuth();
+  const { token, refreshUser } = useAuth();
   const { isMobile, isDesktop } = useBreakpoint();
-  const router = useRouter();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,6 +52,9 @@ export function ProfileView({ userId }: Props) {
   const [comingSoon, setComingSoon] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [sheetError, setSheetError] = useState<string | null>(null);
+  const [resumeBusy, setResumeBusy] = useState(false);
+  const [connectionState, setConnectionState] = useState<'none' | 'pending' | 'accepted' | null>(null);
+  const [connectBusy, setConnectBusy] = useState(false);
 
   const editable = !!profile?.is_self;
 
@@ -63,12 +66,37 @@ export function ProfileView({ userId }: Props) {
         ? await profileApi.fetchProfile(token, userId)
         : await profileApi.fetchMyProfile(token);
       setProfile(data);
+      if (!data.is_self) {
+        // Best-effort: a visitor still gets a usable page — just without a
+        // Connect button — if this lookup fails.
+        try {
+          const status = await apiFetch(`/api/connections/status/${data.id}`, token);
+          setConnectionState(status?.status ?? 'none');
+        } catch {
+          setConnectionState(null);
+        }
+      } else {
+        setConnectionState(null);
+      }
     } catch (e: any) {
       setLoadError(e?.message || 'Could not load this profile.');
     } finally {
       setLoading(false);
     }
   }, [token, userId]);
+
+  const handleConnect = async () => {
+    if (!token || !profile || connectBusy || connectionState !== 'none') return;
+    setConnectBusy(true);
+    try {
+      const res = await apiFetch(`/api/connections/request?target_id=${profile.id}`, token, { method: 'POST' });
+      setConnectionState((res?.status as typeof connectionState) || 'pending');
+    } catch (e: any) {
+      setComingSoon(e?.message || 'Could not send that connection request. Please try again.');
+    } finally {
+      setConnectBusy(false);
+    }
+  };
 
   useEffect(() => { load(); }, [load]);
 
@@ -90,6 +118,20 @@ export function ProfileView({ userId }: Props) {
       setSheetError(e?.message || 'Could not save. Please check the fields and try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const downloadResume = async () => {
+    if (!token || resumeBusy) return;
+    setResumeBusy(true);
+    try {
+      const blob = await profileApi.fetchMyResume(token);
+      const filename = `${(profile?.name || 'resume').trim().replace(/\s+/g, '-')}-resume.pdf`;
+      await openBlob(blob, filename);
+    } catch (e: any) {
+      setComingSoon(e?.message || 'Could not download your resume. Please try again.');
+    } finally {
+      setResumeBusy(false);
     }
   };
 
@@ -224,6 +266,8 @@ export function ProfileView({ userId }: Props) {
         isMobile={isMobile}
         onEdit={() => setScalarSheet('identity')}
         onShare={share}
+        connectionState={connectionState}
+        onConnect={!editable && connectionState !== null ? handleConnect : undefined}
       />
     </>
   );
@@ -432,35 +476,22 @@ export function ProfileView({ userId }: Props) {
         onClose={() => setOverflowOpen(false)}
         options={[
           { label: 'Share profile', icon: 'share-outline', onPress: () => { setOverflowOpen(false); share(); } },
-          {
-            label: 'Download resume',
-            icon: 'download-outline',
-            badge: 'Soon',
-            onPress: () => { setOverflowOpen(false); setComingSoon(RESUME_SOON); },
-          },
-          {
-            label: 'Preview resume',
-            icon: 'document-text-outline',
-            badge: 'Soon',
-            onPress: () => { setOverflowOpen(false); setComingSoon(RESUME_SOON); },
-          },
-          // Restores the entry point this screen lost when its Account/Admin
-          // menu moved to the drawer: the drawer is unreachable above 768px,
-          // so an admin had no route to the review queue on desktop.
-          ...(user?.is_admin
-            ? [{
-                label: 'KYC review queue',
-                icon: 'shield-checkmark-outline' as const,
-                onPress: () => { setOverflowOpen(false); router.push('/admin/kyc' as any); },
-              }]
-            : []),
+          // Only ever your own — this calls the self endpoint, which has no
+          // notion of "whoever's profile is currently on screen". Someone
+          // else's resume is reachable only through their job application,
+          // by whoever they applied to.
           ...(editable
             ? [{
-                label: 'Privacy settings',
-                icon: 'lock-closed-outline' as const,
-                onPress: () => { setOverflowOpen(false); router.push('/settings'); },
+                label: resumeBusy ? 'Preparing resume…' : 'Download resume',
+                icon: 'download-outline' as const,
+                onPress: () => { setOverflowOpen(false); downloadResume(); },
               }]
             : []),
+          // KYC review queue and Settings used to live here as a desktop-only
+          // workaround, because the drawer that normally carries them is
+          // unreachable above 768px. The "Me" menu in the desktop TopBar now
+          // owns both, so this screen goes back to holding only profile-
+          // specific actions.
         ]}
       />
 
@@ -571,9 +602,6 @@ function RailGroup({ empty, children }: { empty?: boolean; children: React.React
   return <View style={styles.railGroup}>{children}</View>;
 }
 
-const RESUME_SOON =
-  'Resume export is coming soon. Your profile is already the structured source it will be generated from, so anything you add now carries straight into it.';
-
 function findEntry(entries: ProfileEntry[], id: string) {
   return entries.find((e) => e.id === id);
 }
@@ -659,52 +687,6 @@ function fromProfile(key: ScalarFormKey, p: Profile): Record<string, any> {
 }
 
 /** A minimal bottom action list — privacy picker, overflow menu, notices. */
-export function ActionSheet({
-  visible, title, message, options, onClose,
-}: {
-  visible: boolean;
-  title: string;
-  message?: string;
-  options: {
-    label: string;
-    icon?: keyof typeof Ionicons.glyphMap;
-    badge?: string;
-    selected?: boolean;
-    onPress: () => void;
-  }[];
-  onClose: () => void;
-}) {
-  const { isMobile } = useBreakpoint();
-  return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose} accessibilityViewIsModal>
-      <View style={[sheetStyles.scrim, !isMobile && sheetStyles.scrimCentred]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
-        <View style={[sheetStyles.shell, isMobile ? sheetStyles.shellMobile : sheetStyles.shellWide]}>
-          <Text style={sheetStyles.title} accessibilityRole="header">{title}</Text>
-          {message ? <Text style={sheetStyles.message}>{message}</Text> : null}
-          {options.map((opt) => (
-            <Pressable
-              key={opt.label}
-              onPress={opt.onPress}
-              accessibilityRole="button"
-              accessibilityState={{ selected: opt.selected }}
-              accessibilityLabel={opt.label}
-              style={({ pressed }) => [sheetStyles.row, pressed && sheetStyles.pressed]}
-            >
-              {opt.icon ? <Ionicons name={opt.icon} size={18} color={colors.textSecondary} /> : null}
-              <Text style={sheetStyles.rowText}>{opt.label}</Text>
-              {opt.badge ? (
-                <View style={sheetStyles.badge}><Text style={sheetStyles.badgeText}>{opt.badge}</Text></View>
-              ) : null}
-              {opt.selected ? <Ionicons name="checkmark" size={18} color={colors.teal} /> : null}
-            </Pressable>
-          ))}
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 const styles = StyleSheet.create({
   rootMobile: { flex: 1, backgroundColor: colors.white },
   scrollMobile: { paddingBottom: 120 },
@@ -748,25 +730,4 @@ const styles = StyleSheet.create({
   },
 });
 
-const sheetStyles = StyleSheet.create({
-  scrim: { flex: 1, backgroundColor: 'rgba(8,12,20,0.5)', justifyContent: 'flex-end' },
-  scrimCentred: { justifyContent: 'center', alignItems: 'center' },
-  shell: { backgroundColor: colors.white, padding: spacing.xl, gap: spacing.xs },
-  shellMobile: { borderTopLeftRadius: radius.xl + 6, borderTopRightRadius: radius.xl + 6 },
-  shellWide: { width: '100%', maxWidth: 420, borderRadius: radius.xl },
-  title: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
-  message: { ...typography.caption, color: colors.textSecondary, lineHeight: 20, marginBottom: spacing.md },
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    minHeight: MIN_TOUCH_TARGET, paddingVertical: spacing.sm,
-  },
-  rowText: { ...typography.body, color: colors.text, flex: 1 },
-  badge: {
-    backgroundColor: colors.warningBg, borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm, paddingVertical: 2,
-  },
-  badgeText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.warning },
-  pressed: { opacity: 0.6 },
-});
-
-export { RESUME_SOON, findEntry, isEntryKind, onSuggestion, toPatch, fromProfile, VISIBILITY_OPTIONS };
+export { findEntry, isEntryKind, onSuggestion, toPatch, fromProfile, VISIBILITY_OPTIONS };

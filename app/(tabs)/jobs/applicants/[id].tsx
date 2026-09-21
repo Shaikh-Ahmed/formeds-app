@@ -9,8 +9,9 @@ import { PageColumn } from '../../../../src/components/web';
 import { Avatar, EmptyState, ErrorBanner, ErrorState } from '../../../../src/components';
 import { Skeleton } from '../../../../src/components/Skeleton';
 import { JobBadge } from '../../../../src/components/jobs/JobMeta';
-import { fetchApplicants, fetchJob, setApplicationStatus } from '../../../../src/api/jobs';
+import { fetchApplicantResume, fetchApplicants, fetchJob, setApplicationStatus } from '../../../../src/api/jobs';
 import { postedAgo } from '../../../../src/utils/time';
+import { openBlob } from '../../../../src/utils/download';
 import { APPLICATION_STATUS_META, type Application, type ApplicationStatusKey, type Job } from '../../../../src/types/jobs';
 
 const TONE_FOR_BADGE = {
@@ -57,6 +58,9 @@ export default function ApplicantsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!token || !id) { setLoading(false); return; }
@@ -87,6 +91,54 @@ export default function ApplicantsScreen() {
   );
 
   /**
+   * Bulk actions only make sense against a single pipeline stage — mixing
+   * statuses would mean offering the union of every stage's next steps, most
+   * of which wouldn't apply to most of the selection. Selecting a filter
+   * scopes it to one stage automatically, so bulk mode piggybacks on that
+   * instead of its own status picker.
+   */
+  const bulkSteps = filter ? NEXT_STEPS[filter] ?? [] : [];
+
+  const setFilterAndReset = (next: ApplicationStatusKey | null) => {
+    setFilter(next);
+    setSelectMode(false);
+    setSelected(new Set());
+  };
+
+  const toggleSelect = useCallback((appId: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(appId)) next.delete(appId); else next.add(appId);
+      return next;
+    });
+  }, []);
+
+  const selectAllVisible = useCallback(() => {
+    setSelected(new Set(visible.map(a => a.id)));
+  }, [visible]);
+
+  const bulkMove = useCallback(async (status: ApplicationStatusKey) => {
+    if (!token || selected.size === 0) return;
+    const ids = Array.from(selected);
+    setActionError(null);
+    setBulkBusy(true);
+    const results = await Promise.allSettled(ids.map(appId => setApplicationStatus(token, appId, status)));
+    const failed = results.filter(r => r.status === 'rejected').length;
+    const succeededIds = ids.filter((_, i) => results[i].status === 'fulfilled');
+    setApps(prev => prev.map(a => (succeededIds.includes(a.id) ? { ...a, status } : a)));
+    setBulkBusy(false);
+    setSelectMode(false);
+    setSelected(new Set());
+    if (failed > 0) {
+      setActionError(
+        succeededIds.length > 0
+          ? `Moved ${succeededIds.length} to ${APPLICATION_STATUS_META[status].label}. ${failed} couldn't be updated — try those again.`
+          : `Couldn't update ${failed === 1 ? 'that applicant' : 'those applicants'}. Try again.`,
+      );
+    }
+  }, [token, selected]);
+
+  /**
    * Optimistic, then reconciled. A pipeline move is a considered click, and
    * making the employer wait a round trip to see the chip change invites them
    * to click it twice.
@@ -106,6 +158,22 @@ export default function ApplicantsScreen() {
       setBusy(null);
     }
   }, [token, apps]);
+
+  const [resumeBusyId, setResumeBusyId] = useState<string | null>(null);
+
+  const downloadResume = useCallback(async (app: Application) => {
+    if (!token || resumeBusyId) return;
+    setActionError(null);
+    setResumeBusyId(app.id);
+    try {
+      const blob = await fetchApplicantResume(token, app.id);
+      await openBlob(blob, `${app.user_name.replace(/\s+/g, '-')}-resume.pdf`);
+    } catch (e: any) {
+      setActionError(e?.message || "Could not download this applicant's resume.");
+    } finally {
+      setResumeBusyId(null);
+    }
+  }, [token, resumeBusyId]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -137,17 +205,58 @@ export default function ApplicantsScreen() {
             <FilterChip
               label={`All ${apps.length}`}
               selected={filter === null}
-              onPress={() => setFilter(null)}
+              onPress={() => setFilterAndReset(null)}
             />
             {PIPELINE.filter(s => counts[s]).map(s => (
               <FilterChip
                 key={s}
                 label={`${APPLICATION_STATUS_META[s].label} ${counts[s]}`}
                 selected={filter === s}
-                onPress={() => setFilter(filter === s ? null : s)}
+                onPress={() => setFilterAndReset(filter === s ? null : s)}
                 testID={`applicant-filter-${s}`}
               />
             ))}
+          </View>
+        ) : null}
+
+        {/* Bulk selection only makes sense once a single stage is picked —
+            see the note on bulkSteps above. */}
+        {filter && bulkSteps.length > 0 && visible.length > 0 ? (
+          <View style={styles.selectRow}>
+            {selectMode ? (
+              <>
+                <Pressable
+                  onPress={() => (selected.size === visible.length ? setSelected(new Set()) : selectAllVisible())}
+                  accessibilityRole="button"
+                  accessibilityLabel={selected.size === visible.length ? 'Deselect all' : 'Select all'}
+                  style={({ pressed }) => [styles.selectLink, pressed && styles.pressed]}
+                >
+                  <Text style={styles.selectLinkText}>
+                    {selected.size === visible.length ? 'Deselect all' : `Select all ${visible.length}`}
+                  </Text>
+                </Pressable>
+                <Text style={styles.selectedCount}>{selected.size} selected</Text>
+                <Pressable
+                  onPress={() => { setSelectMode(false); setSelected(new Set()); }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel selection"
+                  style={({ pressed }) => [styles.selectLink, pressed && styles.pressed]}
+                >
+                  <Text style={styles.selectLinkText}>Cancel</Text>
+                </Pressable>
+              </>
+            ) : (
+              <Pressable
+                testID="bulk-select-toggle"
+                onPress={() => setSelectMode(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Select multiple applicants"
+                style={({ pressed }) => [styles.selectLink, pressed && styles.pressed]}
+              >
+                <Ionicons name="checkbox-outline" size={16} color={colors.navy} />
+                <Text style={styles.selectLinkText}>Select</Text>
+              </Pressable>
+            )}
           </View>
         ) : null}
 
@@ -161,9 +270,14 @@ export default function ApplicantsScreen() {
               onMove={status => move(item, status)}
               onOpenProfile={() => router.push(`/profile/${item.user_id}` as any)}
               onMessage={() => router.push(`/conversation?userId=${item.user_id}` as any)}
+              selectMode={selectMode}
+              selected={selected.has(item.id)}
+              onToggleSelect={() => toggleSelect(item.id)}
+              onDownloadResume={() => downloadResume(item)}
+              resumeBusy={resumeBusyId === item.id}
             />
           )}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, selectMode && bulkSteps.length > 0 && styles.listWithBulkBar]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -190,7 +304,7 @@ export default function ApplicantsScreen() {
                 title={`Nobody at ${APPLICATION_STATUS_META[filter].label.toLowerCase()}`}
                 hint="Clear the filter to see everyone who applied."
                 actionLabel="Show all applicants"
-                onAction={() => setFilter(null)}
+                onAction={() => setFilterAndReset(null)}
               />
             ) : (
               <EmptyState
@@ -203,19 +317,54 @@ export default function ApplicantsScreen() {
             )
           }
         />
+
+        {selectMode && bulkSteps.length > 0 ? (
+          <View style={styles.bulkBar}>
+            <Text style={styles.bulkBarCount}>
+              {selected.size === 0 ? 'Select applicants to move together' : `${selected.size} selected`}
+            </Text>
+            <View style={styles.bulkBarActions}>
+              {bulkSteps.map(status => (
+                <Pressable
+                  key={status}
+                  testID={`bulk-move-${status}`}
+                  onPress={() => bulkMove(status)}
+                  disabled={selected.size === 0 || bulkBusy}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Move ${selected.size} selected to ${APPLICATION_STATUS_META[status].label}`}
+                  style={({ pressed }) => [
+                    styles.bulkAction,
+                    status === 'rejected' && styles.bulkActionQuiet,
+                    (selected.size === 0 || bulkBusy || pressed) && styles.pressed,
+                  ]}
+                >
+                  <Text style={[styles.bulkActionText, status === 'rejected' && styles.actionTextQuiet]}>
+                    {bulkBusy ? 'Updating…' : `Move to ${APPLICATION_STATUS_META[status].label}`}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
       </PageColumn>
     </SafeAreaView>
   );
 }
 
 function ApplicantRow({
-  app, busy, onMove, onOpenProfile, onMessage,
+  app, busy, onMove, onOpenProfile, onMessage, selectMode, selected, onToggleSelect,
+  onDownloadResume, resumeBusy,
 }: {
   app: Application;
   busy: boolean;
   onMove: (status: ApplicationStatusKey) => void;
   onOpenProfile: () => void;
   onMessage: () => void;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
+  onDownloadResume: () => void;
+  resumeBusy: boolean;
 }) {
   const meta = APPLICATION_STATUS_META[app.status] ?? APPLICATION_STATUS_META.applied;
   const card = (app as any).applicant ?? {};
@@ -224,11 +373,19 @@ function ApplicantRow({
   return (
     <View style={styles.card} testID={`applicant-${app.id}`}>
       <Pressable
-        onPress={onOpenProfile}
+        onPress={selectMode ? onToggleSelect : onOpenProfile}
         accessibilityRole="button"
-        accessibilityLabel={`View the profile of ${app.user_name}`}
+        accessibilityLabel={selectMode ? `${selected ? 'Deselect' : 'Select'} ${app.user_name}` : `View the profile of ${app.user_name}`}
+        accessibilityState={selectMode ? { selected: !!selected } : undefined}
         style={({ pressed }) => [styles.identity, pressed && styles.pressed]}
       >
+        {selectMode ? (
+          <Ionicons
+            name={selected ? 'checkbox' : 'square-outline'}
+            size={22}
+            color={selected ? colors.navy : colors.textSecondary}
+          />
+        ) : null}
         <Avatar name={app.user_name} uri={card.avatar} role={card.role} size={44} />
         <View style={styles.identityText}>
           <View style={styles.nameRow}>
@@ -257,6 +414,23 @@ function ApplicantRow({
 
       {app.cover_note ? (
         <Text style={styles.note} numberOfLines={4}>{app.cover_note}</Text>
+      ) : null}
+
+      {app.screening_answers?.length ? (
+        <View style={styles.screening}>
+          {app.screening_answers.map(a => (
+            <View key={a.question_id} style={styles.screeningRow}>
+              <Ionicons
+                name={a.answer === 'yes' ? 'checkmark-circle-outline' : 'close-circle-outline'}
+                size={14}
+                color={a.answer === 'yes' ? colors.teal : colors.textSecondary}
+              />
+              <Text style={styles.screeningText} numberOfLines={2}>
+                {a.text} <Text style={styles.screeningAnswer}>{a.answer === 'yes' ? 'Yes' : 'No'}</Text>
+              </Text>
+            </View>
+          ))}
+        </View>
       ) : null}
 
       <View style={styles.statusRow}>
@@ -299,6 +473,17 @@ function ApplicantRow({
         >
           <Ionicons name="chatbubble-outline" size={14} color={colors.textSecondary} />
           <Text style={styles.actionTextQuiet}>Message</Text>
+        </Pressable>
+        <Pressable
+          testID={`applicant-resume-${app.id}`}
+          onPress={onDownloadResume}
+          disabled={resumeBusy}
+          accessibilityRole="button"
+          accessibilityLabel={`Download ${app.user_name}'s resume`}
+          style={({ pressed }) => [styles.action, styles.actionQuiet, (pressed || resumeBusy) && styles.pressed]}
+        >
+          <Ionicons name="download-outline" size={14} color={colors.textSecondary} />
+          <Text style={styles.actionTextQuiet}>{resumeBusy ? 'Preparing…' : 'Resume'}</Text>
         </Pressable>
       </View>
     </View>
@@ -367,7 +552,50 @@ const styles = StyleSheet.create({
   chipText: { ...typography.small, color: colors.textSecondary },
   chipTextOn: { color: colors.white, fontFamily: fonts.body.semibold },
 
+  selectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  selectLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
+  selectLinkText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.navy },
+  selectedCount: { ...typography.small, color: colors.textSecondary, flex: 1, textAlign: 'center' },
+
   list: { padding: spacing.lg, paddingBottom: spacing.xxxl * 2, gap: spacing.md },
+  listWithBulkBar: { paddingBottom: spacing.xxxl * 3 },
+
+  bulkBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  bulkBarCount: { ...typography.small, color: colors.textSecondary, textAlign: 'center' },
+  bulkBarActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
+  bulkAction: {
+    minHeight: MIN_TOUCH_TARGET,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.navy,
+    backgroundColor: colors.navy,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bulkActionQuiet: { backgroundColor: colors.white, borderColor: colors.border },
+  bulkActionText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.white },
   pad: { gap: spacing.md },
   card: {
     backgroundColor: colors.card,
@@ -392,6 +620,11 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: colors.border,
   },
+
+  screening: { gap: spacing.xs },
+  screeningRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
+  screeningText: { ...typography.caption, color: colors.textSecondary, flex: 1, lineHeight: 18 },
+  screeningAnswer: { fontFamily: fonts.body.semibold, color: colors.text },
 
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap' },
   applied: { ...typography.small, color: colors.textSecondary },

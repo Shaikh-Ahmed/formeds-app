@@ -5,6 +5,8 @@ import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET } from '..
 import { Profile, OPEN_TO_LABELS } from '../../types/profile';
 import { joinMeta } from './format';
 
+type ConnectionState = 'none' | 'pending' | 'accepted';
+
 interface Props {
   profile: Profile;
   /** Post-nominals, derived from education entries rather than stored twice. */
@@ -13,6 +15,9 @@ interface Props {
   isMobile: boolean;
   onEdit?: () => void;
   onShare?: () => void;
+  /** Omitted on your own profile — there is no one to connect with. */
+  connectionState?: ConnectionState | null;
+  onConnect?: () => void;
 }
 
 /**
@@ -23,7 +28,7 @@ interface Props {
  * scan for in the first two seconds.
  */
 export function ProfessionalIdentity({
-  profile, credentials, editable, isMobile, onEdit, onShare,
+  profile, credentials, editable, isMobile, onEdit, onShare, connectionState, onConnect,
 }: Props) {
   // Comma, not the meta separator: 'Hyderabad, Telangana' is one location,
   // whereas 'Hyderabad · Telangana' reads as two unrelated facts.
@@ -84,6 +89,16 @@ export function ProfessionalIdentity({
         {editable && onEdit ? (
           <Action label="Edit profile" icon="create-outline" primary onPress={onEdit} testID="profile-edit" />
         ) : null}
+        {!editable && onConnect ? (
+          <Action
+            label={CONNECT_LABELS[connectionState || 'none']}
+            icon={CONNECT_ICONS[connectionState || 'none']}
+            primary={(connectionState || 'none') === 'none'}
+            disabled={(connectionState || 'none') !== 'none'}
+            onPress={onConnect}
+            testID="profile-connect"
+          />
+        ) : null}
         {onShare ? (
           <Action label="Share" icon="share-outline" onPress={onShare} testID="profile-share" />
         ) : null}
@@ -92,29 +107,53 @@ export function ProfessionalIdentity({
   );
 }
 
+/** Connect is the one action a visitor can send twice by accident — accepted
+ * and pending both go inert rather than re-issuing (or erroring on) a
+ * request the server already has. */
+const CONNECT_LABELS: Record<ConnectionState, string> = {
+  none: 'Connect', pending: 'Request sent', accepted: 'Connected',
+};
+const CONNECT_ICONS: Record<ConnectionState, keyof typeof Ionicons.glyphMap> = {
+  none: 'person-add-outline', pending: 'time-outline', accepted: 'checkmark-circle',
+};
+
 function Action({
-  label, icon, onPress, primary, testID,
+  label, icon, onPress, primary, disabled, testID,
 }: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
   primary?: boolean;
+  disabled?: boolean;
   testID?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
       accessibilityLabel={label}
       testID={testID}
       style={({ pressed }) => [
         styles.action,
         primary ? styles.actionPrimary : styles.actionSecondary,
-        pressed && styles.pressed,
+        disabled && styles.actionDisabled,
+        pressed && !disabled && styles.pressed,
       ]}
     >
-      <Ionicons name={icon} size={16} color={primary ? colors.white : colors.navy} />
-      <Text style={[styles.actionText, primary ? styles.actionTextPrimary : styles.actionTextSecondary]}>
+      <Ionicons
+        name={icon}
+        size={16}
+        color={disabled ? colors.textMuted : primary ? colors.white : colors.navy}
+      />
+      <Text
+        style={[
+          styles.actionText,
+          primary ? styles.actionTextPrimary : styles.actionTextSecondary,
+          disabled && styles.actionTextDisabled,
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -188,8 +227,10 @@ const styles = StyleSheet.create({
   },
   actionPrimary: { backgroundColor: colors.navy, borderColor: colors.navy },
   actionSecondary: { backgroundColor: colors.white, borderColor: colors.border },
+  actionDisabled: { backgroundColor: colors.bgMuted, borderColor: colors.border },
   actionText: { ...typography.caption, fontFamily: fonts.body.semibold },
   actionTextPrimary: { color: colors.white },
   actionTextSecondary: { color: colors.navy },
+  actionTextDisabled: { color: colors.textMuted },
   pressed: { opacity: 0.75 },
 });
