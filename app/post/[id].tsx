@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Pressable, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Share, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
 import { timeAgo } from '../../src/utils/time';
-import { Avatar, RoleBadge, MediaViewer } from '../../src/components';
+import { Avatar, RoleBadge, MediaViewer, TagChip, formatArticleUrl } from '../../src/components';
 import { PageColumn } from '../../src/components/web';
-import { colors, spacing, radius, compactAction } from '../../src/theme';
+import { colors, spacing, radius, compactAction, fonts, typography } from '../../src/theme';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -97,21 +98,79 @@ export default function PostDetailScreen() {
             </View>
           </View>
         </View>
-        <Text style={styles.postContent}>{post.content}</Text>
-        {post.image_url ? (
-          <Pressable
-            testID="post-detail-image"
-            onPress={() => setViewerOpen(true)}
-            accessibilityRole="imagebutton"
-            accessibilityLabel="Open image full screen"
-            style={({ pressed }) => [styles.postImageWrap, pressed && { opacity: 0.9 }]}
-          >
-            <Image source={{ uri: post.image_url }} style={styles.postImage} resizeMode="cover" />
-            <View style={styles.expandHint} pointerEvents="none">
-              <Ionicons name="expand-outline" size={14} color={colors.white} />
-            </View>
-          </Pressable>
-        ) : null}
+        {post.post_type === 'article' ? (
+          <View style={styles.articleDetails}>
+            <Text style={styles.articleTitle}>{post.content}</Text>
+            {post.journal ? (
+              <View style={styles.articleMetaRow}>
+                <Text style={styles.journalText} numberOfLines={1}>
+                  {post.journal}
+                </Text>
+              </View>
+            ) : null}
+
+            {post.authors ? (
+              <View style={styles.authorsRow}>
+                <Ionicons name="person-outline" size={13} color={colors.textMuted} style={{ marginRight: 4 }} />
+                <Text style={styles.authorsText}>{post.authors}</Text>
+              </View>
+            ) : null}
+
+            {post.abstract ? (
+              <View style={styles.abstractContainer}>
+                <Text style={styles.abstractTitle}>Abstract</Text>
+                <Text style={styles.abstractText}>{post.abstract}</Text>
+              </View>
+            ) : null}
+
+            {post.keywords && post.keywords.length > 0 ? (
+              <View style={styles.keywordsRow}>
+                {post.keywords.map((kw: string, idx: number) => (
+                  <TagChip key={`${kw}-${idx}`} label={kw} />
+                ))}
+              </View>
+            ) : null}
+
+            {post.article_url ? (
+              <TouchableOpacity
+                style={styles.readPaperBtn}
+                onPress={async () => {
+                  const url = formatArticleUrl(post.article_url);
+                  if (!url) return;
+                  if (Platform.OS === 'web') {
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  } else {
+                    await WebBrowser.openBrowserAsync(url, {
+                      toolbarColor: colors.navy,
+                      presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+                    });
+                  }
+                }}
+              >
+                <Text style={styles.readPaperText}>Read Full Paper</Text>
+                <Ionicons name="open-outline" size={14} color={colors.navy} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : (
+          <>
+            <Text style={styles.postContent}>{post.content}</Text>
+            {post.image_url ? (
+              <Pressable
+                testID="post-detail-image"
+                onPress={() => setViewerOpen(true)}
+                accessibilityRole="imagebutton"
+                accessibilityLabel="Open image full screen"
+                style={({ pressed }) => [styles.postImageWrap, pressed && { opacity: 0.9 }]}
+              >
+                <Image source={{ uri: post.image_url }} style={styles.postImage} resizeMode="cover" />
+                <View style={styles.expandHint} pointerEvents="none">
+                  <Ionicons name="expand-outline" size={14} color={colors.white} />
+                </View>
+              </Pressable>
+            ) : null}
+          </>
+        )}
         {/* Matches the feed's compact row: 32px painted, 44px effective via
             hit slop. Previously these were bare icon+text with no minimum
             target at all. */}
@@ -300,4 +359,78 @@ const styles = StyleSheet.create({
   commentInput: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 20, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, fontSize: 15, color: '#0F172A', maxHeight: 100, borderWidth: 1, borderColor: '#E2E8F0' },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1A3A5C', alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   sendBtnDisabled: { opacity: 0.5 },
+
+  articleDetails: {
+    marginBottom: spacing.lg,
+  },
+  articleTitle: {
+    ...typography.h2,
+    fontSize: 20,
+    lineHeight: 28,
+    color: colors.text,
+    fontFamily: fonts.heading.bold,
+    marginBottom: spacing.sm,
+  },
+  articleMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs + 2,
+  },
+  journalText: {
+    ...typography.small,
+    color: colors.textSecondary,
+    fontFamily: fonts.body.medium,
+    flex: 1,
+  },
+  authorsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  authorsText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontFamily: fonts.body.regular,
+    flex: 1,
+  },
+  abstractContainer: {
+    backgroundColor: colors.bgMuted,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginVertical: spacing.sm,
+  },
+  abstractTitle: {
+    ...typography.label,
+    fontSize: 12,
+    color: colors.navy,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  abstractText: {
+    ...typography.body,
+    fontSize: 14,
+    lineHeight: 22,
+    color: colors.text,
+  },
+  keywordsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs + 2,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  readPaperBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  readPaperText: {
+    ...typography.caption,
+    fontFamily: fonts.body.semibold,
+    color: colors.navy,
+  },
 });

@@ -7,7 +7,7 @@ import { apiFetch, API_URL } from '../../src/utils/api';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { timeAgo } from '../../src/utils/time';
-import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer } from '../../src/components';
+import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer, ArticleFeedCard } from '../../src/components';
 import { PageGrid, ProfileRail, FeedRail, Hoverable } from '../../src/components/web';
 import { colors, spacing, radius, typography, compactAction, useBreakpoint } from '../../src/theme';
 import { useCollapsibleHeader, focusScrollInset } from '../../src/hooks/useCollapsibleHeader';
@@ -149,8 +149,21 @@ export default function FeedScreen() {
     }
   };
 
-  const renderPost = ({ item }: { item: Post }) => {
+  const renderPost = ({ item }: { item: any }) => {
     const isLiked = item.likes?.includes(user?.id || '');
+
+    if (item.post_type === 'article') {
+      return (
+        <ArticleFeedCard
+          post={item}
+          isLiked={isLiked}
+          onLike={handleLike}
+          onComment={(id) => router.push({ pathname: '/post/[id]', params: { id } } as any)}
+          onShare={handleShare}
+        />
+      );
+    }
+
     return (
       <View testID={`feed-post-${item.id}`} style={[styles.postCard, !isMobile && styles.postCardWide]}>
         {/* The author block opens the post on desktop, where a pointer user
