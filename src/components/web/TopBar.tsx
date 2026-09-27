@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { colors, spacing, radius, layout, useBreakpoint, MIN_TOUCH_TARGET } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../Avatar';
+import { ActionSheet } from '../ActionSheet';
 import { Hoverable } from './Hoverable';
 
 /**
@@ -38,10 +39,17 @@ export function TopBar({
   onSearch?: (q: string) => void;
   searchValue?: string;
 }) {
-  const { user } = useAuth();
+  const { user, logout, isKycApproved } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const { isDesktop } = useBreakpoint();
+  const [meOpen, setMeOpen] = useState(false);
+
+  const handleLogout = async () => {
+    setMeOpen(false);
+    await logout();
+    router.replace('/');
+  };
 
   const role = user?.role || 'healthcare_professional';
 
@@ -159,11 +167,10 @@ export function TopBar({
           <View style={styles.divider} />
 
           <Hoverable
-            testID="topnav-profile"
-            onPress={() => router.push('/(tabs)/profile' as any)}
-            accessibilityRole="link"
-            accessibilityLabel="Your profile"
-            accessibilityState={{ selected: isActive('/(tabs)/profile') }}
+            testID="topnav-me"
+            onPress={() => setMeOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Me menu. Signed in as ${user?.name ?? 'your account'}`}
             style={styles.navItem}
             hoverStyle={styles.navItemHover}
           >
@@ -171,17 +178,61 @@ export function TopBar({
               <Avatar name={user?.name} role={user?.role} uri={user?.avatar} size={24} />
             </View>
             {isDesktop && (
-              <Text
-                style={[styles.navLabel, isActive('/(tabs)/profile') && styles.navLabelActive]}
-                numberOfLines={1}
-              >
-                Me
-              </Text>
+              <Text style={styles.navLabel} numberOfLines={1}>Me</Text>
             )}
-            <View style={[styles.underline, isActive('/(tabs)/profile') && styles.underlineActive]} />
           </Hoverable>
         </View>
       </View>
+
+      {/*
+        Everything infrequently used lives here rather than as its own bar
+        item or scattered across per-screen "workaround" menus: this was the
+        only way an admin could reach the KYC queue, or anyone could reach
+        Settings/Help, from a tab other than their own profile. One menu,
+        reachable from every screen, replaces all of those.
+      */}
+      <ActionSheet
+        visible={meOpen}
+        title={user?.name || 'Me'}
+        onClose={() => setMeOpen(false)}
+        options={[
+          {
+            label: 'View profile',
+            icon: 'person-outline',
+            onPress: () => { setMeOpen(false); router.push('/(tabs)/profile' as any); },
+          },
+          {
+            label: 'My network',
+            icon: 'people-outline',
+            onPress: () => { setMeOpen(false); router.push('/people' as any); },
+          },
+          ...(!isKycApproved
+            ? [{
+                label: 'Complete verification',
+                icon: 'shield-outline' as const,
+                onPress: () => { setMeOpen(false); router.push('/kyc' as any); },
+              }]
+            : []),
+          ...(user?.is_admin
+            ? [{
+                label: 'KYC review queue',
+                icon: 'shield-checkmark-outline' as const,
+                onPress: () => { setMeOpen(false); router.push('/admin/kyc' as any); },
+              }]
+            : []),
+          {
+            label: 'Settings',
+            icon: 'settings-outline',
+            onPress: () => { setMeOpen(false); router.push('/settings' as any); },
+          },
+          {
+            label: 'Help & support',
+            icon: 'help-circle-outline',
+            onPress: () => { setMeOpen(false); router.push('/help' as any); },
+          },
+          { label: 'Sign out', icon: 'log-out-outline', onPress: handleLogout },
+        ]}
+      />
     </View>
   );
 }

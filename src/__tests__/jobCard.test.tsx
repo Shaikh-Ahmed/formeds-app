@@ -37,6 +37,7 @@ const JOB: Job = {
   skills: ['Angioplasty', 'Echocardiography'],
   is_urgent: false,
   status: 'active',
+  screening_questions: [],
   applicant_count: 0,
   view_count: 0,
   save_count: 0,
@@ -108,6 +109,30 @@ describe('JobCard', () => {
     expect(label).toContain('Senior Consultant Cardiologist');
     expect(label).toContain('Apollo Hospitals');
     expect(label).toContain('Hyderabad');
+  });
+
+  it('never nests the save toggle inside the card button', () => {
+    // react-native-web renders accessibilityRole="button" as a literal
+    // <button>, and a <button> cannot contain another <button> — the DOM
+    // silently un-nests it, breaking the save toggle's own click target and
+    // confusing screen readers. The save toggle has to be a sibling of the
+    // card's Pressable, not a JSX descendant of it.
+    const onPress = jest.fn();
+    const onToggleSave = jest.fn();
+    render(<JobCard item={JOB} onPress={onPress} onToggleSave={onToggleSave} />);
+    const save = screen.getByTestId('job-save-job-1');
+    const card = screen.getByTestId('job-card-job-1');
+    let node: any = save.parent;
+    let isDescendantOfCard = false;
+    while (node) {
+      if (node === card) { isDescendantOfCard = true; break; }
+      node = node.parent;
+    }
+    expect(isDescendantOfCard).toBe(false);
+
+    fireEvent.press(save);
+    expect(onToggleSave).toHaveBeenCalledTimes(1);
+    expect(onPress).not.toHaveBeenCalled();
   });
 });
 

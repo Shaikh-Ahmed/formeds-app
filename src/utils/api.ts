@@ -188,3 +188,29 @@ export async function apiFetch(path: string, token?: string | null, options: Req
   }
   return data;
 }
+
+/**
+ * Same shape as `apiFetch` (auth header, one 401-refresh retry) for an
+ * endpoint that returns a binary body — a PDF today — rather than JSON.
+ * `parseBody` would try to JSON.parse a PDF and either throw or silently
+ * hand back null, so this reads the body as a Blob instead and only falls
+ * back to JSON parsing to extract an error message when the response failed.
+ */
+export async function apiFetchBlob(path: string, token?: string | null, options: RequestInit = {}): Promise<Blob> {
+  let res = await rawFetch(path, token, options);
+
+  if (res.status === 401 && token && authHandlers) {
+    const newToken = await authHandlers.refreshTokens();
+    if (newToken) {
+      res = await rawFetch(path, newToken, options);
+    } else {
+      await authHandlers.onAuthFailure();
+    }
+  }
+
+  if (!res.ok) {
+    const data = await parseBody(res);
+    throw new ApiError(detailToMessage(data, `Request failed (${res.status})`), res.status, data);
+  }
+  return res.blob();
+}

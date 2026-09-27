@@ -26,12 +26,26 @@ import { colors, spacing, typography, fonts } from '../theme';
 export function ExpandableText({
   text,
   numberOfLines = 3,
+  clampLines = numberOfLines,
+  lineHeight = 22,
   style,
   testID,
 }: {
   text: string;
-  /** Lines shown while collapsed. */
+  /** Lines the overflow check allows before offering "…more". Kept a whole
+   *  number because the cross-platform detection above depends on it. */
   numberOfLines?: number;
+  /**
+   * Visual clip height while collapsed, in line-heights — allowed to be
+   * fractional (e.g. 2.5), independent of `numberOfLines`. A fractional
+   * value clips mid-line, which reads as "there's more" more honestly than
+   * a clean cutoff at a whole line. Defaults to `numberOfLines` (no clip
+   * beyond what the line limit already produces).
+   */
+  clampLines?: number;
+  /** Must match the line-height the passed `style` actually renders at —
+   *  the clip height is computed from it. */
+  lineHeight?: number;
   style?: StyleProp<TextStyle>;
   testID?: string;
 }) {
@@ -84,14 +98,25 @@ export function ExpandableText({
 
   return (
     <View testID={testID}>
-      <Text
-        ref={nodeRef}
-        style={[styles.body, style]}
-        numberOfLines={expanded ? undefined : numberOfLines}
-        onTextLayout={onTextLayout}
+      {/* The clip lives on its own wrapper around only the Text — never
+          around the toggle too. numberOfLines can lay the Text out taller
+          than clampLines allows (that gap is the whole point of a fractional
+          clamp), and a shared clip box would cut the toggle off along with
+          the extra text, leaving "…more" in the tree but invisible and
+          unreachable. */}
+      <View
+        testID={testID ? `${testID}-clip` : undefined}
+        style={!expanded && clampLines < numberOfLines ? { maxHeight: lineHeight * clampLines, overflow: 'hidden' } : undefined}
       >
-        {text}
-      </Text>
+        <Text
+          ref={nodeRef}
+          style={[styles.body, { lineHeight }, style]}
+          numberOfLines={expanded ? undefined : numberOfLines}
+          onTextLayout={onTextLayout}
+        >
+          {text}
+        </Text>
+      </View>
 
       {canExpand && (
         <Pressable

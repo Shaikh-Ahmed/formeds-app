@@ -61,15 +61,11 @@ export function FeedRail() {
         </View>
       </RailCard>
 
-      {/* Quiet footer — the legal/help links a website is expected to carry,
-          without competing with content for attention. */}
+      {/* Help and Settings used to live here too, reachable only when this
+          rail happened to be on screen (Home tab, >=1128px). Both now live
+          in the "Me" menu in the top bar instead, reachable from every
+          screen at every width — this footer keeps only the brand line. */}
       <View style={styles.footer}>
-        <Hoverable onPress={() => router.push('/help' as any)} accessibilityLabel="Help centre" style={styles.footerLink}>
-          <Text style={styles.footerText}>Help centre</Text>
-        </Hoverable>
-        <Hoverable onPress={() => router.push('/settings' as any)} accessibilityLabel="Settings" style={styles.footerLink}>
-          <Text style={styles.footerText}>Settings</Text>
-        </Hoverable>
         <Text style={styles.footerBrand}>ForMeds © {new Date().getFullYear()}</Text>
       </View>
     </View>
@@ -97,8 +93,6 @@ const styles = StyleSheet.create({
   railHint: { ...typography.caption, color: colors.textSecondary, lineHeight: 19 },
 
   footer: { paddingHorizontal: spacing.xs, gap: spacing.xs },
-  footerLink: { alignSelf: 'flex-start', paddingVertical: 2 },
-  footerText: { ...typography.small, color: colors.textSecondary },
   // textMuted reaches only 2.5:1 on the page background — legible enough for a
   // placeholder, not for a line of standing text.
   footerBrand: { ...typography.small, color: colors.textSecondary, marginTop: spacing.xs },

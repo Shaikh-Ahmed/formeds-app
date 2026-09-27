@@ -21,6 +21,29 @@ export type ApplicationStatusKey =
   | 'applied' | 'reviewing' | 'shortlisted' | 'interviewing'
   | 'offered' | 'hired' | 'rejected' | 'withdrawn';
 
+/**
+ * A yes/no screening question. The public shape (what an applicant browsing
+ * or applying sees) carries only `id`/`text` — `required_answer` and
+ * `knockout` are withheld server-side so an applicant can never see which
+ * answer is "correct" and game a knockout question. The owner-only shape
+ * (what the poster sees managing their own job) carries all four; treat the
+ * extra two fields as present only when `can_manage` is true.
+ */
+export interface ScreeningQuestion {
+  id: string;
+  text: string;
+  required_answer?: 'yes' | 'no';
+  knockout?: boolean;
+}
+
+export interface ScreeningAnswer {
+  question_id: string;
+  answer: 'yes' | 'no';
+  /** Denormalised at apply time, so it still reads correctly even after the
+   *  job's own question list is later edited. */
+  text?: string;
+}
+
 export interface Job {
   id: string;
   poster_id: string;
@@ -63,6 +86,7 @@ export interface Job {
   status: JobStatus;
   expires_at?: string | null;
   published_at?: string | null;
+  screening_questions: ScreeningQuestion[];
 
   applicant_count: number;
   view_count: number;
@@ -114,6 +138,7 @@ export interface Application {
   status: ApplicationStatusKey;
   cover_note?: string;
   employer_note?: string;
+  screening_answers?: ScreeningAnswer[];
   created_at: string;
   status_changed_at?: string;
   job_title?: string;

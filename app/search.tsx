@@ -461,7 +461,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.md,
+    // spacing.lg, matching the card padding used everywhere else a bordered
+    // result sits in a list (JobCard, CaseCard, the applicants card) —
+    // this one was a step tighter for no reason tied to its content.
+    padding: spacing.lg,
     minHeight: MIN_TOUCH_TARGET + 16,
   },
   cardPressed: { backgroundColor: colors.bgMuted },

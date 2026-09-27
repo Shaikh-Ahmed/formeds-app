@@ -15,7 +15,7 @@ import { JobsSegmentedNav, type JobsSegment } from './JobsSegmentedNav';
 import { ApplySheet } from './ApplySheet';
 import { applyToJob, createJobAlert, fetchJob, toggleSaveJob } from '../../api/jobs';
 import { useCollapsibleHeader } from '../../hooks/useCollapsibleHeader';
-import type { Job, JobFilters } from '../../types/jobs';
+import type { Job, JobFilters, ScreeningAnswer } from '../../types/jobs';
 
 /** Width of the list pane in the split view. See the arithmetic below. */
 const LIST_PANE = 400;
@@ -131,12 +131,12 @@ export function JobsScreen({
     });
   }, [detail]);
 
-  const submitApplication = useCallback(async (note: string) => {
+  const submitApplication = useCallback(async (note: string, screeningAnswers: ScreeningAnswer[]) => {
     if (!token || !applyFor) return;
     setApplying(true);
     setActionError(null);
     try {
-      await applyToJob(token, applyFor.id, note);
+      await applyToJob(token, applyFor.id, note, screeningAnswers);
       setApplyFor(null);
       setDetail(prev => (prev && prev.id === applyFor.id ? { ...prev, has_applied: true } : prev));
     } catch (e: any) {

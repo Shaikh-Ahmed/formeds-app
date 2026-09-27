@@ -4,8 +4,10 @@ import { VerifiedMark } from '../components/profile/VerifiedMark';
 import { ProfileSection } from '../components/profile/ProfileSection';
 import { TimelineList } from '../components/profile/TimelineList';
 import { ProfileCompletion } from '../components/profile/ProfileCompletion';
+import { ProfessionalIdentity } from '../components/profile/ProfessionalIdentity';
 import { Chip } from '../components/Chip';
 import { formatRange, maskNumber, toBullets, joinMeta } from '../components/profile/format';
+import type { Profile } from '../types/profile';
 
 /**
  * These cover the rules that make the profile trustworthy rather than merely
@@ -148,6 +150,46 @@ describe('Chip', () => {
     const { getByLabelText } = render(<Chip label="ECG" onRemove={onRemove} />);
     fireEvent.press(getByLabelText('Remove ECG'));
     expect(onRemove).toHaveBeenCalled();
+  });
+});
+
+describe('ProfessionalIdentity Connect button', () => {
+  const visited: Profile = { id: 'other-1', name: 'Dr Other', entries: {} };
+
+  it('offers Connect on a stranger\'s profile you have never messaged', () => {
+    const onConnect = jest.fn();
+    const { getByTestId } = render(
+      <ProfessionalIdentity profile={visited} isMobile connectionState="none" onConnect={onConnect} />,
+    );
+    const btn = getByTestId('profile-connect');
+    expect(btn.props.accessibilityLabel).toBe('Connect');
+    fireEvent.press(btn);
+    expect(onConnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('goes inert instead of re-sending once a request is already pending', () => {
+    const onConnect = jest.fn();
+    const { getByTestId } = render(
+      <ProfessionalIdentity profile={visited} isMobile connectionState="pending" onConnect={onConnect} />,
+    );
+    const btn = getByTestId('profile-connect');
+    expect(btn.props.accessibilityLabel).toBe('Request sent');
+    fireEvent.press(btn);
+    expect(onConnect).not.toHaveBeenCalled();
+  });
+
+  it('shows Connected, not another Connect prompt, once accepted', () => {
+    const { getByTestId } = render(
+      <ProfessionalIdentity profile={visited} isMobile connectionState="accepted" onConnect={jest.fn()} />,
+    );
+    expect(getByTestId('profile-connect').props.accessibilityLabel).toBe('Connected');
+  });
+
+  it('never offers to connect with yourself', () => {
+    const { queryByTestId } = render(
+      <ProfessionalIdentity profile={{ ...visited, is_self: true }} isMobile editable onEdit={jest.fn()} />,
+    );
+    expect(queryByTestId('profile-connect')).toBeNull();
   });
 });
 

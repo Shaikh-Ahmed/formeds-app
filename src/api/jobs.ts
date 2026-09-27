@@ -12,7 +12,7 @@
  * cheapest thing in the app to test.
  */
 
-import { apiFetch } from '../utils/api';
+import { apiFetch, apiFetchBlob } from '../utils/api';
 import type {
   Application, Job, JobAlert, JobFacets, JobFilters, JobsPage,
 } from '../types/jobs';
@@ -138,10 +138,20 @@ export const toggleSaveJob = (token: string, jobId: string): Promise<{ saved: bo
 
 export const applyToJob = (
   token: string, jobId: string, coverNote = '',
+  screeningAnswers: { question_id: string; answer: 'yes' | 'no' }[] = [],
 ): Promise<{ status: string }> =>
   apiFetch(`/api/jobs/${jobId}/apply`, token, {
-    method: 'POST', body: JSON.stringify({ cover_note: coverNote }),
+    method: 'POST',
+    body: JSON.stringify({ cover_note: coverNote, screening_answers: screeningAnswers }),
   });
+
+/**
+ * An applicant's resume as a Blob, for whoever manages the job they applied
+ * to — never a bare URL, since the endpoint needs the same bearer token as
+ * every other authenticated call, and a plain `<a href>` can't attach one.
+ */
+export const fetchApplicantResume = (token: string, applicationId: string): Promise<Blob> =>
+  apiFetchBlob(`/api/jobs/applications/${applicationId}/resume`, token);
 
 /**
  * Taken out by the candidate. Separate from setApplicationStatus because that

@@ -161,6 +161,15 @@ function toDraft(job: Job): Partial<JobDraft> {
     description: job.description ?? '',
     responsibilities: job.responsibilities ?? '',
     is_urgent: job.is_urgent,
+    // `job.can_manage` gates this screen (see the check above), so the fetch
+    // that produced `job` was made as the owner and carries the full shape,
+    // required_answer/knockout included — never the applicant-facing one.
+    screening_questions: (job.screening_questions ?? []).map(q => ({
+      id: q.id,
+      text: q.text,
+      required_answer: q.required_answer ?? 'yes',
+      knockout: q.knockout ?? true,
+    })),
   };
 }
 

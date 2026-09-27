@@ -170,6 +170,94 @@ describe('JobWizard', () => {
     expect(screen.getByText('Describe the role in at least a couple of sentences.')).toBeTruthy();
   });
 
+  it('drops screening questions with no real text rather than sending blanks', () => {
+    const onSubmit = jest.fn();
+    setup({ onSubmit });
+
+    typeTitle('Senior Consultant Cardiologist');
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-mode-remote'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.changeText(
+      screen.getByTestId('wizard-description'),
+      'Join a busy interventional service running a full cath lab rota, with a supportive team.',
+    );
+
+    fireEvent.press(screen.getByTestId('wizard-add-question'));
+    fireEvent.changeText(
+      screen.getByTestId('wizard-question-0-text'),
+      'Do you have an active nursing license?',
+    );
+    fireEvent.press(screen.getByTestId('wizard-question-0-answer-no'));
+
+    fireEvent.press(screen.getByTestId('wizard-publish'));
+    const [payload] = onSubmit.mock.calls[0];
+    expect(payload.screening_questions).toEqual([
+      { text: 'Do you have an active nursing license?', required_answer: 'no', knockout: true },
+    ]);
+  });
+
+  it('blocks finishing on a question with no real text, rather than silently dropping it mid-edit', () => {
+    const onSubmit = jest.fn();
+    setup({ onSubmit });
+
+    typeTitle('Senior Consultant Cardiologist');
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-mode-remote'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.changeText(
+      screen.getByTestId('wizard-description'),
+      'Join a busy interventional service running a full cath lab rota, with a supportive team.',
+    );
+
+    fireEvent.press(screen.getByTestId('wizard-add-question'));
+    fireEvent.changeText(screen.getByTestId('wizard-question-0-text'), 'No');
+
+    fireEvent.press(screen.getByTestId('wizard-publish'));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText('Give each screening question a full question, or remove it.')).toBeTruthy();
+  });
+
+  it('caps screening questions at five', () => {
+    setup();
+    typeTitle('Senior Consultant Cardiologist');
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-mode-remote'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+
+    for (let i = 0; i < 5; i++) fireEvent.press(screen.getByTestId('wizard-add-question'));
+    expect(screen.queryByTestId('wizard-add-question')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('wizard-question-2-remove'));
+    expect(screen.getByTestId('wizard-add-question')).toBeTruthy();
+  });
+
+  it('carries an existing question\'s id through an edit unchanged', () => {
+    const onSubmit = jest.fn();
+    setup({
+      onSubmit,
+      mode: 'edit',
+      initial: {
+        title: 'Existing Consultant Role',
+        work_mode: 'remote' as const,
+        description: 'An existing description that is comfortably long enough to pass.',
+        screening_questions: [
+          { id: 'q-existing', text: 'Do you hold a valid NMC registration?', required_answer: 'yes' as const, knockout: true },
+        ],
+      },
+    });
+
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-publish'));
+
+    expect(onSubmit.mock.calls[0][0].screening_questions[0]).toMatchObject({ id: 'q-existing' });
+  });
+
   it('opens on the stored values when editing, and offers no draft button', () => {
     setup({
       mode: 'edit',
