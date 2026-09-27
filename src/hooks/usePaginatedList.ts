@@ -71,7 +71,17 @@ export function usePaginatedList<T = any>({ path, token, extract, enabled = true
         );
         pageRef.current = page;
       } catch (e: any) {
-        if (gen === generation.current) setError(e?.message || 'Could not load. Pull to retry.');
+        if (gen === generation.current) {
+          setError(e?.message || 'Could not load. Pull to retry.');
+          // A failed page is not "more to come". Leaving hasMore true turned a
+          // server error into a request storm: the list renders its error state
+          // into an empty, short list, onEndReached keeps firing, and pageRef
+          // only advances on success — so the same page was re-requested dozens
+          // of times a second for as long as the screen stayed open. Retrying
+          // is the user's call, via ErrorState's button or pull-to-refresh,
+          // both of which reset this through fetchPage.
+          setHasMore(false);
+        }
       } finally {
         inFlight.current = false;
         setLoading(false);
