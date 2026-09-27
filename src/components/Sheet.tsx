@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  AccessibilityInfo, KeyboardAvoidingView, Modal, Platform, Pressable,
+  AccessibilityInfo, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, View, type StyleProp, type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +23,10 @@ import { colors, radius, spacing, typography, useBreakpoint, MIN_TOUCH_TARGET } 
  *  - `animationType` becomes 'none' under reduce-motion. A sheet that slides is
  *    a vestibular trigger, and the slide is decorative — the sheet appearing is
  *    the information.
+ *  - The body scrolls by default. The shell is capped at 85-92% of the screen,
+ *    so content taller than that was clipped with no way to reach it — and the
+ *    footer's buttons went with it. Pass `scroll={false}` only when the children
+ *    bring their own ScrollView or list.
  */
 export function Sheet({
   visible,
@@ -34,6 +38,7 @@ export function Sheet({
   maxWidth = 560,
   testID,
   contentStyle,
+  scroll = true,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -43,6 +48,8 @@ export function Sheet({
   maxWidth?: number;
   testID?: string;
   contentStyle?: StyleProp<ViewStyle>;
+  /** False when the children already scroll themselves. */
+  scroll?: boolean;
 }) {
   const { isMobile } = useBreakpoint();
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -92,7 +99,11 @@ export function Sheet({
             </View>
           ) : null}
 
-          {children}
+          {scroll ? (
+            <ScrollView keyboardShouldPersistTaps="handled" testID={testID ? `${testID}-scroll` : undefined}>
+              {children}
+            </ScrollView>
+          ) : children}
 
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </KeyboardAvoidingView>

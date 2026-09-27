@@ -94,6 +94,7 @@ export function ApplySheet({
   return (
     <Sheet
       visible={visible}
+      scroll={false}
       onClose={onClose}
       title="Apply"
       testID="apply-sheet"
