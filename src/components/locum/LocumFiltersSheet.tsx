@@ -57,6 +57,7 @@ export function LocumFiltersSheet({
   return (
     <Sheet
       visible={visible}
+      scroll={false}
       onClose={onClose}
       title="Filter locums"
       testID="locum-filters"

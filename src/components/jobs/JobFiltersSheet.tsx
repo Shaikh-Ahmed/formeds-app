@@ -70,6 +70,7 @@ export function JobFiltersSheet({
   return (
     <Sheet
       visible={visible}
+      scroll={false}
       onClose={onClose}
       title="Filter jobs"
       testID="jobs-filters-sheet"
