@@ -4,15 +4,14 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { colors, layout, radius, spacing, typography, useBreakpoint, MIN_TOUCH_TARGET } from '../../theme';
-import { API_URL } from '../../utils/api';
-import { shareLink } from '../../utils/share';
+import { shareJob } from '../../utils/share';
 import { PageGrid } from '../web';
 import { Button } from '../Button';
 import { ErrorBanner } from '../States';
 import { JobsList } from './JobsList';
 import { JobDetailPanel } from './JobDetailPanel';
 import { JobsSegmentedNav, type JobsSegment } from './JobsSegmentedNav';
-import { ApplySheet } from './ApplySheet';
+import { ApplySheet, type ApplyExtras } from './ApplySheet';
 import { applyToJob, createJobAlert, fetchJob, toggleSaveJob } from '../../api/jobs';
 import { useCollapsibleHeader } from '../../hooks/useCollapsibleHeader';
 import type { Job, JobFilters } from '../../types/jobs';
@@ -85,6 +84,8 @@ export function JobsScreen({
   const [detail, setDetail] = useState<Job | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [applyFor, setApplyFor] = useState<Job | null>(null);
+  const [appliedIds, setAppliedIds] = useState<string[]>([]);
+  const [copied, setCopied] = useState(false);
   const [applying, setApplying] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -122,22 +123,19 @@ export function JobsScreen({
     }
   }, [token, detail]);
 
-  const onShare = useCallback(() => {
+  const onShare = useCallback(async () => {
     if (!detail) return;
-    shareLink({
-      url: `${API_URL.replace(/\/$/, '')}/jobs/${detail.id}`,
-      title: detail.title,
-      message: `${detail.title} at ${detail.employer_name}`,
-    });
+    if ((await shareJob(detail)) === 'copied') { setCopied(true); setTimeout(() => setCopied(false), 2200); }
   }, [detail]);
 
-  const submitApplication = useCallback(async (note: string) => {
+  const submitApplication = useCallback(async (note: string, extras?: ApplyExtras) => {
     if (!token || !applyFor) return;
     setApplying(true);
     setActionError(null);
     try {
-      await applyToJob(token, applyFor.id, note);
+      await applyToJob(token, applyFor.id, note, extras);
       setApplyFor(null);
+      setAppliedIds(prev => [...prev, applyFor.id]);
       setDetail(prev => (prev && prev.id === applyFor.id ? { ...prev, has_applied: true } : prev));
     } catch (e: any) {
       setActionError(e?.message || 'Could not submit your application.');
@@ -165,6 +163,8 @@ export function JobsScreen({
     <JobsList
       selectedId={split ? selectedId : null}
       onSelect={openJob}
+      onQuickApply={setApplyFor}
+      appliedIds={appliedIds}
       compact={split}
       emptyAction={
         user?.role
@@ -227,6 +227,8 @@ export function JobsScreen({
             </Animated.View>
             <JobsList
               onSelect={openJob}
+              onQuickApply={setApplyFor}
+              appliedIds={appliedIds}
               scrollProps={scrollProps}
               contentInsetTop={headerHeight}
               onSaveSearch={saveSearch}
@@ -239,6 +241,12 @@ export function JobsScreen({
           </View>
         )}
       </PageGrid>
+
+      {copied ? (
+        <View style={styles.copied} accessibilityLiveRegion="polite" testID="job-link-copied">
+          <Text style={styles.copiedText}>Link copied</Text>
+        </View>
+      ) : null}
 
       <ApplySheet
         visible={!!applyFor}
@@ -300,6 +308,11 @@ export function JobActionBar({
 }
 
 const styles = StyleSheet.create({
+  copied: {
+    position: 'absolute', bottom: spacing.xl, alignSelf: 'center', zIndex: 20, backgroundColor: colors.text,
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.pill,
+  },
+  copiedText: { ...typography.label, color: colors.white },
   flex: { flex: 1 },
 
   header: { paddingTop: spacing.xl, paddingHorizontal: spacing.lg, gap: spacing.xs },

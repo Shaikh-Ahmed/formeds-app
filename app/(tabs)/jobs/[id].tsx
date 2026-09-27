@@ -9,10 +9,9 @@ import { PageColumn } from '../../../src/components/web';
 import { ErrorBanner, ErrorState } from '../../../src/components';
 import { JobDetailPanel } from '../../../src/components/jobs/JobDetailPanel';
 import { JobActionBar, JobsScreen } from '../../../src/components/jobs/JobsScreen';
-import { ApplySheet } from '../../../src/components/jobs/ApplySheet';
+import { ApplySheet, type ApplyExtras } from '../../../src/components/jobs/ApplySheet';
 import { applyToJob, fetchJob, toggleSaveJob } from '../../../src/api/jobs';
-import { API_URL } from '../../../src/utils/api';
-import { shareLink } from '../../../src/utils/share';
+import { shareJob } from '../../../src/utils/share';
 import type { Job } from '../../../src/types/jobs';
 
 /** The tab bar stays mounted under this route, so the pinned bar clears it. */
@@ -28,8 +27,11 @@ const TAB_BAR_HEIGHT = 60;
  */
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const { isDesktop } = useBreakpoint();
+  // A recruiter sees their posting on its own: no job board around it, and no
+  // tab bar under it (see (tabs)/_layout).
+  const isRecruiter = user?.role === 'recruiter';
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -73,20 +75,15 @@ export default function JobDetailScreen() {
   }, [token, job]);
 
   const onShare = useCallback(() => {
-    if (!job) return;
-    shareLink({
-      url: `${API_URL.replace(/\/$/, '')}/jobs/${job.id}`,
-      title: job.title,
-      message: `${job.title} at ${job.employer_name}`,
-    });
+    if (job) shareJob(job);
   }, [job]);
 
-  const submit = useCallback(async (note: string) => {
+  const submit = useCallback(async (note: string, extras?: ApplyExtras) => {
     if (!token || !job) return;
     setApplying(true);
     setActionError(null);
     try {
-      await applyToJob(token, job.id, note);
+      await applyToJob(token, job.id, note, extras);
       setApplyOpen(false);
       setJob(prev => (prev ? { ...prev, has_applied: true } : prev));
     } catch (e: any) {
@@ -96,7 +93,7 @@ export default function JobDetailScreen() {
     }
   }, [token, job]);
 
-  if (mounted && isDesktop) {
+  if (mounted && isDesktop && !isRecruiter) {
     return (
       <SafeAreaView style={styles.safe} edges={[]}>
         <JobsScreen selectedId={id ?? null} segment="discover" />
@@ -142,7 +139,7 @@ export default function JobDetailScreen() {
           onApply={() => setApplyOpen(true)}
           onToggleSave={onToggleSave}
           onShare={onShare}
-          bottomInset={insets.bottom + TAB_BAR_HEIGHT}
+          bottomInset={insets.bottom + (isRecruiter ? 0 : TAB_BAR_HEIGHT)}
         />
       ) : null}
 

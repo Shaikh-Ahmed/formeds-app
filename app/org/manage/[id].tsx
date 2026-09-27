@@ -339,7 +339,7 @@ export default function ManageOrganizationScreen() {
                       The last submission was declined. Correct the document and try again.
                     </Text>
                   ) : null}
-                  <FormInput
+                  <FormInput maxLength={80}
                     label="Registration or licence number"
                     value={regNumber}
                     onChangeText={setRegNumber}
@@ -406,7 +406,7 @@ export default function ManageOrganizationScreen() {
             </>
           ) : (
             <>
-              <FormInput
+              <FormInput maxLength={200}
                 label="Their email address"
                 value={inviteEmail}
                 onChangeText={setInviteEmail}

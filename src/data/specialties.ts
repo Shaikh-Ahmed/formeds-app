@@ -140,3 +140,13 @@ export const SPECIALTY_OPTIONS: string[] = [...SPECIALTIES, OTHER_SPECIALTY];
 /** True when a stored value came from free text rather than the list. */
 export const isCustomSpecialty = (value: string) =>
   !!value.trim() && !SPECIALTIES.includes(value.trim());
+
+/**
+ * The professional roles a member picks from. Like specialties, the column is
+ * free text server-side (older profiles hold whatever was typed), so the
+ * picker offers OTHER_SPECIALTY as its free-text escape too.
+ */
+export const PROFESSIONAL_ROLES: string[] = [
+  'Doctor', 'Nurse', 'Dentist', 'Pharmacist', 'Physiotherapist', 'Allied health professional',
+  'Paramedic', 'Medical student', 'Nursing student', 'Hospital administrator',
+];

@@ -71,7 +71,7 @@ export default function LoginScreen() {
 
           <ErrorBanner message={error} />
 
-          <FormInput
+          <FormInput maxLength={200}
             testID="login-email-input"
             label="Email"
             icon="mail-outline"

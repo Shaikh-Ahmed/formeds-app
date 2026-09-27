@@ -121,7 +121,7 @@ export default function AdminKycScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Reason for rejection</Text>
-            <TextInput style={styles.modalInput} placeholder="e.g. Document unreadable" value={reason} onChangeText={setReason} multiline />
+            <TextInput maxLength={500} style={styles.modalInput} placeholder="e.g. Document unreadable" value={reason} onChangeText={setReason} multiline />
             <View style={styles.modalActions}>
               <TouchableOpacity onPress={() => { setRejecting(null); setReason(''); }}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
               <TouchableOpacity style={[styles.btn, styles.rejectBtn]} onPress={submitReject}><Text style={styles.rejectText}>Confirm reject</Text></TouchableOpacity>

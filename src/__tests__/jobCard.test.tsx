@@ -145,3 +145,33 @@ describe('shift dates', () => {
     expect(formatShiftDates(JOB)).toBeNull();
   });
 });
+
+describe('JobCard quick actions', () => {
+  it('offers Quick apply on an open job and hands the job to the caller', () => {
+    const onQuickApply = jest.fn();
+    const onPress = jest.fn();
+    render(<JobCard item={make({ status: 'active' })} onPress={onPress} onQuickApply={onQuickApply} />);
+    fireEvent.press(screen.getByTestId('job-quick-apply-job-1'));
+    expect(onQuickApply).toHaveBeenCalledWith(expect.objectContaining({ id: 'job-1' }));
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('shows Applied instead of Quick apply once applied, and never to the poster or on a closed job', () => {
+    const { rerender } = render(<JobCard item={make({ has_applied: true })} onPress={jest.fn()} onQuickApply={jest.fn()} />);
+    expect(screen.queryByTestId('job-quick-apply-job-1')).toBeNull();
+    expect(screen.getByText('Applied')).toBeTruthy();
+    rerender(<JobCard item={make({ can_manage: true })} onPress={jest.fn()} onQuickApply={jest.fn()} />);
+    expect(screen.queryByTestId('job-quick-apply-job-1')).toBeNull();
+    rerender(<JobCard item={make({ status: 'closed' })} onPress={jest.fn()} onQuickApply={jest.fn()} />);
+    expect(screen.queryByTestId('job-quick-apply-job-1')).toBeNull();
+  });
+
+  it('shares the job without opening it', () => {
+    const onShare = jest.fn();
+    const onPress = jest.fn();
+    render(<JobCard item={JOB} onPress={onPress} onShare={onShare} />);
+    fireEvent.press(screen.getByTestId('job-share-job-1'));
+    expect(onShare).toHaveBeenCalledWith(expect.objectContaining({ id: 'job-1' }));
+    expect(onPress).not.toHaveBeenCalled();
+  });
+});
