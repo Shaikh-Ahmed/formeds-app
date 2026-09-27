@@ -196,7 +196,7 @@ export default function CaseComposerScreen() {
           </Text>
 
           <Text style={styles.label}>Details</Text>
-          <TextInput
+          <TextInput maxLength={20000}
             testID="case-body-input"
             style={[styles.input, styles.textArea]}
             placeholder={BODY_PROMPT}
@@ -251,7 +251,7 @@ export default function CaseComposerScreen() {
             </View>
           ) : null}
           {tags.length < MAX_TAGS ? (
-            <TextInput
+            <TextInput maxLength={30}
               testID="case-tag-input"
               style={styles.input}
               placeholder="Add a tag and press enter"

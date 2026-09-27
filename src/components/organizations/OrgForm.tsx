@@ -1,7 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography, fonts } from '../../theme';
-import { Button, FormInput, SelectField } from '../index';
+import { Button, FormInput, NumberField, SelectField } from '../index';
+import { yearOptions } from '../InputFields';
+import {
+  normalizeUrl, validateContactPhone, validateInteger, validateOptionalEmail, validatePincode, validateUrl,
+} from '../../utils/validation';
 import { ErrorBanner } from '../States';
 import { STATE_NAMES, citiesForState } from '../../data/indiaLocations';
 import { SPECIALTY_OPTIONS } from '../../data/specialties';
@@ -57,16 +61,17 @@ export function OrgForm({
   // after one. The server stays the authority.
   const problems = useMemo(() => {
     const out: Record<string, string> = {};
-    if (name.trim().length < 2) out.name = 'Give the organisation a name.';
-    if (website && !/^https:\/\//i.test(website.trim())) {
-      out.website = 'Use a full https:// address.';
-    }
-    const year = Number(foundedYear);
-    if (foundedYear && (year < 1800 || year > 2100)) {
-      out.foundedYear = 'Enter a four-digit year.';
-    }
+    if (name.trim().length < 2) out.name = 'Give the organisation a name (at least 2 characters).';
+    const checks: Record<string, string | null> = {
+      website: validateUrl(website),
+      publicEmail: validateOptionalEmail(publicEmail),
+      publicPhone: validateContactPhone(publicPhone),
+      pincode: validatePincode(pincode),
+      bedCount: validateInteger(bedCount, 'Beds', { max: 100000 }),
+    };
+    Object.entries(checks).forEach(([k, v]) => { if (v) out[k] = v; });
     return out;
-  }, [name, website, foundedYear]);
+  }, [name, website, publicEmail, publicPhone, pincode, bedCount]);
 
   const toggleSpecialty = (value: string) =>
     setSpecialties(prev =>
@@ -87,7 +92,7 @@ export function OrgForm({
       city,
       address_line: addressLine.trim(),
       pincode: pincode.trim(),
-      website: website.trim(),
+      website: normalizeUrl(website),
       public_email: publicEmail.trim(),
       public_phone: publicPhone.trim(),
       bed_count: Number(bedCount) || 0,
@@ -181,10 +186,13 @@ export function OrgForm({
           placeholder="Street and area"
         />
         <FormInput
-          label="Pincode (optional)"
+          label="PIN code (optional)"
           value={pincode}
-          onChangeText={setPincode}
+          onChangeText={v => setPincode(v.replace(/\D/g, '').slice(0, 6))}
           keyboardType="number-pad"
+          inputMode="numeric"
+          maxLength={6}
+          error={err('pincode')}
         />
       </Section>
 
@@ -193,8 +201,10 @@ export function OrgForm({
           label="Website (optional)"
           value={website}
           onChangeText={setWebsite}
-          placeholder="https://example.org"
+          placeholder="example.org"
           autoCapitalize="none"
+          keyboardType="url"
+          maxLength={300}
           error={err('website')}
         />
         <FormInput
@@ -204,29 +214,35 @@ export function OrgForm({
           placeholder="careers@example.org"
           autoCapitalize="none"
           keyboardType="email-address"
+          maxLength={200}
+          error={err('publicEmail')}
         />
         <FormInput
           label="Public phone (optional)"
           value={publicPhone}
           onChangeText={setPublicPhone}
           keyboardType="phone-pad"
+          placeholder="e.g. 020 2612 3456"
+          maxLength={20}
+          error={err('publicPhone')}
         />
       </Section>
 
       <Section title="Details">
-        <FormInput
+        <NumberField
           label="Beds (optional)"
           value={bedCount}
           onChangeText={setBedCount}
-          keyboardType="number-pad"
+          maxDigits={6}
+          error={err('bedCount')}
         />
-        <FormInput
+        {/* A year from a list: never in the future, never a typo like 19983. */}
+        <SelectField
           label="Founded (optional)"
           value={foundedYear}
-          onChangeText={setFoundedYear}
-          keyboardType="number-pad"
-          placeholder="e.g. 1983"
-          error={err('foundedYear')}
+          onChange={setFoundedYear}
+          options={['', ...yearOptions(1800, new Date().getFullYear())]}
+          placeholder="Year"
         />
         <Text style={styles.label}>
           Specialties {specialties.length ? `(${specialties.length}/${MAX_SPECIALTIES})` : ''}

@@ -224,7 +224,7 @@ export default function ConversationScreen() {
           <TouchableOpacity testID="attach-image-btn" style={s.attachBtn} onPress={pickImage} disabled={uploadingImage}>
             {uploadingImage ? <ActivityIndicator size="small" color="#1A3A5C" /> : <Ionicons name="image-outline" size={24} color="#1A3A5C" />}
           </TouchableOpacity>
-          <TextInput testID="message-input" style={s.chatInput} placeholder="Type a message..." placeholderTextColor="#94A3B8" value={input} onChangeText={handleInputChange} multiline onSubmitEditing={() => sendMessage('text')} />
+          <TextInput maxLength={5000} testID="message-input" style={s.chatInput} placeholder="Type a message..." placeholderTextColor="#94A3B8" value={input} onChangeText={handleInputChange} multiline onSubmitEditing={() => sendMessage('text')} />
           <TouchableOpacity testID="send-message-btn" style={[s.sendBtn, !input.trim() && s.sendBtnDisabled]} onPress={() => sendMessage('text')} disabled={!input.trim() || sending}>
             {sending ? <ActivityIndicator size="small" color="#FFF" /> : <Ionicons name="send" size={20} color="#FFF" />}
           </TouchableOpacity>

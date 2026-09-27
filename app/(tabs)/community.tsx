@@ -9,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { timeAgo } from '../../src/utils/time';
 import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer } from '../../src/components';
 import { PageGrid, ProfileRail, FeedRail, Hoverable } from '../../src/components/web';
-import { colors, spacing, radius, typography, compactAction, useBreakpoint } from '../../src/theme';
+import { colors, fonts, spacing, radius, typography, compactAction, useBreakpoint } from '../../src/theme';
 import { useCollapsibleHeader, focusScrollInset } from '../../src/hooks/useCollapsibleHeader';
 
 const FEED_PAGE_SIZE = 20;
@@ -308,7 +308,7 @@ export default function FeedScreen() {
             {/* Posting is KYC-gated server-side; explain that instead of letting
                 the user write a post and only then hit a 403. */}
             <KycNotice action="post to the community" />
-            <TextInput testID="post-input" style={styles.composeInput} placeholder="Share something with the community..." placeholderTextColor="#94A3B8" value={newPost} onChangeText={setNewPost} multiline editable={isKycApproved} />
+            <TextInput maxLength={5000} testID="post-input" style={styles.composeInput} placeholder="Share something with the community..." placeholderTextColor="#94A3B8" value={newPost} onChangeText={setNewPost} multiline editable={isKycApproved} />
           
             {attachedImage && (
               <View style={styles.attachedImageWrap}>
@@ -440,16 +440,17 @@ const styles = StyleSheet.create({
   listWide: { paddingHorizontal: 0, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
   postCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
   postCardWide: { marginBottom: spacing.lg },
-  postHeader: { flexDirection: 'row', marginBottom: 12, borderRadius: radius.md, marginHorizontal: -4, paddingHorizontal: 4, paddingVertical: 2 },
+  postHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: 12, borderRadius: radius.md, marginHorizontal: -4, paddingHorizontal: 4, paddingVertical: 2 },
   postHeaderHover: { backgroundColor: colors.bgMuted },
-  avatarCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1A3A5C', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  avatarText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
-  postMeta: { flex: 1 },
-  authorName: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  roleTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginRight: 8 },
-  roleTagText: { fontSize: 11, fontWeight: '600' },
-  timeText: { fontSize: 12, color: '#94A3B8' },
+  // The spacing lives on the row itself. It used to sit on an inline avatar
+  // style that stopped being used when the shared Avatar replaced it, which
+  // left the role badge touching the avatar and the time touching the badge.
+  postMeta: { flex: 1, gap: 4 },
+  authorName: { fontSize: 16, fontFamily: fonts.body.semibold, color: colors.text },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  // textSecondary, not the lighter textMuted: the time is read, and the
+  // lighter grey falls below text contrast on white.
+  timeText: { ...typography.small, color: colors.textSecondary },
   postContent: { fontSize: 15, color: '#334155', lineHeight: 22 },
   postImageWrap: { marginTop: 12, borderRadius: 12, overflow: 'hidden' },
   postImagePressed: { opacity: 0.9 },

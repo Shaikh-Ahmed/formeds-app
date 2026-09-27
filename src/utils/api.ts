@@ -94,6 +94,13 @@ export class ApiError extends Error {
   code?: string;
   /** Full parsed response body, for errors that carry extra fields. */
   data?: any;
+  /**
+   * Per-field messages from a 422 (field name -> message), so a form can show
+   * each one under the input it belongs to instead of one banner. The server
+   * names the field in plain words already ("Title must be at least 6
+   * characters"); this only says WHERE.
+   */
+  fieldErrors: Record<string, string> = {};
   constructor(message: string, status: number, data?: any) {
     super(message);
     this.status = status;
@@ -101,8 +108,29 @@ export class ApiError extends Error {
     const detail = data?.detail;
     if (detail && typeof detail === 'object' && !Array.isArray(detail)) {
       this.code = detail.code;
+      if (typeof detail.field === 'string' && typeof detail.message === 'string') {
+        this.fieldErrors[detail.field] = detail.message;
+      }
+    }
+    if (Array.isArray(detail)) {
+      detail.forEach((e: any) => {
+        if (e && typeof e.field === 'string' && typeof e.msg === 'string' && !this.fieldErrors[e.field]) {
+          this.fieldErrors[e.field] = e.msg;
+        }
+      });
     }
   }
+}
+
+/**
+ * Field messages from any error: the 422 map, plus business-rule codes the
+ * caller knows how to place (e.g. {shift_in_past: 'shift_date'}).
+ */
+export function errorFields(e: unknown, codes: Record<string, string> = {}): Record<string, string> {
+  if (!(e instanceof ApiError)) return {};
+  const out = { ...e.fieldErrors };
+  if (e.code && codes[e.code]) out[codes[e.code]] = e.message;
+  return out;
 }
 
 async function parseBody(res: Response): Promise<any> {
@@ -132,7 +160,16 @@ export function detailToMessage(data: any, fallback: string): string {
   return fallback;
 }
 
-async function rawFetch(path: string, token: string | null | undefined, options: RequestInit) {
+/**
+ * Request options, plus an optional per-call timeout. Everything uses the 15s
+ * default except calls that are slow by nature -- an AED answer from a model
+ * that reasons before replying can legitimately take longer.
+ */
+export type ApiFetchOptions = RequestInit & { timeoutMs?: number };
+
+async function rawFetch(path: string, token: string | null | undefined, options: ApiFetchOptions) {
+  const { timeoutMs, ...init } = options;
+  options = init;
   const headers: any = { ...options.headers };
   const isFormData = options.body && typeof (options.body as any).append === 'function';
   if (!isFormData) {
@@ -151,7 +188,7 @@ async function rawFetch(path: string, token: string | null | undefined, options:
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs ?? REQUEST_TIMEOUT_MS);
   try {
     return await fetch(`${API_URL}${finalPath}`, {
       cache: 'no-store',
@@ -169,7 +206,7 @@ async function rawFetch(path: string, token: string | null | undefined, options:
   }
 }
 
-export async function apiFetch(path: string, token?: string | null, options: RequestInit = {}) {
+export async function apiFetch(path: string, token?: string | null, options: ApiFetchOptions = {}) {
   let res = await rawFetch(path, token, options);
 
   // Access token expired: refresh once and retry with the new token.

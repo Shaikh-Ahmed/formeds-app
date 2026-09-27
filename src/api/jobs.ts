@@ -138,9 +138,10 @@ export const toggleSaveJob = (token: string, jobId: string): Promise<{ saved: bo
 
 export const applyToJob = (
   token: string, jobId: string, coverNote = '',
+  extra: { answers?: Record<string, unknown>; include_resume?: boolean } = {},
 ): Promise<{ status: string }> =>
   apiFetch(`/api/jobs/${jobId}/apply`, token, {
-    method: 'POST', body: JSON.stringify({ cover_note: coverNote }),
+    method: 'POST', body: JSON.stringify({ cover_note: coverNote, ...extra }),
   });
 
 /**

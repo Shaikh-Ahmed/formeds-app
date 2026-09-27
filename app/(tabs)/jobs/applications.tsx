@@ -13,6 +13,16 @@ import { JobBadge } from '../../../src/components/jobs/JobMeta';
 import { fetchMyApplications, withdrawApplication } from '../../../src/api/jobs';
 import { postedAgo } from '../../../src/utils/time';
 import { APPLICATION_STATUS_META, type Application } from '../../../src/types/jobs';
+import { INTERVIEW_MODE_LABELS } from '../../../src/types/applicants';
+
+/** "on 3 Oct at 3:30 PM", in the viewer's own time. */
+function interviewWhen(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const h = d.getHours();
+  return `on ${d.getDate()} ${months[d.getMonth()]} at ${h % 12 === 0 ? 12 : h % 12}:${String(d.getMinutes()).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+}
 
 /** Once a decision is in, withdrawing says nothing the status does not. */
 const WITHDRAWABLE = new Set(['applied', 'reviewing', 'shortlisted', 'interviewing', 'offered']);
@@ -116,6 +126,17 @@ export default function ApplicationsScreen() {
                     {postedAgo(item.created_at).replace('Posted', 'Applied')}
                   </Text>
                 </View>
+
+                {item.interview_at && item.status === 'interviewing' ? (
+                  <View style={styles.interview} testID={`my-interview-${item.id}`}>
+                    <Ionicons name="calendar" size={16} color={colors.navy} />
+                    <Text style={styles.interviewText}>
+                      Interview {interviewWhen(item.interview_at)}
+                      {item.interview_mode ? ` · ${INTERVIEW_MODE_LABELS[item.interview_mode]}` : ''}
+                      {item.interview_location ? ` · ${item.interview_location}` : ''}
+                    </Text>
+                  </View>
+                ) : null}
 
                 {item.employer_note ? (
                   <Text style={styles.note} numberOfLines={3}>{item.employer_note}</Text>
@@ -243,4 +264,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.borderLight,
   },
+  interview: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, padding: spacing.sm,
+    borderRadius: radius.md, backgroundColor: colors.bgMuted,
+  },
+  interviewText: { ...typography.caption, color: colors.text, flex: 1 },
 });

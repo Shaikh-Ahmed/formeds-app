@@ -6,11 +6,14 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../../src/context/AuthContext';
 import { colors, spacing, typography, MIN_TOUCH_TARGET } from '../../../src/theme';
 import { PageColumn } from '../../../src/components/web';
-import { KycNotice } from '../../../src/components';
-import { JobWizard } from '../../../src/components/jobs/wizard/JobWizard';
+import { KycNotice, LoadingState } from '../../../src/components';
+import { errorFields } from '../../../src/utils/api';
+import { JOB_ERROR_FIELDS, JobWizard } from '../../../src/components/jobs/wizard/JobWizard';
 import { createJob, setJobStatus } from '../../../src/api/jobs';
 import { fetchMyOrganizations } from '../../../src/api/organizations';
 import type { Organization } from '../../../src/types/organizations';
+import { RecruiterClientFields } from '../../../src/components/recruiters/RecruiterClientFields';
+import { fetchRecruiterAccount } from '../../../src/api/recruiters';
 
 /**
  * Post an opportunity.
@@ -23,14 +26,24 @@ export default function NewJobScreen() {
   const { token, isKycApproved, user } = useAuth();
   const router = useRouter();
 
-  const [orgs, setOrgs] = useState<Organization[]>([]);
+  const [orgs, setOrgs] = useState<Organization[] | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // Recruiters only: who the role is for, and whether candidates see the name.
+  const isRecruiter = user?.role === 'recruiter';
+  const [client, setClient] = useState({ client_name: '', client_confidential: false });
 
+  // A recruiter posts as their agency, never as themselves, so the wizard
+  // waits for the agency to be known and starts with it selected.
+  const [agencyId, setAgencyId] = useState<string | null>(null);
   useEffect(() => {
     if (!token) return;
-    fetchMyOrganizations(token).then(setOrgs).catch(() => {});
-  }, [token]);
+    fetchMyOrganizations(token).then(setOrgs).catch(() => setOrgs([]));
+    if (isRecruiter) fetchRecruiterAccount(token).then(a => setAgencyId(a.org_id || '')).catch(() => setAgencyId(''));
+  }, [token, isRecruiter]);
+  const agencies = isRecruiter && orgs ? orgs.filter(o => o.id === agencyId) : orgs ?? [];
+  const ready = orgs !== null && (!isRecruiter || agencyId !== null);
 
   const submit = useCallback(async (
     payload: Record<string, unknown>, { publish }: { publish: boolean },
@@ -42,15 +55,16 @@ export default function NewJobScreen() {
       // Created as a draft either way, then published as a second step. That
       // ordering means a failure to publish still leaves the writing saved
       // rather than discarding everything the person just typed.
-      const job = await createJob(token, { ...payload, status: 'draft' });
+      const job = await createJob(token, { ...payload, ...(isRecruiter ? client : {}), status: 'draft' });
       if (publish) await setJobStatus(token, job.id, 'active');
-      router.replace('/jobs/posted' as any);
+      router.replace((isRecruiter ? '/recruiter/jobs' : '/jobs/posted') as any);
     } catch (e: any) {
       setError(e?.message || 'Could not save this posting.');
+      setFieldErrors(errorFields(e, JOB_ERROR_FIELDS));
     } finally {
       setSubmitting(false);
     }
-  }, [token, router]);
+  }, [token, router, isRecruiter, client]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -68,10 +82,14 @@ export default function NewJobScreen() {
           <Text style={styles.headerTitle}>Post an opportunity</Text>
         </View>
 
-        {isKycApproved ? (
+        {isKycApproved && !ready ? <LoadingState /> : isKycApproved ? (
           <JobWizard
-            organizations={orgs}
-            onCreateOrganization={() => router.push('/org/new' as any)}
+            serverFieldErrors={fieldErrors}
+            organizations={agencies}
+            initial={isRecruiter && agencies[0] ? { org_id: agencies[0].id } : undefined}
+            allowSelf={!isRecruiter || !agencies.length}
+            firstStepExtra={isRecruiter ? <RecruiterClientFields value={client} onChange={setClient} /> : undefined}
+            onCreateOrganization={isRecruiter ? undefined : () => router.push('/org/new' as any)}
             onSubmit={submit}
             submitting={submitting}
             error={error}

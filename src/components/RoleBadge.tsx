@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { radius, spacing } from '../theme';
+import { fonts, radius, spacing } from '../theme';
 import { getRoleMeta } from '../theme/roles';
 
 interface Props {
@@ -26,5 +26,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     alignSelf: 'flex-start',
   },
-  text: { fontSize: 11, fontWeight: '700' },
+  // A named brand weight: a bare fontWeight renders in the system font.
+  text: { fontSize: 11, fontFamily: fonts.body.semibold },
 });

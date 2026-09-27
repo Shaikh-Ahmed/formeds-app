@@ -65,7 +65,7 @@ export default function ForgotPasswordScreen() {
 
               <ErrorBanner message={error} />
 
-              <FormInput
+              <FormInput maxLength={200}
                 testID="forgot-email-input"
                 label="Email"
                 icon="mail-outline"

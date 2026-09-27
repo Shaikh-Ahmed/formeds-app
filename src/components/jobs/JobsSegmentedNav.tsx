@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET } from '../../theme';
+import { JobsModuleTabs } from './JobsModuleTabs';
 
 export type JobsSegment = 'discover' | 'saved' | 'applications' | 'posted';
 
@@ -82,16 +83,24 @@ export function JobsSegmentedNav({ active }: { active: JobsSegment }) {
   // lines costs a card's worth of feed on every screen. A scroller is the right
   // trade here specifically because the items are peers with a clear selected
   // state — nothing is hidden that the user has to discover.
-  return isMobile ? (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.scroller}
-    >
-      {content}
-    </ScrollView>
-  ) : (
-    <View style={styles.wide}>{content}</View>
+  //
+  // The Jobs | Locum switch sits above the segments. It is the only thing this
+  // component gained when Locum arrived; the segments themselves are unchanged.
+  return (
+    <View>
+      <JobsModuleTabs active="jobs" />
+      {isMobile ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scroller}
+        >
+          {content}
+        </ScrollView>
+      ) : (
+        <View style={styles.wide}>{content}</View>
+      )}
+    </View>
   );
 }
 

@@ -9,6 +9,8 @@ import { timeAgo } from '../utils/time';
 import { usePaginatedList } from '../hooks/usePaginatedList';
 import { LoadingState, EmptyState, ErrorState } from './States';
 import { PageColumn } from './web';
+import { JobBadge } from './jobs/JobMeta';
+import { isLocumNotification, locumNotificationMeta } from '../types/locum';
 import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET } from '../theme';
 
 /**
@@ -34,21 +36,30 @@ interface Notification {
 const TYPE_ICONS: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string }> = {
   application: { icon: 'briefcase', color: colors.navy, bg: '#EFF6FF' },
   optin: { icon: 'people', color: colors.teal, bg: '#F0FDF4' },
-  message: { icon: 'chatbubble', color: '#7C3AED', bg: '#F5F3FF' },
+  message: { icon: 'chatbubble', color: '#7C3AED', bg: colors.recruiterBg },
   case: { icon: 'help-buoy', color: colors.teal, bg: colors.tealBg },
   general: { icon: 'notifications', color: colors.warning, bg: colors.warningBg },
   shift: { icon: 'time', color: colors.redText, bg: colors.redBg },
+  locum: { icon: 'flash', color: colors.teal, bg: colors.tealBg },
+  recruiter_invitation: { icon: 'mail-open', color: colors.recruiter, bg: colors.recruiterBg },
+  invitation_accepted: { icon: 'thumbs-up', color: colors.teal, bg: colors.tealBg },
+  recruiter_status: { icon: 'shield-checkmark', color: colors.recruiter, bg: colors.recruiterBg },
 };
 
 /** Filters map onto the notification types the backend actually emits. */
 type Filter = 'all' | 'work' | 'cases' | 'network';
 
-const FILTERS: { key: Filter; label: string; types?: string[] }[] = [
+const FILTERS: { key: Filter; label: string; types?: string[]; locum?: boolean }[] = [
   { key: 'all', label: 'All' },
-  { key: 'work', label: 'Jobs & shifts', types: ['application', 'shift'] },
+  { key: 'work', label: 'Jobs & shifts', types: ['application', 'application_status', 'shift', 'recruiter_invitation', 'invitation_accepted', 'recruiter_status'], locum: true },
   { key: 'cases', label: 'Cases', types: ['case'] },
   { key: 'network', label: 'Network', types: ['optin', 'message'] },
 ];
+
+/** Locum notifications carry their workflow step in the type (`locum_selected`). */
+function matchesFilter(f: { types?: string[]; locum?: boolean }, type: string): boolean {
+  return !!f.types?.includes(type) || (!!f.locum && isLocumNotification(type));
+}
 
 export function NotificationsView({ withBack = false }: { withBack?: boolean }) {
   const { token } = useAuth();
@@ -85,18 +96,29 @@ export function NotificationsView({ withBack = false }: { withBack?: boolean }) 
     markRead(item.id);
     if (item.type === 'case' && item.ref_id) {
       router.push({ pathname: '/case/[id]', params: { id: item.ref_id } } as any);
+    } else if (item.type === 'recruiter_invitation') {
+      router.push({ pathname: '/opportunities', params: { tab: 'invitations' } } as any);
+    } else if (item.type === 'invitation_accepted') {
+      router.push('/recruiter/invitations' as any);
+    } else if (item.type === 'recruiter_status') {
+      router.push('/recruiter' as any);
+    } else if (isLocumNotification(item.type) && item.ref_id) {
+      // Every Locum notification points at its locum; the page shows the
+      // applicant their status and the hospital its Manage button.
+      router.push(`/jobs/locum/${item.ref_id}` as any);
     }
   };
 
   const visible = useMemo(() => {
-    const types = FILTERS.find(f => f.key === filter)?.types;
-    return types ? notifications.filter(n => types.includes(n.type)) : notifications;
+    const f = FILTERS.find(x => x.key === filter);
+    return f?.types ? notifications.filter(n => matchesFilter(f, n.type)) : notifications;
   }, [notifications, filter]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const renderNotification = ({ item }: { item: Notification }) => {
-    const config = TYPE_ICONS[item.type] || TYPE_ICONS.general;
+    const config = TYPE_ICONS[isLocumNotification(item.type) ? 'locum' : item.type] || TYPE_ICONS.general;
+    const step = locumNotificationMeta(item.type);
     return (
       <Pressable
         testID={`notif-${item.id}`}
@@ -112,6 +134,11 @@ export function NotificationsView({ withBack = false }: { withBack?: boolean }) 
         </View>
         <View style={styles.notifContent}>
           <Text style={[styles.notifTitle, !item.read && styles.unreadTitle]}>{item.title}</Text>
+          {step ? (
+            <View style={styles.notifStep}>
+              <JobBadge label={step.label} icon={step.icon as any} tone={step.tone} />
+            </View>
+          ) : null}
           <Text style={styles.notifMessage} numberOfLines={2}>{item.message}</Text>
           <Text style={styles.notifTime}>{timeAgo(item.created_at)}</Text>
         </View>
@@ -153,7 +180,7 @@ export function NotificationsView({ withBack = false }: { withBack?: boolean }) 
           {FILTERS.map(f => {
             const selected = filter === f.key;
             const count = f.types
-              ? notifications.filter(n => f.types!.includes(n.type)).length
+              ? notifications.filter(n => matchesFilter(f, n.type)).length
               : notifications.length;
             return (
               <Pressable
@@ -288,6 +315,7 @@ const styles = StyleSheet.create({
   notifContent: { flex: 1 },
   notifTitle: { ...typography.body, fontFamily: fonts.body.medium, color: colors.textSecondary, marginBottom: 2 },
   unreadTitle: { fontWeight: '700', color: colors.text },
+  notifStep: { marginBottom: 4 },
   notifMessage: { ...typography.body, fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: 4 },
   notifTime: { ...typography.small, color: colors.textSecondary },
 });

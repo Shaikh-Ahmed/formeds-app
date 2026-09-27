@@ -6,6 +6,7 @@ import { colors, spacing, radius, layout, useBreakpoint, MIN_TOUCH_TARGET } from
 import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../Avatar';
 import { Hoverable } from './Hoverable';
+import { AedLogo } from '../aed/AedLogo';
 
 /**
  * Persistent desktop navigation — the replacement for the bottom tab bar,
@@ -44,10 +45,19 @@ export function TopBar({
   const { isDesktop } = useBreakpoint();
 
   const role = user?.role || 'healthcare_professional';
+  // Recruiters get their own portal and nothing of the professional network:
+  // no feed, no job board, no AED, no network search.
+  const isRecruiter = role === 'recruiter';
+  const homeHref = isRecruiter ? '/recruiter' : '/(tabs)/community';
+  const profileHref = isRecruiter ? '/recruiter/account' : '/(tabs)/profile';
 
   // Mirrors the href gating in app/(tabs)/_layout.tsx. Kept in the same shape
   // so the two can't silently disagree about who sees what.
-  const items: NavItem[] = [
+  const items: NavItem[] = isRecruiter ? [
+    { key: 'recruiter', label: 'Dashboard', href: '/recruiter', icon: 'grid-outline', iconActive: 'grid' },
+    { key: 'messages', label: 'Messages', href: '/messages', icon: 'mail-outline', iconActive: 'mail', badge: unreadMessages },
+    { key: 'notifications', label: 'Alerts', href: '/notifications', icon: 'notifications-outline', iconActive: 'notifications', badge: unreadNotifications },
+  ] : [
     { key: 'community', label: 'Home', href: '/(tabs)/community', icon: 'chatbubbles-outline', iconActive: 'chatbubbles' },
     { key: 'jobs', label: 'Jobs', href: '/(tabs)/jobs', icon: 'briefcase-outline', iconActive: 'briefcase' },
     ...(role === 'healthcare_professional'
@@ -70,7 +80,7 @@ export function TopBar({
       <View style={styles.inner}>
         {/* Brand — also the "home" affordance a browser user expects. */}
         <Hoverable
-          onPress={() => router.push('/(tabs)/community' as any)}
+          onPress={() => router.push(homeHref as any)}
           accessibilityLabel="ForMeds home"
           style={styles.brand}
           hoverStyle={styles.brandHover}
@@ -86,12 +96,14 @@ export function TopBar({
 
         {/* Global search. Present at every width above mobile because search is
             the primary way a pointer user navigates a network this size. */}
+        {isRecruiter ? null : (
         <View style={styles.searchWrap}>
           <Ionicons name="search" size={17} color={colors.textMuted} />
           <TextInput
             testID="topbar-search"
             style={styles.searchInput}
-            placeholder="Search people, cases, jobs"
+            // Tablet widths leave the box ~150px; the long hint would clip.
+            placeholder={isDesktop ? 'Search people, cases, jobs' : 'Search'}
             placeholderTextColor={colors.textMuted}
             value={searchValue}
             onChangeText={onSearch}
@@ -99,10 +111,12 @@ export function TopBar({
             accessibilityLabel="Search ForMeds"
           />
         </View>
+        )}
 
         <View style={styles.nav}>
           {items.map(item => {
-            const active = isActive(item.href);
+            // The portal's Account page belongs to "Me", not to Dashboard.
+            const active = isActive(item.href) && !(item.key === 'recruiter' && isActive(profileHref));
             return (
               <Hoverable
                 key={item.key}
@@ -113,7 +127,9 @@ export function TopBar({
                   item.badge ? `${item.label}, ${item.badge} unread` : item.label
                 }
                 accessibilityState={{ selected: active }}
-                style={styles.navItem}
+                // Icon-only below desktop, so the item can shrink to the
+                // minimum touch target and give the search box the room.
+                style={[styles.navItem, !isDesktop && styles.navItemCompact]}
                 hoverStyle={styles.navItemHover}
               >
                 <View style={styles.navIconWrap}>
@@ -144,6 +160,7 @@ export function TopBar({
               desktop equivalent has to be persistent too — a rail card would
               vanish on Jobs and Learning, which have no right rail. Red is
               reserved for this and destructive actions. */}
+          {isRecruiter ? null : (
           <Hoverable
             testID="topnav-aed"
             onPress={() => router.push('/aed-chat' as any)}
@@ -152,18 +169,19 @@ export function TopBar({
             style={styles.aedItem}
             hoverStyle={styles.aedItemHover}
           >
-            <Ionicons name="pulse" size={18} color={colors.red} />
+            <AedLogo size={22} />
             {isDesktop && <Text style={styles.aedLabel}>AED</Text>}
           </Hoverable>
+          )}
 
           <View style={styles.divider} />
 
           <Hoverable
             testID="topnav-profile"
-            onPress={() => router.push('/(tabs)/profile' as any)}
+            onPress={() => router.push(profileHref as any)}
             accessibilityRole="link"
-            accessibilityLabel="Your profile"
-            accessibilityState={{ selected: isActive('/(tabs)/profile') }}
+            accessibilityLabel={isRecruiter ? 'Your recruiter account' : 'Your profile'}
+            accessibilityState={{ selected: isActive(profileHref) }}
             style={styles.navItem}
             hoverStyle={styles.navItemHover}
           >
@@ -172,13 +190,13 @@ export function TopBar({
             </View>
             {isDesktop && (
               <Text
-                style={[styles.navLabel, isActive('/(tabs)/profile') && styles.navLabelActive]}
+                style={[styles.navLabel, isActive(profileHref) && styles.navLabelActive]}
                 numberOfLines={1}
               >
                 Me
               </Text>
             )}
-            <View style={[styles.underline, isActive('/(tabs)/profile') && styles.underlineActive]} />
+            <View style={[styles.underline, isActive(profileHref) && styles.underlineActive]} />
           </Hoverable>
         </View>
       </View>
@@ -227,6 +245,11 @@ const styles = StyleSheet.create({
   // +html.tsx is the single focus treatment across the app.
   searchInput: {
     flex: 1,
+    // A browser <input> has an intrinsic width of ~20 characters and will not
+    // shrink below it on its own. At tablet widths that pushed the field out of
+    // its box and underneath the nav icons; minWidth 0 lets it fit the box.
+    minWidth: 0,
+    width: '100%',
     fontSize: 14,
     color: colors.text,
     ...({ outlineStyle: 'none' } as object),
@@ -242,6 +265,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   navItemHover: { backgroundColor: colors.bgMuted },
+  navItemCompact: { minWidth: MIN_TOUCH_TARGET, paddingHorizontal: spacing.xs },
   navIconWrap: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   navLabel: { fontSize: 11, fontWeight: '500', color: colors.textSecondary },
   navLabelActive: { color: colors.navy, fontWeight: '700' },
