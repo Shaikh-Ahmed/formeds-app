@@ -442,7 +442,7 @@ export default function CaseDetailScreen() {
             <KycNotice action="answer cases" />
 
             <View style={styles.composerRow}>
-              <TextInput
+              <TextInput maxLength={20000}
                 testID="answer-input"
                 style={styles.composerInput}
                 placeholder={replyTo ? 'Write a reply…' : 'Write an answer…'}

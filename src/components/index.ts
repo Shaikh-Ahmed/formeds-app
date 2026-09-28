@@ -1,6 +1,7 @@
 export { Button } from './Button';
 export { FormInput } from './FormInput';
 export { SelectField } from './SelectField';
+export { DateField, TimeField, DateTimeField, MonthField, NumberField, displayDate, displayTime, yearOptions } from './InputFields';
 export type { SelectFieldProps } from './SelectField';
 export { Avatar } from './Avatar';
 export { RoleBadge } from './RoleBadge';

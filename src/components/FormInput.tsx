@@ -59,6 +59,13 @@ export function FormInput({ label, icon, error, secure, rows, testID, ...inputPr
         ) : null}
       </View>
       {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
+      {/* A counter for long text, once it is worth knowing: from 70% of the
+          limit, so a short answer is not cluttered by "12 / 20000". */}
+      {multiline && inputProps.maxLength && String(inputProps.value ?? '').length >= inputProps.maxLength * 0.7 ? (
+        <Text style={styles.counter} accessibilityLiveRegion="polite">
+          {String(inputProps.value ?? '').length.toLocaleString('en-IN')} / {inputProps.maxLength.toLocaleString('en-IN')}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -81,5 +88,6 @@ const styles = StyleSheet.create({
   wrapMultiline: { alignItems: 'flex-start', paddingVertical: spacing.sm },
   icon: { marginRight: spacing.sm + 2 },
   input: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: spacing.md },
-  error: { color: colors.red, fontSize: 13, marginTop: 4 },
+  error: { color: colors.redText, fontSize: 13, marginTop: 4 },
+  counter: { ...typography.small, color: colors.textSecondary, marginTop: 4, textAlign: 'right' },
 });

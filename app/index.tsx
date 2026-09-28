@@ -16,7 +16,7 @@ export default function WelcomeScreen() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.replace('/(tabs)/community');
+      router.replace((user.role === 'recruiter' ? '/recruiter' : '/(tabs)/community') as any);
     }
   }, [user, loading]);
 
@@ -70,6 +70,34 @@ export default function WelcomeScreen() {
     </Hoverable>
   );
 
+  // Recruiters have their own sign-up and sign-in, kept apart from the role
+  // cards above so the professional path stays the obvious one.
+  const recruiterLink = (
+    <View style={styles.recruiterBox} testID="recruiter-entry">
+      <Text style={styles.recruiterTitle}>Recruiter or staffing agency?</Text>
+      <View style={styles.recruiterActions}>
+        <Hoverable
+          testID="recruiter-link"
+          style={styles.recruiterBtn}
+          hoverStyle={styles.loginLinkHover}
+          onPress={() => router.push('/recruiter-register' as any)}
+          accessibilityLabel="Join as a recruiter"
+        >
+          <Text style={styles.loginBold}>Join as a recruiter</Text>
+        </Hoverable>
+        <Hoverable
+          testID="recruiter-login-link"
+          style={styles.recruiterBtn}
+          hoverStyle={styles.loginLinkHover}
+          onPress={() => router.push('/recruiter-login' as any)}
+          accessibilityLabel="Recruiter sign in"
+        >
+          <Text style={styles.loginBold}>Recruiter sign in</Text>
+        </Hoverable>
+      </View>
+    </View>
+  );
+
   // Desktop: the brand moves to AuthShell's left panel, so this side carries
   // only the choice itself.
   if (!isMobile) {
@@ -85,6 +113,7 @@ export default function WelcomeScreen() {
           </Text>
           <View style={styles.cardRoles}>{roleCards}</View>
           {signInLink}
+          {recruiterLink}
         </View>
       </AuthShell>
     );
@@ -109,6 +138,7 @@ export default function WelcomeScreen() {
         <Text style={styles.getStartedText}>Get Started As</Text>
         {roleCards}
         {signInLink}
+        {recruiterLink}
       </View>
     </View>
   );
@@ -170,4 +200,11 @@ const styles = StyleSheet.create({
   loginLinkHover: { backgroundColor: colors.bgMuted },
   loginText: { ...typography.body, color: colors.textSecondary },
   loginBold: { fontWeight: '700', color: colors.navy },
+  recruiterBox: {
+    marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.borderLight,
+    alignItems: 'center',
+  },
+  recruiterTitle: { ...typography.caption, color: colors.textSecondary },
+  recruiterActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.xs },
+  recruiterBtn: { paddingVertical: 10, paddingHorizontal: spacing.md, borderRadius: radius.md },
 });

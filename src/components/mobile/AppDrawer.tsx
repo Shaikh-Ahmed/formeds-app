@@ -118,7 +118,7 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
                   so its state is stated here rather than discovered at a 403. */}
               <Pressable
                 testID="drawer-kyc"
-                onPress={() => go('/kyc')}
+                onPress={() => go(user?.role === 'recruiter' ? '/recruiter/account' : '/kyc')}
                 accessibilityRole="link"
                 accessibilityLabel={
                   isKycApproved ? 'Verified account' : 'Verification pending. Complete verification'
@@ -149,6 +149,14 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
 
               <View style={styles.divider} />
 
+              {user?.role === 'recruiter' ? (
+                <DrawerRow icon="grid-outline" label="Recruiter portal" iconColor={colors.recruiter}
+                  onPress={() => go('/recruiter')} testID="drawer-recruiter" />
+              ) : null}
+              {user?.role === 'healthcare_professional' ? (
+                <DrawerRow icon="compass-outline" label="Opportunities & availability"
+                  onPress={() => go('/opportunities')} testID="drawer-opportunities" />
+              ) : null}
               <DrawerRow icon="people-outline" label="My network" onPress={() => go('/people')} testID="drawer-network" />
               <DrawerRow icon="notifications-outline" label="Notifications" onPress={() => go('/notifications')} testID="drawer-notifications" />
               <DrawerRow icon="create-outline" label="Edit profile" onPress={() => go('/edit-profile')} testID="drawer-edit" />
@@ -163,11 +171,19 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
                     onPress={() => go('/admin/kyc')}
                     testID="drawer-admin"
                   />
+                  <DrawerRow
+                    icon="briefcase-outline"
+                    label="Recruiter review"
+                    iconColor={colors.teal}
+                    onPress={() => go('/admin/recruiters')}
+                    testID="drawer-admin-recruiters"
+                  />
                 </>
               ) : null}
 
               <View style={styles.divider} />
 
+              <DrawerRow icon="ribbon-outline" label="Plans & AED tokens" onPress={() => go('/subscription')} testID="drawer-plans" />
               <DrawerRow icon="settings-outline" label="Settings" onPress={() => go('/settings')} testID="drawer-settings" />
               <DrawerRow icon="help-circle-outline" label="Help & support" onPress={() => go('/help')} testID="drawer-help" />
 
