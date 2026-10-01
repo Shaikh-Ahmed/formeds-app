@@ -85,7 +85,14 @@ export default function AdminKycScreen() {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color="#1A3A5C" /></TouchableOpacity>
         <Text style={styles.headerTitle}>KYC Review</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity
+          style={styles.uploadSwitchBtn}
+          onPress={() => router.push('/admin/upload' as any)}
+          accessibilityRole="button"
+        >
+          <Ionicons name="cloud-upload-outline" size={15} color="#0D9488" style={{ marginRight: 4 }} />
+          <Text style={styles.uploadSwitchBtnText}>Upload Content</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -160,4 +167,20 @@ const styles = StyleSheet.create({
   modalInput: { backgroundColor: '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', padding: 12, minHeight: 80, textAlignVertical: 'top', fontSize: 15 },
   modalActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
   cancelText: { color: '#64748B', fontWeight: '600', fontSize: 15 },
+
+  uploadSwitchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#CCFBF1',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#0D9488',
+  },
+  uploadSwitchBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0D9488',
+  },
 });

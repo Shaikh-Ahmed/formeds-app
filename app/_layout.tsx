@@ -104,10 +104,12 @@ function RootNavigator() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="kyc" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="admin/kyc" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="admin/upload" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="edit-profile" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="help" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="lesson/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="learning/reader/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="post/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="case/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="case/new" options={{ animation: 'slide_from_bottom' }} />

@@ -61,7 +61,10 @@ export function ProfileRail() {
     // 768px. Without this row an admin on desktop has no route to /admin/kyc at
     // all. Label and icon deliberately match the drawer's row.
     ...(user?.is_admin
-      ? [{ label: 'KYC review queue', icon: 'shield-checkmark-outline' as const, href: '/admin/kyc' }]
+      ? [
+          { label: 'KYC review queue', icon: 'shield-checkmark-outline' as const, href: '/admin/kyc' },
+          { label: 'Upload Content', icon: 'cloud-upload-outline' as const, href: '/admin/upload' },
+        ]
       : []),
     { label: 'Settings', icon: 'settings-outline', href: '/settings' },
     { label: 'Help', icon: 'help-circle-outline', href: '/help' },

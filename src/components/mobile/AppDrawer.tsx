@@ -163,6 +163,13 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
                     onPress={() => go('/admin/kyc')}
                     testID="drawer-admin"
                   />
+                  <DrawerRow
+                    icon="cloud-upload-outline"
+                    label="Upload Books & Research"
+                    iconColor={colors.navy}
+                    onPress={() => go('/admin/upload')}
+                    testID="drawer-admin-upload"
+                  />
                 </>
               ) : null}
 

@@ -448,11 +448,18 @@ export function ProfileView({ userId }: Props) {
           // menu moved to the drawer: the drawer is unreachable above 768px,
           // so an admin had no route to the review queue on desktop.
           ...(user?.is_admin
-            ? [{
-                label: 'KYC review queue',
-                icon: 'shield-checkmark-outline' as const,
-                onPress: () => { setOverflowOpen(false); router.push('/admin/kyc' as any); },
-              }]
+            ? [
+                {
+                  label: 'KYC review queue',
+                  icon: 'shield-checkmark-outline' as const,
+                  onPress: () => { setOverflowOpen(false); router.push('/admin/kyc' as any); },
+                },
+                {
+                  label: 'Upload Books & Research',
+                  icon: 'cloud-upload-outline' as const,
+                  onPress: () => { setOverflowOpen(false); router.push('/admin/upload' as any); },
+                },
+              ]
             : []),
           ...(editable
             ? [{

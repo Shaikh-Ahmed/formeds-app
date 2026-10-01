@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ComingSoon } from '../../src/components';
+import { ComingSoon, BooksCatalog, ResearchCatalog } from '../../src/components';
+import { useAuth } from '../../src/context/AuthContext';
+import { useRouter } from 'expo-router';
 import { PageGrid, ProfileRail } from '../../src/components/web';
 import { colors, spacing, radius, typography, useBreakpoint } from '../../src/theme';
 
@@ -20,9 +22,9 @@ const TABS: {
     key: 'books',
     label: 'Books',
     icon: 'book-outline',
-    title: 'Medical books are coming soon',
+    title: 'Medical Reference E-Books',
     description: 'A curated library of reference texts and clinical handbooks, readable inside the app.',
-    bullets: ['Specialty-filtered catalogue', 'Offline reading', 'Bookmarks and highlights'],
+    bullets: ['Specialty-filtered catalogue', 'Continue reading shelf', 'Bookmarks and highlights'],
   },
   {
     key: 'cme',
@@ -43,6 +45,8 @@ const TABS: {
 ];
 
 export default function LearningScreen() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('books');
   const active = TABS.find(t => t.key === activeTab)!;
   const { isMobile } = useBreakpoint();
@@ -51,10 +55,28 @@ export default function LearningScreen() {
     <SafeAreaView style={styles.safe} edges={[]}>
       <PageGrid left={<ProfileRail />} testID="learning-grid">
       <View style={[styles.wideTitleWrap, isMobile && styles.titleWrapMobile]}>
-        <Text style={styles.wideTitle} accessibilityRole="header">Learning Hub</Text>
-        <Text style={styles.wideSubtitle}>
-          Reference texts, accredited CME and peer-reviewed research, in one place.
-        </Text>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.wideTitle} accessibilityRole="header">Learning Hub</Text>
+            <Text style={styles.wideSubtitle}>
+              Reference texts, accredited CME and peer-reviewed research, in one place.
+            </Text>
+          </View>
+          {user?.is_admin && (
+            <TouchableOpacity
+              style={styles.adminHeaderUploadBtn}
+              onPress={() => router.push(`/admin/upload?tab=${activeTab === 'research' ? 'research' : 'books'}` as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Upload Content"
+              testID="learning-header-upload-btn"
+            >
+              <Ionicons name="cloud-upload" size={16} color={colors.white} style={{ marginRight: 6 }} />
+              <Text style={styles.adminHeaderUploadBtnText}>
+                {activeTab === 'books' ? 'Upload Book' : activeTab === 'research' ? 'Upload Research Paper' : 'Upload Content'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
@@ -66,7 +88,7 @@ export default function LearningScreen() {
             onPress={() => setActiveTab(t.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === t.key }}
-            accessibilityLabel={`${t.label} — coming soon`}
+            accessibilityLabel={t.key === 'books' ? t.label : `${t.label} — coming soon`}
           >
             <Ionicons name={t.icon} size={16} color={activeTab === t.key ? colors.textOnDark : '#64748B'} />
             <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
@@ -74,19 +96,29 @@ export default function LearningScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.body}>
-        <ComingSoon
-          testID={`coming-soon-${active.key}`}
-          icon={active.icon}
-          title={active.title}
-          description={active.description}
-          bullets={active.bullets}
-        />
+      {activeTab === 'books' ? (
+        <View style={styles.booksWrapper}>
+          <BooksCatalog />
+        </View>
+      ) : activeTab === 'research' ? (
+        <View style={styles.booksWrapper}>
+          <ResearchCatalog />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.body}>
+          <ComingSoon
+            testID={`coming-soon-${active.key}`}
+            icon={active.icon}
+            title={active.title}
+            description={active.description}
+            bullets={active.bullets}
+          />
 
-        <Text style={styles.footnote}>
-          Books, CME and Research all arrive in a later phase. Nothing to do here yet.
-        </Text>
-      </ScrollView>
+          <Text style={styles.footnote}>
+            {active.label} arrives in a later phase. Stay tuned for updates.
+          </Text>
+        </ScrollView>
+      )}
       </PageGrid>
     </SafeAreaView>
   );
@@ -132,5 +164,31 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     paddingHorizontal: spacing.xl,
     lineHeight: 18,
+  },
+  booksWrapper: {
+    flex: 1,
+    padding: spacing.lg,
+    paddingBottom: 0,
+  },
+
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  adminHeaderUploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.teal,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    alignSelf: 'center',
+  },
+  adminHeaderUploadBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.white,
   },
 });
