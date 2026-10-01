@@ -10,8 +10,11 @@ import {
 import { Button, ErrorBanner } from '../index';
 import { Chip } from '../Chip';
 import { EntryKind } from '../../types/profile';
-import { ENTRY_FORMS, EntryForm, FieldDef, OTHER_OPTION, pruneEmpty } from './entryForms';
+import {
+  ENTRY_FORMS, EntryForm, FieldDef, OTHER_OPTION, entryFieldErrors, normalizeEntryValues, pruneEmpty,
+} from './entryForms';
 import { SelectField } from '../SelectField';
+import { MonthField, yearOptions } from '../InputFields';
 
 interface Props {
   visible: boolean;
@@ -57,12 +60,7 @@ export function EntrySheet({
   const form = formOverride ?? (kind ? ENTRY_FORMS[kind] : null);
   const isEdit = !!initial;
 
-  const missing = useMemo(() => {
-    if (!form) return [];
-    return form.fields
-      .filter((f) => f.required && !String(values[f.key] ?? '').trim())
-      .map((f) => f.key);
-  }, [form, values]);
+  const fieldErrors = useMemo(() => (form ? entryFieldErrors(form, values) : {}), [form, values]);
 
   if (!form) return null;
 
@@ -79,8 +77,8 @@ export function EntrySheet({
 
   const submit = () => {
     setTouched(true);
-    if (missing.length) return;
-    onSave(pruneEmpty(values));
+    if (Object.keys(fieldErrors).length) return;
+    onSave(pruneEmpty(normalizeEntryValues(form, values)));
   };
 
   return (
@@ -133,7 +131,7 @@ export function EntrySheet({
                   value={values[field.key]}
                   draft={values}
                   onChange={(v) => set(field.key, v)}
-                  showError={touched && missing.includes(field.key)}
+                  error={touched ? fieldErrors[field.key] : undefined}
                 />
               );
             })}
@@ -240,16 +238,42 @@ function Lookup({
 }
 
 function Field({
-  field, value, draft, onChange, showError,
+  field, value, draft, onChange, error,
 }: {
   field: FieldDef;
   value: any;
   /** The whole payload, so a lookup can scope itself to another field. */
   draft: Record<string, any>;
   onChange: (v: any) => void;
-  showError?: boolean;
+  error?: string;
 }) {
   const [tagDraft, setTagDraft] = useState('');
+  const showError = !!error;
+
+  // Month precision: pickers, never "YYYY-MM" typed by hand.
+  if (field.type === 'month') {
+    const nowYear = new Date().getFullYear();
+    return (
+      <View style={styles.field}>
+        <MonthField label={field.label} value={value ? String(value) : ''} onChange={v => onChange(v || undefined)}
+          maxYear={field.notFuture ? nowYear : nowYear + 15} minYear={1950} error={error}
+          helper={field.helper} testID={`entry-${field.key}`} />
+      </View>
+    );
+  }
+  if (field.type === 'year') {
+    const nowYear = new Date().getFullYear();
+    return (
+      <View style={styles.field}>
+        <Text style={styles.label}>{field.label}</Text>
+        <SelectField label={field.label} hideLabel containerStyle={styles.lookupField}
+          value={value ? String(value) : ''} placeholder="Year"
+          options={yearOptions(1950, field.max ?? nowYear + 10)}
+          onChange={v => onChange(v ? Number(v) : undefined)} testID={`entry-${field.key}`} />
+        {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
+      </View>
+    );
+  }
 
   if (field.type === 'lookup' && field.lookup) {
     return <Lookup field={field} value={value} draft={draft} onChange={onChange} />;
@@ -369,9 +393,15 @@ function Field({
   }
 
   const multiline = field.type === 'textarea';
-  const numeric = field.type === 'year' || field.type === 'number';
-  const placeholder =
-    field.type === 'month' ? 'YYYY-MM' : field.type === 'year' ? 'YYYY' : field.placeholder;
+  const numeric = field.type === 'number';
+  const placeholder = field.placeholder;
+  // Numbers keep only digits (and one point when decimals are allowed); the
+  // raw text is held so "4." can be typed on the way to "4.5".
+  const onNumber = (text: string) => {
+    let clean = text.replace(field.decimals ? /[^\d.]/g : /\D/g, '');
+    if (field.decimals) { const [w, ...f] = clean.split('.'); clean = f.length ? `${w}.${f.join('').slice(0, 2)}` : w; }
+    onChange(clean === '' ? undefined : clean.endsWith('.') ? clean : Number(clean));
+  };
 
   return (
     <View style={styles.field}>
@@ -381,17 +411,19 @@ function Field({
       </Text>
       <TextInput
         value={value == null ? '' : String(value)}
-        onChangeText={(text) => onChange(numeric ? (text ? Number(text) || undefined : undefined) : text)}
+        onChangeText={(text) => (numeric ? onNumber(text) : onChange(text))}
         placeholder={placeholder}
         placeholderTextColor={colors.textMuted}
         multiline={multiline}
         numberOfLines={multiline ? 4 : 1}
-        keyboardType={numeric ? 'number-pad' : 'default'}
+        keyboardType={numeric ? (field.decimals ? 'decimal-pad' : 'number-pad') : field.url ? 'url' : 'default'}
+        autoCapitalize={field.url ? 'none' : undefined}
+        maxLength={field.maxLength ?? (multiline ? 2000 : 200)}
         style={[styles.input, multiline && styles.inputMultiline, showError && styles.inputError]}
         accessibilityLabel={field.label}
       />
       {showError ? (
-        <Text style={styles.error} accessibilityRole="alert">{`${field.label} is required`}</Text>
+        <Text style={styles.error} accessibilityRole="alert">{error}</Text>
       ) : field.helper ? (
         <Text style={styles.helper}>{field.helper}</Text>
       ) : null}

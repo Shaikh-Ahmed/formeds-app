@@ -45,7 +45,7 @@ export function JobFilterBar({
       <View style={styles.searchRow}>
         <View style={styles.searchBar}>
           <Ionicons name="search" size={18} color={colors.textSecondary} />
-          <TextInput
+          <TextInput maxLength={100}
             testID="jobs-search"
             style={styles.searchInput}
             value={query}

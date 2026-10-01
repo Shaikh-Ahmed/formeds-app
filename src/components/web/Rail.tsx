@@ -59,12 +59,10 @@ export function ProfileRail() {
     // The admin queue's only other entry point is AppDrawer, and the drawer can
     // only be opened by MobileTopBar's hamburger — which does not render above
     // 768px. Without this row an admin on desktop has no route to /admin/kyc at
-    // all. Label and icon deliberately match the drawer's row.
+    // all. Labels and icons deliberately match the drawer's rows.
     ...(user?.is_admin
-      ? [
-          { label: 'KYC review queue', icon: 'shield-checkmark-outline' as const, href: '/admin/kyc' },
-          { label: 'Upload Content', icon: 'cloud-upload-outline' as const, href: '/admin/upload' },
-        ]
+      ? [{ label: 'KYC review queue', icon: 'shield-checkmark-outline' as const, href: '/admin/kyc' },
+      { label: 'Recruiter review', icon: 'briefcase-outline' as const, href: '/admin/recruiters' }]
       : []),
     { label: 'Settings', icon: 'settings-outline', href: '/settings' },
     { label: 'Help', icon: 'help-circle-outline', href: '/help' },

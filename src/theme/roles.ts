@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from './colors';
 
-export type Role = 'healthcare_professional' | 'hospital' | 'clinic' | 'official';
+export type Role = 'healthcare_professional' | 'hospital' | 'clinic' | 'recruiter' | 'Official' ;
 
 export interface RoleMeta {
   /** Short label for badges (feed, people cards). */
@@ -54,6 +54,14 @@ export const ROLE_META: Record<Role, RoleMeta> = {
     bg: '#EEF2FF',
     icon: 'checkmark-circle',
     description: 'Verified Formeds Medical Publication',
+  },
+  recruiter: {
+    label: 'Recruiter',
+    longLabel: 'Healthcare Recruiter',
+    color: colors.recruiter,
+    bg: colors.recruiterBg,
+    icon: 'briefcase',
+    description: 'Place professionals with healthcare employers',
   },
 };
 

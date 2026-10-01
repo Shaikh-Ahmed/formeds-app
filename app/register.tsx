@@ -92,7 +92,7 @@ export default function RegisterScreen() {
 
           <ErrorBanner message={error} />
 
-          <FormInput
+          <FormInput maxLength={120}
             testID="register-name-input"
             label={nameLabel}
             icon="person-outline"
@@ -103,7 +103,7 @@ export default function RegisterScreen() {
             autoComplete="name"
             returnKeyType="next"
           />
-          <FormInput
+          <FormInput maxLength={200}
             testID="register-email-input"
             label="Email address"
             icon="mail-outline"
@@ -115,7 +115,7 @@ export default function RegisterScreen() {
             autoComplete="email"
             returnKeyType="next"
           />
-          <FormInput
+          <FormInput maxLength={16}
             testID="register-phone-input"
             label="Phone number"
             icon="call-outline"

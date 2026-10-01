@@ -20,8 +20,9 @@ export default function SettingsScreen() {
 
   const handleLogout = async () => {
     setLoggingOut(true);
+    const wasRecruiter = user?.role === 'recruiter';
     await logout();
-    router.replace('/login');
+    router.replace(wasRecruiter ? '/recruiter-login' : '/login');
   };
 
   const confirmDelete = () => {
@@ -56,7 +57,7 @@ export default function SettingsScreen() {
           {/* Previously a dead read-only row — there was no way to act on it. */}
           <TouchableOpacity
             style={styles.row}
-            onPress={() => router.push('/kyc')}
+            onPress={() => router.push((user?.role === 'recruiter' ? '/recruiter/account' : '/kyc') as any)}
             accessibilityRole="button"
             accessibilityLabel={`Professional verification: ${user?.verified ? 'verified' : 'not verified'}. Tap to view.`}
             testID="settings-kyc"
@@ -71,6 +72,43 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
+
+        {user?.role === 'healthcare_professional' ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Opportunities</Text>
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => router.push('/opportunities' as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Discovery, locum availability and invitations. Tap to manage."
+              testID="settings-opportunities"
+            >
+              <Ionicons name="compass-outline" size={18} color={colors.navy} />
+              <Text style={styles.rowLabel}>Discovery & locum availability</Text>
+              <Text style={styles.rowValue}>Manage</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
+        {/* Plans are AED tokens -- not part of the recruiter portal. */}
+        {user?.role !== 'recruiter' ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Plan</Text>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => router.push('/subscription' as any)}
+            accessibilityRole="button"
+            accessibilityLabel="Plan and AED tokens. Tap to view."
+            testID="settings-plan"
+          >
+            <Ionicons name="ribbon-outline" size={18} color={colors.navy} />
+            <Text style={styles.rowLabel}>Plan & AED tokens</Text>
+            <Text style={styles.rowValue}>Manage</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>

@@ -102,6 +102,12 @@ export function JobDetailPanel({
                 />
               ) : null}
             </View>
+            {job.posted_by_recruiter ? (
+              <Text style={styles.employerMeta} testID="job-detail-client">
+                {job.client_name ? `Recruiter posting · For: ${job.client_name}`
+                  : job.client_confidential ? 'Recruiter posting · For: Confidential client' : 'Recruiter posting'}
+              </Text>
+            ) : null}
             {job.location ? <Text style={styles.employerMeta}>{job.location}</Text> : null}
           </View>
         </Pressable>
@@ -221,7 +227,11 @@ export function JobDetailPanel({
           <View style={styles.employerText}>
             <Text style={styles.employerName}>{job.employer_name}</Text>
             <Text style={styles.employerMeta}>
-              {job.employer_verified
+              {job.posted_by_recruiter
+                ? [job.employer_verified ? 'Verified Recruiter' : 'Recruiter',
+                  job.client_name ? `For: ${job.client_name}` : job.client_confidential ? 'For: Confidential client' : '']
+                  .filter(Boolean).join(' · ')
+                : job.employer_verified
                 ? 'Verified healthcare organisation'
                 : job.poster_role === 'healthcare_professional'
                   ? 'Posted by an individual professional'

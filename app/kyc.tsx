@@ -177,6 +177,7 @@ export default function KycScreen() {
             onChangeText={setRegistrationNumber}
             placeholder={isProfessional ? 'e.g. MH-12345' : 'e.g. 1234567890123'}
             autoCapitalize="characters"
+            maxLength={80}
           />
 
           {isProfessional ? (
@@ -188,6 +189,7 @@ export default function KycScreen() {
               onChangeText={setStateCouncil}
               placeholder="e.g. Maharashtra Medical Council"
               autoCapitalize="words"
+              maxLength={120}
             />
           ) : null}
 

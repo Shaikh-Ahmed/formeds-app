@@ -4,8 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
-import { Button, FormInput, SelectField, ScreenHeader, ErrorBanner } from '../src/components';
+import { Button, FormInput, NumberField, SelectField, ScreenHeader, ErrorBanner } from '../src/components';
+import { validateInteger } from '../src/utils/validation';
+import { ResumeCard } from '../src/components/jobs/ResumeCard';
 import { STATE_NAMES, citiesForState, isCustomCity, OTHER_CITY } from '../src/data/indiaLocations';
+import { OTHER_SPECIALTY, PROFESSIONAL_ROLES, SPECIALTY_OPTIONS, SPECIALTIES } from '../src/data/specialties';
 import { colors, spacing, typography } from '../src/theme';
 import { PageColumn } from '../src/components/web';
 
@@ -45,12 +48,16 @@ export default function EditProfileScreen() {
     if (!cityIsOther && !citiesForState(next).includes(citySelection)) setCitySelection('');
   };
 
+  const [experienceError, setExperienceError] = useState<string | null>(null);
   const isProfessional = user?.role === 'healthcare_professional';
   const isHospital = user?.role === 'hospital';
   const isClinic = user?.role === 'clinic';
 
   const save = async () => {
-    if (!name.trim()) { setError('Name is required'); return; }
+    if (!name.trim()) { setError('Name is required.'); return; }
+    const expError = isProfessional ? validateInteger(experience, 'Years of experience', { max: 80 }) : null;
+    setExperienceError(expError);
+    if (expError) { setError(expError); return; }
     setSaving(true); setError(null);
     try {
       const payload: Record<string, any> = { name: name.trim() };
@@ -59,8 +66,7 @@ export default function EditProfileScreen() {
         payload.specialty = specialty.trim();
         payload.city = cityValue.trim();
         payload.state = state.trim();
-        const years = parseInt(experience, 10);
-        if (!Number.isNaN(years)) payload.years_experience = years;
+        if (experience) payload.years_experience = Number(experience);
       } else if (isHospital) {
         payload.location = location.trim();
         payload.contact_person = contactPerson.trim();
@@ -87,12 +93,16 @@ export default function EditProfileScreen() {
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <ErrorBanner message={error} />
 
-          <FormInput label="Full name" icon="person-outline" value={name} onChangeText={setName} placeholder="Your name" testID="edit-name" />
+          <FormInput label="Full name" icon="person-outline" value={name} onChangeText={setName} placeholder="Your name" maxLength={120} testID="edit-name" />
 
           {isProfessional && (
             <>
-              <FormInput label="Professional role" icon="medkit-outline" value={professionalRole} onChangeText={setProfessionalRole} placeholder="Doctor, Nurse, Allied Health" />
-              <FormInput label="Specialty" icon="medical-outline" value={specialty} onChangeText={setSpecialty} placeholder="e.g. Cardiology" />
+              <Text style={styles.sectionLabel}>Resume</Text>
+              <ResumeCard />
+              <ListOrOther label="Professional role" icon="medkit-outline" value={professionalRole}
+                onChange={setProfessionalRole} known={PROFESSIONAL_ROLES} maxLength={80} testID="edit-role" />
+              <ListOrOther label="Specialty" icon="medical-outline" value={specialty}
+                onChange={setSpecialty} known={SPECIALTIES} options={SPECIALTY_OPTIONS} maxLength={120} testID="edit-specialty" />
               {/* State first: it is what narrows the city list, and a city
                   picker with nothing in it reads as broken. */}
               <SelectField
@@ -129,21 +139,23 @@ export default function EditProfileScreen() {
                   maxLength={80}
                 />
               ) : null}
-              <FormInput label="Years of experience" icon="time-outline" value={experience} onChangeText={setExperience} placeholder="e.g. 8" keyboardType="number-pad" />
+              <NumberField label="Years of experience" suffix="years" value={experience} maxDigits={2}
+                onChangeText={v => { setExperience(v); setExperienceError(null); }} placeholder="e.g. 8"
+                error={experienceError} testID="edit-experience" />
             </>
           )}
 
           {isHospital && (
             <>
-              <FormInput label="Location" icon="location-outline" value={location} onChangeText={setLocation} placeholder="City / address" />
-              <FormInput label="Contact person" icon="person-outline" value={contactPerson} onChangeText={setContactPerson} placeholder="Who should applicants reach?" />
+              <FormInput label="Location" icon="location-outline" value={location} onChangeText={setLocation} placeholder="City / address" maxLength={200} />
+              <FormInput label="Contact person" icon="person-outline" value={contactPerson} onChangeText={setContactPerson} placeholder="Who should applicants reach?" maxLength={120} />
             </>
           )}
 
           {isClinic && (
             <>
-              <FormInput label="Specialty focus" icon="medical-outline" value={specialtyFocus} onChangeText={setSpecialtyFocus} placeholder="e.g. Dermatology" />
-              <FormInput label="Location" icon="location-outline" value={location} onChangeText={setLocation} placeholder="City / address" />
+              <FormInput label="Specialty focus" icon="medical-outline" value={specialtyFocus} onChangeText={setSpecialtyFocus} placeholder="e.g. Dermatology" maxLength={120} />
+              <FormInput label="Location" icon="location-outline" value={location} onChangeText={setLocation} placeholder="City / address" maxLength={200} />
             </>
           )}
 
@@ -160,8 +172,32 @@ export default function EditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  sectionLabel: { ...typography.label, color: colors.text, marginBottom: spacing.sm },
   safe: { flex: 1, backgroundColor: colors.white },
   flex: { flex: 1 },
   scroll: { padding: spacing.xxl, paddingBottom: spacing.xxxl + 16 },
   note: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.xl },
 });
+
+/**
+ * A value from a known list, with "Other" for anything the list lacks. A
+ * stored value outside the list re-opens as Other with its text intact.
+ */
+function ListOrOther({ label, icon, value, onChange, known, options, maxLength, testID }: {
+  label: string; icon: React.ComponentProps<typeof FormInput>['icon']; value: string; onChange: (v: string) => void;
+  known: string[]; options?: string[]; maxLength: number; testID?: string;
+}) {
+  const [other, setOther] = useState(!!value && !known.includes(value));
+  return (
+    <>
+      <SelectField label={label} icon={icon} value={other ? OTHER_SPECIALTY : value}
+        options={options ?? [...known, OTHER_SPECIALTY]} placeholder={`Choose your ${label.toLowerCase()}`}
+        searchPlaceholder="Search…" testID={testID}
+        onChange={v => { if (v === OTHER_SPECIALTY) { setOther(true); onChange(''); } else { setOther(false); onChange(v); } }} />
+      {other ? (
+        <FormInput label={`${label} (type it)`} icon="create-outline" value={value} onChangeText={onChange}
+          maxLength={maxLength} testID={testID ? `${testID}-other` : undefined} />
+      ) : null}
+    </>
+  );
+}

@@ -80,7 +80,7 @@ export function CasesList({
     <View style={[styles.controls, styles.controlsInList]}>
       <View style={styles.searchBar}>
         <Ionicons name="search" size={18} color={colors.textMuted} />
-        <TextInput
+        <TextInput maxLength={100}
           testID="case-search-input"
           style={styles.searchInput}
           placeholder="Search cases…"

@@ -9,7 +9,7 @@ import { apiFetch } from '../../src/utils/api';
 import { timeAgo } from '../../src/utils/time';
 import { Avatar, RoleBadge, MediaViewer, TagChip, formatArticleUrl } from '../../src/components';
 import { PageColumn } from '../../src/components/web';
-import { colors, spacing, radius, compactAction, fonts, typography } from '../../src/theme';
+import { colors, fonts, spacing, radius, typography, compactAction } from '../../src/theme';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -254,7 +254,7 @@ export default function PostDetailScreen() {
         )}
 
         <View style={styles.inputBar}>
-          <TextInput 
+          <TextInput maxLength={2000} 
             testID="comment-input" 
             style={styles.commentInput} 
             placeholder="Write a comment..." 
@@ -297,15 +297,16 @@ const styles = StyleSheet.create({
   list: { paddingBottom: 20 },
   
   postCard: { backgroundColor: '#FFFFFF', padding: 16, marginBottom: 8, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
-  postHeader: { flexDirection: 'row', marginBottom: 12 },
-  avatarCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1A3A5C', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  avatarText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
-  postMeta: { flex: 1 },
-  authorName: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  roleTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginRight: 8 },
-  roleTagText: { fontSize: 11, fontWeight: '600' },
-  timeText: { fontSize: 12, color: '#94A3B8' },
+  postHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: 12 },
+  // The spacing lives on the row itself. It used to sit on an inline avatar
+  // style that stopped being used when the shared Avatar replaced it, which
+  // left the role badge touching the avatar and the time touching the badge.
+  postMeta: { flex: 1, gap: 4 },
+  authorName: { fontSize: 16, fontFamily: fonts.body.semibold, color: colors.text },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  // textSecondary, not the lighter textMuted: the time is read, and the
+  // lighter grey falls below text contrast on white.
+  timeText: { ...typography.small, color: colors.textSecondary },
   postContent: { fontSize: 16, color: '#334155', lineHeight: 24, marginBottom: 16 },
   postImageWrap: { marginBottom: 16, borderRadius: 12, overflow: 'hidden' },
   postImage: { width: '100%', height: 250 },

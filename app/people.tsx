@@ -191,7 +191,7 @@ export default function PeopleScreen() {
         <View style={styles.searchBar}>
           <View style={styles.searchWrap}>
             <Ionicons name="search" size={18} color="#94A3B8" />
-            <TextInput testID="people-search-input" style={styles.searchInput} placeholder="Search professionals..." placeholderTextColor="#94A3B8" value={searchQuery} onChangeText={setSearchQuery} onSubmitEditing={handleSearch} returnKeyType="search" />
+            <TextInput maxLength={100} testID="people-search-input" style={styles.searchInput} placeholder="Search professionals..." placeholderTextColor="#94A3B8" value={searchQuery} onChangeText={setSearchQuery} onSubmitEditing={handleSearch} returnKeyType="search" />
           </View>
           <TouchableOpacity testID="people-search-btn" style={styles.searchBtn} onPress={handleSearch}>
             <Ionicons name="search" size={18} color="#FFF" />
