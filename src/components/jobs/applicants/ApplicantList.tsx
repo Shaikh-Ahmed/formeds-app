@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   },
   rowOn: { backgroundColor: colors.bg },
   rowHover: { backgroundColor: colors.bg },
-  rowBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: colors.navy },
+  rowBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: colors.primaryFill },
   checkbox: { width: 28, alignItems: 'center', paddingTop: 12 },
   name: { ...typography.bodyStrong, color: colors.text },
   verified: { flexDirection: 'row', alignItems: 'center', gap: 4 },

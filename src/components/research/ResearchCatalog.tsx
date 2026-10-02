@@ -388,8 +388,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   specialtyChipActive: {
-    backgroundColor: colors.navy,
-    borderColor: colors.navy,
+    backgroundColor: colors.primaryFill,
+    borderColor: colors.primaryFill,
   },
   specialtyChipText: {
     ...typography.small,
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   retryBtn: {
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
     maxWidth: 320,
   },
   clearFilterBtn: {
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,

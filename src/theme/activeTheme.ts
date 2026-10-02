@@ -21,7 +21,7 @@ export type ThemeId = 'classic' | 'journal' | 'premium' | 'material' | 'terracot
 export const THEMES: { id: ThemeId; label: string; description: string }[] = [
   { id: 'classic', label: 'Classic', description: 'Clean white and navy, the original ForMeds look.' },
   { id: 'journal', label: 'Journal', description: 'Warm ivory, serif headings and deep teal, like a medical journal.' },
-  { id: 'premium', label: 'ForMeds Premium', description: 'Calm and refined: clearer hierarchy, quieter surfaces, one trust mark.' },
+  { id: 'premium', label: 'ForMeds Premium', description: 'Clinical and credentialed: deep teal, crisp white surfaces, verification first.' },
   { id: 'material', label: 'ForMeds Material', description: 'Tactile and layered: soft depth, cool blue, floating controls.' },
   { id: 'terracotta', label: 'ForMeds Terracotta', description: 'Material’s depth and gloss in warm off-white and terracotta.' },
 ];

@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: colors.border,
     alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white,
   },
-  stepDotOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  stepDotOn: { backgroundColor: colors.primaryFill, borderColor: colors.primaryFill },
   stepNum: { ...typography.small, color: colors.textSecondary },
   stepNumOn: { color: colors.white },
   stepLabel: { ...typography.caption, color: colors.textSecondary },

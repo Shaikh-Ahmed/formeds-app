@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography, isRefined, isMaterial, elevation } from '../theme';
+import { colors, radius, spacing, typography, isRefined, isMaterial, isPremium, elevation } from '../theme';
 import { objectTones } from './material/SoftObjects';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button } from './Button';
@@ -36,6 +36,14 @@ function StateIcon({ name, tone }: { name: keyof typeof Ionicons.glyphMap; tone:
         <LinearGradient colors={tone === 'error' ? [objectTones.light[0], '#FCE4E4'] : objectTones.light}
           start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={[StyleSheet.absoluteFill, { borderRadius: 40 }]} />
         <Ionicons name={name} size={34} color={tone === 'error' ? colors.aed : colors.teal} />
+      </View>
+    );
+  }
+  if (isPremium) {
+    // Premium: the state's icon on a soft squircle tile in its tint.
+    return (
+      <View style={[styles.cTile, tone === 'error' ? styles.cTileError : styles.cTileCalm]}>
+        <Ionicons name={name} size={30} color={tone === 'error' ? colors.aed : colors.teal} />
       </View>
     );
   }
@@ -114,7 +122,10 @@ const styles = StyleSheet.create({
   pHaloCalm: { backgroundColor: colors.verifiedBg },
   pHaloError: { backgroundColor: colors.aedBg },
   pHint: { maxWidth: 360, color: colors.textSecondary },
-  pAction: { minHeight: 44, borderRadius: 10 },
+  pAction: { minHeight: 44, borderRadius: isPremium ? radius.pill : 10 },
+  cTile: { width: 72, height: 72, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xs },
+  cTileCalm: { backgroundColor: colors.tealBg, borderColor: colors.tealLine },
+  cTileError: { backgroundColor: colors.redBg, borderColor: colors.redLine },
   pLoading: { ...typography.caption, color: colors.textSecondary },
 
   center: { alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.xxxl + 16, paddingHorizontal: spacing.xxl, gap: spacing.sm },
@@ -126,7 +137,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     backgroundColor: colors.redBg,
-    borderRadius: 10,
+    borderRadius: isPremium ? radius.lg : 10,
+    ...(isPremium ? { borderWidth: 1, borderColor: colors.redLine } : {}),
     padding: spacing.md,
     marginBottom: spacing.lg,
   },

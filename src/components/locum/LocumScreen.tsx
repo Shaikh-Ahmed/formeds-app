@@ -7,7 +7,7 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, layout, radius, spacing, typography, fonts, useBreakpoint, gloss } from '../../theme';
+import { colors, layout, radius, spacing, typography, fonts, useBreakpoint, gloss, isPremium } from '../../theme';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { PageGrid } from '../web';
 import { Button } from '../Button';
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     minHeight: 36,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.navy,
+    borderColor: isPremium ? colors.border : colors.navy,
     backgroundColor: colors.white,
     ...gloss.glass,
   },

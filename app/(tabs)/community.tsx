@@ -17,7 +17,7 @@ import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer, E
 import type { ArticleFeedPost } from '../../src/types/feed';
 import { PostActions } from '../../src/components/PostActions';
 import { PageGrid, ProfileRail, FeedRail, Hoverable } from '../../src/components/web';
-import { colors, fonts, spacing, radius, typography, shadow, elevation, useBreakpoint, activeTheme, isRefined, isMaterial, isTerracotta, gloss } from '../../src/theme';
+import { colors, fonts, spacing, radius, typography, shadow, elevation, useBreakpoint, activeTheme, isRefined, isMaterial, isPremium, isTerracotta, gloss } from '../../src/theme';
 import { useCollapsibleHeader, focusScrollInset } from '../../src/hooks/useCollapsibleHeader';
 import { mediaUri } from '../../src/utils/media';
 
@@ -83,7 +83,7 @@ export default function FeedScreen() {
   // scrolls, and returns at the top; measured so the header knows how far.
   const [heroHeight, setHeroHeight] = useState(0);
   const { headerHeight, headerStyle, onHeaderLayout, scrollProps, reveal } =
-    useCollapsibleHeader({ enabled: !composerOpen, leadHeight: isMaterial ? heroHeight : 0 });
+    useCollapsibleHeader({ enabled: !composerOpen, leadHeight: isMaterial || isPremium ? heroHeight : 0 });
 
   // Unread counts moved to the layouts that own the persistent bars, which
   // also drops two requests from every feed load and refresh.
@@ -379,6 +379,32 @@ export default function FeedScreen() {
             </View>
           </HeroCard>
           </View>
+        ) : isPremium ? (
+          // Premium: the greeting as the one gradient hero -- clinical teal
+          // into cyan light -- with who you are and a glass verification seal.
+          // Same account data as every theme; it scrolls away first.
+          <View style={[styles.mHeroWrap, isMobile && styles.mHeroWrapMobile]}
+            onLayout={e => setHeroHeight(Math.round(e.nativeEvent.layout.height))}>
+            <HeroCard compact style={styles.cHero} testID="premium-greeting">
+              <Text style={styles.cOverline}>{greeting().toUpperCase()}</Text>
+              <Text style={styles.cHeadline} accessibilityRole="header" numberOfLines={1}>
+                {user?.name || 'Welcome to ForMeds'}
+              </Text>
+              <View style={styles.mIdentity}>
+                {[user?.specialty || user?.professional_role, user?.city].filter(Boolean).length ? (
+                  <Text style={styles.cIdentityText} numberOfLines={1}>
+                    {[user?.specialty || user?.professional_role, user?.city].filter(Boolean).join(' · ')}
+                  </Text>
+                ) : null}
+                {user?.verified ? (
+                  <GlassPanel onDark style={styles.mVerified}>
+                    <Ionicons name="shield-checkmark" size={13} color="#FFFFFF" />
+                    <Text style={styles.cVerifiedText}>Verified professional</Text>
+                  </GlassPanel>
+                ) : null}
+              </View>
+            </HeroCard>
+          </View>
         ) : isRefined && !isMobile ? (
           <View style={styles.pIntro} testID="premium-greeting">
             <Text style={styles.pOverline}>{greeting()}</Text>
@@ -397,14 +423,14 @@ export default function FeedScreen() {
             </View>
           </View>
         ) : null}
-        <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
-          <TouchableOpacity testID="tab-feed" style={[styles.tab, activeTab === 'feed' && styles.tabActive]} onPress={() => { setActiveTab('feed'); reveal(); }} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'feed' }}>
-            <Ionicons name="newspaper-outline" size={16} color={activeTab === 'feed' ? '#FFF' : colors.textSubtle} />
-            <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive]}>Feed</Text>
+        <View style={[styles.tabBar, !isMobile && styles.tabBarWide, isPremium && styles.cTabBar, isPremium && isMobile && styles.cTabBarMobile]}>
+          <TouchableOpacity testID="tab-feed" style={[styles.tab, activeTab === 'feed' && styles.tabActive, isPremium && styles.cTab, isPremium && activeTab === 'feed' && styles.cTabActive]} onPress={() => { setActiveTab('feed'); reveal(); }} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'feed' }}>
+            <Ionicons name="newspaper-outline" size={16} color={activeTab === 'feed' ? (isPremium ? colors.teal : '#FFF') : colors.textSubtle} />
+            <Text style={[styles.tabText, activeTab === 'feed' && styles.tabTextActive, isPremium && styles.cTabText, isPremium && activeTab === 'feed' && styles.cTabTextActive]}>Feed</Text>
           </TouchableOpacity>
-          <TouchableOpacity testID="tab-cases" style={[styles.tab, activeTab === 'cases' && styles.tabActive]} onPress={() => { setActiveTab('cases'); reveal(); }} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'cases' }}>
-            <Ionicons name="help-buoy-outline" size={16} color={activeTab === 'cases' ? '#FFF' : colors.textSubtle} />
-            <Text style={[styles.tabText, activeTab === 'cases' && styles.tabTextActive]}>Cases</Text>
+          <TouchableOpacity testID="tab-cases" style={[styles.tab, activeTab === 'cases' && styles.tabActive, isPremium && styles.cTab, isPremium && activeTab === 'cases' && styles.cTabActive]} onPress={() => { setActiveTab('cases'); reveal(); }} accessibilityRole="tab" accessibilityState={{ selected: activeTab === 'cases' }}>
+            <Ionicons name="help-buoy-outline" size={16} color={activeTab === 'cases' ? (isPremium ? colors.teal : '#FFF') : colors.textSubtle} />
+            <Text style={[styles.tabText, activeTab === 'cases' && styles.tabTextActive, isPremium && styles.cTabText, isPremium && activeTab === 'cases' && styles.cTabTextActive]}>Cases</Text>
           </TouchableOpacity>
         </View>
 
@@ -432,14 +458,32 @@ export default function FeedScreen() {
               activeTab === 'cases' ? router.push('/case/new' as any) : setShowCompose(true)
             }
             accessibilityLabel={activeTab === 'cases' ? 'Post a case' : 'Write a post'}
-            style={[styles.composeTrigger, isMobile && styles.composeTriggerMobile]}
+            style={[styles.composeTrigger, isMobile && styles.composeTriggerMobile, isPremium && styles.cCompose]}
             hoverStyle={styles.composeTriggerHover}
           >
             <Avatar name={user?.name} role={user?.role} uri={user?.avatar} size={40} />
-            <Text style={styles.composeTriggerText} numberOfLines={1}>
-              {activeTab === 'cases' ? 'Ask the community about a case…' : 'Share something with the community…'}
-            </Text>
-            <Ionicons name="create-outline" size={20} color={colors.navy} />
+            {isPremium ? (
+              <>
+                <View style={styles.cComposeWell}>
+                  <Text style={styles.composeTriggerText} numberOfLines={1}>
+                    {activeTab === 'cases' ? 'Ask peers about a clinical case…' : 'Share an update, insight or question…'}
+                  </Text>
+                </View>
+                {isMobile ? null : (
+                  <View style={styles.cComposeBtn} pointerEvents="none">
+                    <Ionicons name={activeTab === 'cases' ? 'medkit-outline' : 'add'} size={15} color={colors.white} />
+                    <Text style={styles.cComposeBtnText}>{activeTab === 'cases' ? 'Post case' : 'Post'}</Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                <Text style={styles.composeTriggerText} numberOfLines={1}>
+                  {activeTab === 'cases' ? 'Ask the community about a case…' : 'Share something with the community…'}
+                </Text>
+                <Ionicons name="create-outline" size={20} color={colors.navy} />
+              </>
+            )}
           </Hoverable>
         )}
 
@@ -513,6 +557,33 @@ function greeting(): string {
 }
 
 const styles = StyleSheet.create({
+  // -- ForMeds Premium --------------------------------------------------------
+  cHero: { ...elevation.subtle },
+  cOverline: { ...typography.overline, color: 'rgba(255,255,255,0.92)' },
+  cHeadline: { ...typography.h1, color: '#FFFFFF' },
+  cIdentityText: { ...typography.body, color: 'rgba(255,255,255,0.9)' },
+  cVerifiedText: { fontSize: 12, fontFamily: fonts.body.bold, color: '#FFFFFF' },
+  cTabBar: { backgroundColor: colors.bgMuted, borderColor: colors.bgMuted, padding: 4, gap: 4, borderRadius: radius.pill },
+  cTabBarMobile: { marginHorizontal: spacing.lg, marginVertical: spacing.xs, borderRadius: radius.pill },
+  cTab: { backgroundColor: 'transparent', borderRadius: radius.pill, paddingVertical: 9 },
+  cTabActive: {
+    backgroundColor: colors.white,
+    ...(Platform.OS === 'web' ? ({ boxShadow: '0 1px 3px rgba(15,23,42,0.10), 0 1px 2px rgba(15,23,42,0.06)' } as object) : elevation.subtle),
+  },
+  cTabText: { fontFamily: fonts.body.semibold, fontWeight: undefined, color: colors.textSecondary },
+  cTabTextActive: { color: colors.teal, fontFamily: fonts.body.bold },
+  // The compose row: your avatar, a recessed pill to type into, and the post action.
+  cCompose: { borderRadius: radius.card, paddingVertical: spacing.md, ...shadow.card },
+  cComposeWell: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: 42, paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill, backgroundColor: colors.bgMuted,
+    ...(Platform.OS === 'web' ? ({ boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)' } as object) : {}),
+  },
+  cComposeBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, height: 36, paddingHorizontal: spacing.md + 2,
+    borderRadius: radius.pill, backgroundColor: colors.action,
+  },
+  cComposeBtnText: { fontSize: 13, fontFamily: fonts.body.bold, color: colors.white },
   journalIntro: { paddingTop: spacing.lg, paddingBottom: spacing.sm, gap: spacing.xs },
   pIntro: { paddingTop: spacing.lg, paddingBottom: spacing.md, gap: 2 },
   // The header clips at the column edge, so the hero takes the short shadow:

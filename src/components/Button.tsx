@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ViewStyle, StyleProp, View } from 'react-native';
-import { colors, radius, spacing, fonts, isRefined, isMaterial, elevation, gloss, materials, MIN_TOUCH_TARGET } from '../theme';
+import { Animated, Platform, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ViewStyle, StyleProp, View } from 'react-native';
+import { colors, radius, spacing, fonts, isRefined, isMaterial, isPremium, elevation, gloss, materials, MIN_TOUCH_TARGET } from '../theme';
 import { GradientFill } from './material/Surfaces';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
@@ -27,7 +27,19 @@ interface Props {
   accessibilityHint?: string;
 }
 
-const VARIANTS: Record<Variant, { bg: string; fg: string; border?: string }> = {
+/**
+ * Premium: a filled teal pill is the one primary action; secondary is tonal
+ * (a pale teal well, teal words) -- present but quieter; outline is a white
+ * pill with a hairline, for the third option.
+ */
+const PREMIUM_VARIANTS: Record<Variant, { bg: string; fg: string; border?: string }> = {
+  primary: { bg: colors.action, fg: colors.white },
+  secondary: { bg: colors.tealBg, fg: colors.teal, border: colors.tealLine },
+  outline: { bg: colors.white, fg: colors.text, border: colors.border },
+  danger: { bg: colors.redBg, fg: colors.redText, border: colors.redLine },
+};
+
+const VARIANTS: Record<Variant, { bg: string; fg: string; border?: string }> = isPremium ? PREMIUM_VARIANTS : {
   primary: { bg: colors.navy, fg: colors.white },
   secondary: { bg: colors.teal, fg: colors.white },
   // Material: outline buttons are frosted glass with teal text (see `glass`).
@@ -51,7 +63,7 @@ export function Button({ label, onPress, variant = 'primary', loading, loadingLa
   const reduced = useReducedMotion();
   const press = useRef(new Animated.Value(1)).current;
   const squeeze = (to: number) => {
-    if (!isMaterial || reduced) return;
+    if (!(isMaterial || isPremium) || reduced) return;
     Animated.timing(press, { toValue: to, duration: 90, useNativeDriver: true }).start();
   };
   const filled = isMaterial && (variant === 'primary' || variant === 'secondary');
@@ -89,9 +101,10 @@ export function Button({ label, onPress, variant = 'primary', loading, loadingLa
         v.border ? { borderWidth: 1, borderColor: v.border } : null,
         filled && styles.materialFilled,
         isMaterial && variant === 'outline' && gloss.glass,
+        isPremium && variant === 'primary' && styles.premiumPrimary,
         isDisabled ? styles.disabled : null,
         style,
-        isMaterial ? { transform: [{ scale: press }] } : null,
+        isMaterial || isPremium ? { transform: [{ scale: press }] } : null,
       ]}
     >
       {filled ? (
@@ -121,7 +134,7 @@ export function Button({ label, onPress, variant = 'primary', loading, loadingLa
 const styles = StyleSheet.create({
   btn: {
     // Premium: a slightly lower, squarer button (still >= 44px to touch).
-    minHeight: isRefined ? 48 : Math.max(MIN_TOUCH_TARGET, 52),
+    minHeight: isPremium ? 46 : isRefined ? 48 : Math.max(MIN_TOUCH_TARGET, 52),
     borderRadius: radius.button,
     alignItems: 'center',
     justifyContent: 'center',
@@ -129,9 +142,14 @@ const styles = StyleSheet.create({
   },
   // Premium sets the label in the brand face; a bare fontWeight would fall
   // back to the system font.
-  label: isRefined ? { fontSize: 15, fontFamily: fonts.body.semibold } : { fontSize: 16, fontWeight: '700' },
+  label: isPremium ? { fontSize: 14, fontFamily: fonts.body.bold, letterSpacing: 0.1 }
+    : isRefined ? { fontSize: 15, fontFamily: fonts.body.semibold } : { fontSize: 16, fontWeight: '700' },
   busyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   disabled: { opacity: 0.6 },
+  // Premium: the primary pill lifts a little off the page in its own colour.
+  premiumPrimary: Platform.OS === 'web'
+    ? ({ boxShadow: '0 1px 2px rgba(15,23,42,0.08), 0 4px 10px -2px rgba(15,118,110,0.28)', transition: 'background-color 200ms cubic-bezier(0.2,0,0,1)' } as object)
+    : { shadowColor: '#0F766E', shadowOpacity: 0.22, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
   materialFilled: {
     overflow: 'hidden',
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.28)',

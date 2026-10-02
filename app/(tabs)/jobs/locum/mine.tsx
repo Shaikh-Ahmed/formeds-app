@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   },
   action: {
     paddingHorizontal: spacing.md, minHeight: 36, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.navy, justifyContent: 'center', backgroundColor: colors.white,
+    borderWidth: 1, borderColor: colors.primaryFill, justifyContent: 'center', backgroundColor: colors.white,
   },
   actionPrimary: { backgroundColor: colors.action, ...gloss.fill },
   actionQuiet: { borderColor: colors.border },

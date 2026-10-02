@@ -81,28 +81,59 @@ describe('Classic is unchanged', () => {
   });
 });
 
-describe('Premium', () => {
+describe('Premium (clinical design language)', () => {
   const { theme } = loadTheme('premium');
+  const material = loadTheme('material').theme;
+  const classic = loadTheme(null).theme;
 
   it('applies its own tokens only when chosen', () => {
     expect(theme.isPremium).toBe(true);
-    expect(theme.colors.bg).toBe('#F3F5F8');
-    expect(theme.colors.featured).not.toBe(theme.colors.card);
-    expect(theme.typography.h1.fontSize).toBe(30);
-    expect(theme.radius.card).toBe(14);
+    expect(theme.isMaterial).toBe(false);
+    expect(theme.colors.bg).toBe('#F8FAFC');
+    expect(theme.colors.card).toBe('#FFFFFF');
   });
 
-  it('keeps the brand fonts, teal for trust and red for AED', () => {
-    expect(theme.fonts.heading.bold).toBe('Outfit_700Bold');
-    expect(theme.fonts.body.regular).toBe('IBMPlexSans_400Regular');
+  it('makes deep teal the action and trust colour, slate navy the anchor, red reserved for AED', () => {
+    expect(theme.colors.action).toBe('#0F766E');
+    expect(theme.colors.teal).toBe('#0F766E');
     expect(theme.colors.verified).toBe(theme.colors.teal);
-    expect(theme.colors.aed).toMatch(/^#D9/);
+    expect(theme.colors.primaryFill).toBe(theme.colors.action);
+    expect(theme.colors.navy).toBe('#0F172A');
+    expect(theme.colors.aed).toMatch(/^#DC/);
+    // "Done" is green, never the action teal.
+    expect(theme.colors.success).not.toBe(theme.colors.action);
   });
 
-  it('keeps shadows restrained', () => {
-    for (const level of ['subtle', 'standard', 'featured']) {
-      expect(theme.elevation[level].shadowOpacity).toBeLessThanOrEqual(0.08);
-    }
+  it('sets everything in Plus Jakarta Sans, hierarchy by weight', () => {
+    expect(theme.fonts.heading.bold).toBe('PlusJakartaSans_700Bold');
+    expect(theme.fonts.body.regular).toBe('PlusJakartaSans_400Regular');
+    expect(theme.typography.body.fontSize).toBe(14);
+    expect(theme.typography.overline.textTransform).toBe('uppercase');
+    expect(theme.typography.h1.fontFamily).toBe('PlusJakartaSans_800ExtraBold');
+  });
+
+  it('has three shape tiers: pill controls, soft containers, crisp tags', () => {
+    expect(theme.radius.button).toBe(999);
+    expect(theme.radius.card).toBe(16);
+    expect(theme.radius.tag).toBe(4);
+    expect(theme.spacing).toEqual({ xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32 });
+  });
+
+  it('keeps resting shadows faint; depth is spent on the hero and the anchor', () => {
+    expect(theme.elevation.subtle.shadowOpacity).toBeLessThanOrEqual(0.06);
+    expect(theme.elevation.standard.shadowOpacity).toBeLessThanOrEqual(0.08);
+    expect(theme.materials.gradients.hero.colors).toEqual(['#115E59', '#0F766E', '#0891B2']);
+    expect(theme.materials.gradients.featured.colors[1]).toBe('#0F172A');
+    expect(Object.keys(theme.gloss.fill)).toHaveLength(0);
+  });
+
+  it('leaves Material and Classic exactly as they were', () => {
+    expect(material.typography.body).toEqual({ fontSize: 15, lineHeight: 22, fontFamily: 'IBMPlexSans_400Regular' });
+    expect(material.fonts.heading.bold).toBe('Outfit_700Bold');
+    expect(material.colors.primaryFill).toBe(material.colors.navy);
+    expect(material.colors.tintBg).toBe('#EFF6FF');
+    expect(classic.colors.primaryFill).toBe(classic.colors.navy);
+    expect(classic.radius.button).toBe(14);
   });
 });
 

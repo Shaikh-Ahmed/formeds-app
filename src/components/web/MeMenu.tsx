@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { colors, fonts, getRoleMeta, layout, radius, shadow, spacing, typography, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, fonts, getRoleMeta, isPremium, layout, radius, shadow, spacing, typography, MIN_TOUCH_TARGET } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../Avatar';
 
@@ -89,11 +89,14 @@ function Item({ icon, label, onPress, testID }: {
   );
 }
 
+const PREMIUM_ROW = 64;
+
 const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
   menu: {
     position: 'absolute',
-    top: layout.topBar - 4,
+    // Premium's account row is taller (the two-tier header's first tier).
+    top: isPremium ? PREMIUM_ROW - 2 : layout.topBar - 4,
     width: 280,
     backgroundColor: colors.white,
     borderRadius: radius.lg,
@@ -107,7 +110,7 @@ const styles = StyleSheet.create({
   role: { ...typography.caption, color: colors.textSecondary },
   viewBtn: {
     marginHorizontal: spacing.lg, marginTop: spacing.xs, marginBottom: spacing.sm, minHeight: 34,
-    borderRadius: radius.pill, borderWidth: 1, borderColor: colors.navy, alignItems: 'center', justifyContent: 'center',
+    borderRadius: radius.pill, borderWidth: 1, borderColor: colors.primaryFill, alignItems: 'center', justifyContent: 'center',
   },
   viewText: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.navy },
   rule: { height: 1, backgroundColor: colors.borderLight, marginVertical: spacing.xs },

@@ -6,7 +6,8 @@ import { ComingSoon, BooksCatalog, ResearchCatalog } from '../../src/components'
 import { useAuth } from '../../src/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { PageGrid, ProfileRail } from '../../src/components/web';
-import { colors, spacing, radius, typography, useBreakpoint, gloss } from '../../src/theme';
+import { colors, spacing, radius, typography, useBreakpoint, gloss, fonts, elevation, isPremium } from '../../src/theme';
+import { Platform } from 'react-native';
 
 type TabKey = 'books' | 'cme' | 'research';
 
@@ -79,19 +80,19 @@ export default function LearningScreen() {
         </View>
       </View>
 
-      <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
+      <View style={[styles.tabBar, !isMobile && styles.tabBarWide, isPremium && styles.cBar, isPremium && isMobile && styles.cBarMobile]}>
         {TABS.map(t => (
           <TouchableOpacity
             key={t.key}
             testID={`tab-${t.key}`}
-            style={[styles.tab, activeTab === t.key && styles.tabActive]}
+            style={[styles.tab, activeTab === t.key && styles.tabActive, isPremium && styles.cTab, isPremium && activeTab === t.key && styles.cTabActive]}
             onPress={() => setActiveTab(t.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === t.key }}
             accessibilityLabel={t.key === 'books' ? t.label : `${t.label} — coming soon`}
           >
-            <Ionicons name={t.icon} size={16} color={activeTab === t.key ? colors.textOnDark : colors.textSubtle} />
-            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
+            <Ionicons name={t.icon} size={16} color={activeTab === t.key ? (isPremium ? colors.teal : colors.textOnDark) : colors.textSubtle} />
+            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive, isPremium && styles.cTabText, isPremium && activeTab === t.key && styles.cTabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -157,6 +158,16 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.action, ...gloss.fill },
   tabText: { fontSize: 13, fontWeight: '600', color: colors.textSubtle },
   tabTextActive: { color: colors.textOnDark },
+  // Premium: the shared tonal segmented control (slate track, white thumb).
+  cBar: { backgroundColor: colors.bgMuted, borderColor: colors.bgMuted, padding: 4, gap: 4, borderRadius: radius.pill },
+  cBarMobile: { marginHorizontal: spacing.lg, marginVertical: spacing.xs },
+  cTab: { backgroundColor: 'transparent', borderRadius: radius.pill, paddingVertical: 9 },
+  cTabActive: {
+    backgroundColor: colors.white,
+    ...(Platform.OS === 'web' ? ({ boxShadow: '0 1px 3px rgba(15,23,42,0.10), 0 1px 2px rgba(15,23,42,0.06)' } as object) : elevation.subtle),
+  },
+  cTabText: { fontFamily: fonts.body.semibold, fontWeight: undefined },
+  cTabTextActive: { color: colors.teal, fontFamily: fonts.body.bold },
   body: { padding: spacing.lg, paddingBottom: 100 },
   footnote: {
     ...typography.small,

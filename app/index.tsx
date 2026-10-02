@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  roleCardHover: { backgroundColor: colors.bg, borderColor: colors.navy },
+  roleCardHover: { backgroundColor: colors.bg, borderColor: colors.primaryFill },
   roleIconContainer: {
     width: 52,
     height: 52,

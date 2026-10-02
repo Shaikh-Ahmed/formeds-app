@@ -3,7 +3,7 @@ import { CoverArt } from '../material';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, MIN_TOUCH_TARGET, isMaterial } from '../../theme';
+import { colors, spacing, MIN_TOUCH_TARGET, isMaterial, isPremium } from '../../theme';
 import { Avatar } from '../Avatar';
 import { Profile } from '../../types/profile';
 import { absoluteMediaUrl } from '../../api/profile';
@@ -35,7 +35,7 @@ export function ProfileHeader({
     <View testID="profile-header">
       <View style={[styles.cover, isMobile ? styles.coverMobile : styles.coverWide]}>
         {/* Material: a gradient cover until the person uploads their own. */}
-        {isMaterial && !cover ? <CoverArt /> : null}
+        {(isMaterial || isPremium) && !cover ? <CoverArt /> : null}
         {cover ? (
           <Image
             source={{ uri: cover }}
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     borderWidth: 2,
     borderColor: colors.white,
     alignItems: 'center',

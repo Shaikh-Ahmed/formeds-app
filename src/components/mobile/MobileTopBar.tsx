@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing, radius, typography, MIN_TOUCH_TARGET, getRoleMeta } from '../../theme';
+import { colors, spacing, radius, typography, MIN_TOUCH_TARGET, getRoleMeta, isPremium } from '../../theme';
+import { Platform } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../Avatar';
 
@@ -125,6 +126,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgMuted,
     borderWidth: 1,
     borderColor: colors.border,
+    // Premium: the recessed search pill, as on desktop.
+    ...(isPremium ? {
+      borderColor: 'transparent', height: 40,
+      ...(Platform.OS === 'web' ? ({ boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)' } as object) : {}),
+    } : {}),
   },
   searchPressed: { backgroundColor: colors.border },
   searchText: { ...typography.body, color: colors.textSecondary, flex: 1 },

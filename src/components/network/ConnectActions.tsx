@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   },
   btnCompact: { minHeight: 34, paddingHorizontal: spacing.md, borderRadius: radius.pill },
   btnOutline: { minHeight: 32, paddingHorizontal: spacing.sm + 2, gap: 4, borderRadius: radius.pill },
-  outlineAction: { borderColor: colors.navy },
+  outlineAction: { borderColor: colors.primaryFill },
   primary: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   secondary: { backgroundColor: colors.white, borderColor: colors.border },
   muted: { opacity: 0.8 },

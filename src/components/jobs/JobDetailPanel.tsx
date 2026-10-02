@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.white,
   },
-  iconActionActive: { borderColor: colors.navy, backgroundColor: '#EFF6FF' },
+  iconActionActive: { borderColor: colors.primaryFill, backgroundColor: colors.tintBg },
   pressed: { opacity: 0.7 },
 
   section: { gap: spacing.sm },

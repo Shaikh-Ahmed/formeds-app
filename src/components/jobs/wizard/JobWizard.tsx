@@ -835,7 +835,7 @@ const styles = StyleSheet.create({
   progressSeg: {
     flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border,
   },
-  progressSegOn: { backgroundColor: colors.navy },
+  progressSegOn: { backgroundColor: colors.primaryFill },
   progressText: { ...typography.small, color: colors.textSecondary },
 
   body: { padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.xs },

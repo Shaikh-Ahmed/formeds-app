@@ -34,7 +34,7 @@ interface Notification {
 }
 
 const TYPE_ICONS: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string }> = {
-  application: { icon: 'briefcase', color: colors.navy, bg: '#EFF6FF' },
+  application: { icon: 'briefcase', color: colors.navy, bg: colors.tintBg },
   optin: { icon: 'people', color: colors.teal, bg: '#F0FDF4' },
   message: { icon: 'chatbubble', color: '#7C3AED', bg: colors.recruiterBg },
   case: { icon: 'help-buoy', color: colors.teal, bg: colors.tealBg },
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.tintBg,
     minHeight: 34,
     justifyContent: 'center',
   },
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 3,
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
   },
   notifIcon: {
     width: 44,

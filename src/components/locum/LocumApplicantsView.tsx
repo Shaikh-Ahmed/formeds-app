@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
   action: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
     paddingHorizontal: spacing.md, minHeight: 36, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.navy, backgroundColor: colors.white, justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.primaryFill, backgroundColor: colors.white, justifyContent: 'center',
   },
   actionPrimary: { backgroundColor: colors.action, ...gloss.fill },
   actionQuiet: { borderColor: colors.border },

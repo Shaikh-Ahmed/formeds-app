@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AiOrb } from '../src/components/material';
+import { AiOrb, GradientFill } from '../src/components/material';
 import { newIdempotencyKey } from '../src/hooks/useSubmit';
 import {
   ActivityIndicator, Animated, Easing, FlatList, Image, KeyboardAvoidingView, Linking, Platform, Pressable,
@@ -11,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
-import { colors, fonts, radius, spacing, typography, MIN_TOUCH_TARGET, isRefined, isMaterial, isTerracotta, materials, elevation, gloss, useBreakpoint } from '../src/theme';
+import { colors, fonts, radius, spacing, typography, MIN_TOUCH_TARGET, isRefined, isMaterial, isPremium, isTerracotta, materials, elevation, gloss, useBreakpoint } from '../src/theme';
 import { useReducedMotion } from '../src/hooks/useReducedMotion';
 import { PageColumn } from '../src/components/web';
 import { AedMarkdown } from '../src/components/aed/AedMarkdown';
@@ -371,24 +371,34 @@ export default function AEDChatScreen() {
           accessibilityLabel="Close AED" testID="aed-scrim" />
       ) : null}
       <AedFrame>
-        <View style={[styles.header, isMaterial && styles.mHeader]}>
+        <View style={[styles.header, isMaterial && styles.mHeader, isPremium && styles.cHeader]}>
+          {/* Premium: AED's header is the navy anchor -- the clinical AI's own surface. */}
+          {isPremium ? <GradientFill name="featured" style={StyleSheet.absoluteFill} pointerEvents="none" /> : null}
           <Pressable testID="aed-back-btn" onPress={close} accessibilityRole="button"
             accessibilityLabel="Close AED" style={styles.headerBtn}>
-            <Ionicons name="chevron-down" size={24} color={colors.text} />
+            <Ionicons name="chevron-down" size={24} color={isPremium ? colors.white : colors.text} />
           </Pressable>
           <View style={styles.headerCenter}>
             <AedLogo size={36} />
             <View>
               {/* Premium names it in full, so "AED" is never read as the
                   defibrillator: ForMeds' clinical-support workspace. */}
-              <Text style={styles.headerName}>{isRefined ? 'AED Assist' : 'AED'}</Text>
-              <Text style={styles.headerSub}>{isRefined ? 'Clinical support workspace · ForMeds' : 'AI Healthcare Assistant'}</Text>
+              <View style={styles.cNameRow}>
+                <Text style={[styles.headerName, isPremium && styles.cHeaderName]}>{isRefined ? 'AED Assist' : 'AED'}</Text>
+                {isPremium ? (
+                  <View style={styles.cLive}>
+                    <View style={styles.cLiveDot} />
+                    <Text style={styles.cLiveText}>Live</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={[styles.headerSub, isPremium && styles.cHeaderSub]}>{isRefined ? 'Clinical support workspace · ForMeds' : 'AI Healthcare Assistant'}</Text>
             </View>
           </View>
           {messages.length ? (
             <Pressable testID="aed-new-chat" onPress={newChat} accessibilityRole="button"
               accessibilityLabel="Start a new conversation" style={styles.headerBtn}>
-              <Ionicons name="create-outline" size={22} color={colors.text} />
+              <Ionicons name="create-outline" size={22} color={isPremium ? colors.white : colors.text} />
             </Pressable>
           ) : <View style={styles.headerBtnSpacer} />}
         </View>
@@ -495,7 +505,8 @@ export default function AEDChatScreen() {
                 ) : null}
               </View>
             ) : null}
-            <View style={[styles.inputShell, isMaterial && styles.mInputShell, isMaterial && inputFocused && styles.mInputShellFocus]}>
+            <View style={[styles.inputShell, isMaterial && styles.mInputShell, isMaterial && inputFocused && styles.mInputShellFocus,
+              isPremium && styles.cInputShell, isPremium && inputFocused && styles.cInputFocus]}>
               <Pressable testID="aed-attach-btn" onPress={() => setAttachOpen(true)} accessibilityRole="button"
                 accessibilityLabel="Attach a report or image" style={[styles.iconBtn, isMaterial && styles.mIconBtn]} disabled={loading}>
                 <Ionicons name="attach" size={isMaterial ? 19 : 22} color={colors.textSecondary} />
@@ -636,6 +647,24 @@ const styles = StyleSheet.create({
   },
   headerBtnSpacer: { width: MIN_TOUCH_TARGET },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2 },
+  // -- Premium -----------------------------------------------------------------
+  cHeader: { overflow: 'hidden', borderBottomWidth: 0 },
+  cNameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  cHeaderName: { color: colors.white },
+  cHeaderSub: { color: '#CBD5E1' },
+  cLive: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: radius.pill, backgroundColor: 'rgba(16,185,129,0.14)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.32)',
+  },
+  cLiveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#34D399' },
+  cLiveText: { fontSize: 10.5, fontFamily: fonts.body.bold, color: '#6EE7B7' },
+  cInputShell: {
+    backgroundColor: colors.bgMuted, borderColor: 'transparent', borderRadius: 24,
+    ...(Platform.OS === 'web' ? ({ boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)', transition: 'background-color 200ms cubic-bezier(0.2,0,0,1), box-shadow 200ms cubic-bezier(0.2,0,0,1)' } as object) : {}),
+  },
+  cInputFocus: Platform.OS === 'web'
+    ? ({ backgroundColor: colors.white, borderColor: colors.teal, boxShadow: '0 0 0 3px rgba(15,118,110,0.14)' } as object)
+    : { backgroundColor: colors.white, borderColor: colors.teal },
   headerName: { ...typography.h3, color: colors.text },
   headerSub: { ...typography.small, color: colors.textSecondary },
 
@@ -662,7 +691,7 @@ const styles = StyleSheet.create({
 
   userRow: { alignSelf: 'flex-end', maxWidth: '85%' },
   userBubble: {
-    backgroundColor: colors.navy, borderRadius: radius.xl, borderBottomRightRadius: 4,
+    backgroundColor: colors.primaryFill, borderRadius: radius.xl, borderBottomRightRadius: 4,
     padding: spacing.md + 2, gap: spacing.sm,
   },
   userText: { ...typography.body, color: colors.white, lineHeight: 22 },
@@ -691,7 +720,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, backgroundColor: colors.bg,
   },
   sourceIndex: {
-    ...typography.small, fontFamily: fonts.body.semibold, color: colors.white, backgroundColor: colors.navy,
+    ...typography.small, fontFamily: fonts.body.semibold, color: colors.white, backgroundColor: colors.primaryFill,
     width: 20, height: 20, borderRadius: 10, textAlign: 'center', lineHeight: 20, overflow: 'hidden',
   },
   sourceTitle: { ...typography.caption, fontFamily: fonts.body.medium, color: colors.navy, lineHeight: 18 },
@@ -833,7 +862,7 @@ const styles = StyleSheet.create({
   attachHint: { ...typography.small, color: colors.textSecondary },
   lockPill: {
     flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 3,
-    borderRadius: radius.pill, backgroundColor: '#EFF6FF',
+    borderRadius: radius.pill, backgroundColor: colors.tintBg,
   },
   lockText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.navy },
   footnote: { ...typography.small, color: colors.textMuted, textAlign: 'center' },

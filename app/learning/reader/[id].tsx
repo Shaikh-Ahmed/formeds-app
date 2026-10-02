@@ -1685,7 +1685,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: spacing.lg,
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: radius.md,
@@ -1883,7 +1883,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   chapterNumPill: {
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: radius.xs,
@@ -1994,7 +1994,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: radius.sm,
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     marginLeft: 'auto',
   },
   chapterBottomNextText: {
@@ -2031,7 +2031,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     paddingVertical: 10,
     borderRadius: radius.md,
   },
@@ -2203,7 +2203,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   jumpPageGoBtn: {
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: radius.sm,
@@ -2290,7 +2290,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
   },
   annTabActive: {
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
   },
   annTabText: {
     fontSize: 12,
@@ -2338,7 +2338,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   annotationPageBadge: {
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.xs,
@@ -2414,7 +2414,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
   },
   dialogTypeBtnActive: {
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
   },
   dialogTypeBtnText: {
     fontSize: 12,
@@ -2446,7 +2446,7 @@ const styles = StyleSheet.create({
   },
   colorCircleSelected: {
     borderWidth: 2,
-    borderColor: colors.navy,
+    borderColor: colors.primaryFill,
   },
   textInputArea: {
     backgroundColor: '#F8FAFC',
@@ -2506,7 +2506,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   viewModeTabActive: {
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
   },
   viewModeTabText: {
     fontSize: typography.caption.fontSize,

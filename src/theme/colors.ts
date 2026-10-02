@@ -19,6 +19,25 @@ const classic = {
    */
   action: '#1A3A5C',
   actionHover: '#2A527D',
+  /**
+   * Fill for small CONTROLS that have always been navy -- active chips and
+   * tabs, step and progress marks, the sent message bubble, badges. Equal to
+   * `navy` in every theme but Premium, where navy is the dark anchor surface
+   * and controls are teal. Surfaces that are meant to be dark keep `navy`.
+   */
+  primaryFill: '#1A3A5C',
+  /** A pale tint behind a small icon or selected control. Blue in every theme but Premium (teal). */
+  tintBg: '#EFF6FF',
+  /**
+   * Hairlines and ink for tinted chips and status pills: the edge of a pale
+   * tint in its own hue, and the darker teal its words are set in. Premium's
+   * tags and pills draw on these; no other theme uses them.
+   */
+  tealLine: '#99F6E4',
+  tealInk: '#115E59',
+  infoLine: '#A5F3FC',
+  redLine: '#FECACA',
+  warningLine: '#FDE68A',
   teal: '#0F766E',
   tealLight: '#14B8A6',
   tealBg: '#F0FDFA',
@@ -122,48 +141,61 @@ const journal: Partial<Palette> = {
 };
 
 /**
- * ForMeds Premium -- "calm authority". The same navy/teal identity, made
- * quieter and more deliberate: a cool grey page so white content reads as
- * content, a deeper navy for authority, teal kept for trust, red kept for AED
- * and urgency, and a featured surface faintly tinted so priority content
- * stands apart without a heavier shadow.
+ * ForMeds Premium -- clinical and credentialed.
  *
- * Contrast (on white): text 17.8:1, textSecondary 7.3:1, textMuted 3.6:1
- * (placeholders and tertiary metadata only), teal 5.4:1, navy 13.6:1.
+ * One hue, used with discipline: a deep clinical teal is THE action and trust
+ * colour (buttons, the active tab, salaries, the verified tick); its pale
+ * tints carry chips and selected states. Slate navy is the anchor -- the one
+ * dark surface a screen may have (AED, a featured panel) -- and cyan only
+ * ever appears inside a gradient, as light. Everything else is slate grey, so
+ * colour always means something. Red stays AED's and urgency's alone.
+ *
+ * Contrast on white: text 17.9:1, textBody 10.4:1, textSecondary 7.6:1,
+ * textSubtle 4.8:1 (metadata), teal 5.5:1; white on teal 5.5:1, on navy
+ * 17.9:1. textMuted (2.6:1) is for placeholders and decoration only.
  */
 const premium: Partial<Palette> = {
-  navy: '#15304D',
-  navyLight: '#24496F',
-  navyDark: '#0B1E33',
-  teal: '#0B7268',
-  tealLight: '#13A08F',
-  tealBg: '#EAF6F3',
-  bg: '#F3F5F8',
-  bgMuted: '#EBEFF4',
+  navy: '#0F172A',
+  navyLight: '#1E293B',
+  navyDark: '#0A0F1D',
+  action: '#0F766E',
+  actionHover: '#115E59',
+  primaryFill: '#0F766E',
+  tintBg: '#F0FDFA',
+  teal: '#0F766E',
+  tealLight: '#14B8A6',
+  tealBg: '#F0FDFA',
+  bg: '#F8FAFC',
+  bgMuted: '#F1F5F9',
   card: '#FFFFFF',
-  text: '#0C1A2A',
-  textSecondary: '#4A5A6D',
-  textMuted: '#7D8DA0',
-  border: '#DFE5EC',
-  borderLight: '#EDF1F5',
-  success: '#0B7268',
-  successBg: '#EAF6F3',
-  warning: '#9A5800',
-  warningBg: '#FDF5E7',
+  text: '#0F172A',
+  textBody: '#334155',
+  textSecondary: '#475569',
+  textSubtle: '#64748B',
+  textMuted: '#94A3B8',
+  iconFaint: '#CBD5E1',
+  border: '#E2E8F0',
+  borderLight: '#F1F5F9',
+  // Done is green, never the action teal: "complete" must not read as "tap".
+  success: '#15803D',
+  successBg: '#F0FDF4',
+  warning: '#B45309',
+  warningBg: '#FFFBEB',
+  online: '#10B981',
   surface: '#FFFFFF',
   surfaceElevated: '#FFFFFF',
-  featured: '#F7FAFC',
-  featuredBorder: '#D5DFEA',
-  verified: '#0B7268',
-  verifiedBg: '#EAF6F3',
-  info: '#24496F',
-  infoBg: '#EEF3F8',
-  aed: '#D93A3A',
-  aedBg: '#FDF1F1',
-  disabled: '#9AA8B8',
-  disabledBg: '#EDF1F5',
-  hover: '#F1F4F8',
-  selected: '#EEF4FA',
+  featured: '#FFFFFF',
+  featuredBorder: '#99F6E4',
+  verified: '#0F766E',
+  verifiedBg: '#F0FDFA',
+  info: '#0E7490',
+  infoBg: '#ECFEFF',
+  aed: '#DC2626',
+  aedBg: '#FEF2F2',
+  disabled: '#94A3B8',
+  disabledBg: '#F1F5F9',
+  hover: '#F1F5F9',
+  selected: '#F0FDFA',
 };
 
 /**
@@ -281,4 +313,6 @@ if (!OVERRIDES[activeTheme].action) {
   merged.action = merged.navy;
   merged.actionHover = merged.navyLight;
 }
+// Likewise controls that were navy stay that theme's navy unless it says so.
+if (!OVERRIDES[activeTheme].primaryFill) merged.primaryFill = merged.navy;
 export const colors: Palette = merged;

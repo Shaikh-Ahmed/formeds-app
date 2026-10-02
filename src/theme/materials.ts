@@ -54,6 +54,24 @@ const TERRACOTTA: typeof MATERIAL = {
   sheen: MATERIAL.sheen,
 };
 
+/**
+ * Premium (clinical): gradients are rare and purposeful. Teal deepening from
+ * the text side into cyan light is the one hero; slate navy is the anchor
+ * surface (AED, a featured panel). Buttons and cards stay flat.
+ */
+const PREMIUM: typeof MATERIAL = {
+  hero: { colors: ['#115E59', '#0F766E', '#0891B2'], start: { x: 0, y: 0.3 }, end: { x: 1, y: 0.7 } },
+  primary: { colors: ['#0F766E', '#0F766E'], start: { x: 0, y: 0 }, end: { x: 0, y: 1 } },
+  featured: { colors: ['#1E293B', '#0F172A'], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
+  aed: { colors: ['#EF4444', '#B91C1C'], start: { x: 0, y: 0 }, end: { x: 1, y: 1 } },
+  shift: { colors: ['#1E293B', '#0F172A'], start: { x: 0, y: 0 }, end: { x: 0, y: 1 } },
+  page: { colors: ['#F8FAFC', '#F8FAFC'], start: { x: 0, y: 0 }, end: { x: 0, y: 1 } },
+  sheen: {
+    colors: ['rgba(255,255,255,0.10)', 'rgba(255,255,255,0)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0.06)'],
+    start: { x: 0, y: 0 }, end: { x: 0, y: 1 }, locations: [0, 0.4, 0.7, 1],
+  },
+};
+
 const FLAT = (c: string): Gradient => ({ colors: [c, c], start: { x: 0, y: 0 }, end: { x: 0, y: 1 } });
 const CLASSIC = {
   hero: FLAT('#1A3A5C'),
@@ -71,6 +89,14 @@ const CLASSIC = {
  * falls back to the translucent fill alone (no costly blur views).
  */
 const GLASS = {
+  // Premium: glass only ever sits over the gradient hero or the navy anchor.
+  premium: {
+    fill: 'rgba(255,255,255,0.96)',
+    fillOnDark: 'rgba(255,255,255,0.10)',
+    border: '#E2E8F0',
+    borderOnDark: 'rgba(255,255,255,0.20)',
+    blur: 'blur(12px)',
+  },
   terracotta: {
     fill: 'rgba(253,250,245,0.74)',
     fillOnDark: 'rgba(255,248,240,0.15)',
@@ -132,7 +158,7 @@ const BACKDROP_WEB_TERRACOTTA = [
  * focus rings: `rgba(${materials.tint}, 0.16)`. Material blue (#003A72) or
  * Terracotta (#A3472A); the other themes keep Material's, as before.
  */
-const TINT = activeTheme === 'terracotta' ? '163,71,42' : '0,58,114';
+const TINT = activeTheme === 'terracotta' ? '163,71,42' : activeTheme === 'premium' ? '15,118,110' : '0,58,114';
 
 /**
  * Gloss and glass for controls, as style fragments to spread into a style.
@@ -169,7 +195,8 @@ const GLOSS_MATERIAL: { fill: StyleFragment; glass: StyleFragment } = Platform.O
 export const gloss = isMaterial ? GLOSS_MATERIAL : { fill: {} as StyleFragment, glass: {} as StyleFragment };
 
 export const materials = {
-  gradients: activeTheme === 'terracotta' ? TERRACOTTA : activeTheme === 'material' ? MATERIAL : CLASSIC,
+  gradients: activeTheme === 'terracotta' ? TERRACOTTA : activeTheme === 'material' ? MATERIAL
+    : activeTheme === 'premium' ? PREMIUM : CLASSIC,
   /** CSS background for the page wallpaper on the web; null outside Material. */
   backdropWeb: activeTheme === 'terracotta' ? BACKDROP_WEB_TERRACOTTA : activeTheme === 'material' ? BACKDROP_WEB : null,
   /**
@@ -183,6 +210,7 @@ export const materials = {
       + ' fill="none" stroke="white" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" opacity="0.55"/></svg>',
     )}")`
     : null,
-  glass: activeTheme === 'terracotta' ? GLASS.terracotta : activeTheme === 'material' ? GLASS.material : GLASS.flat,
+  glass: activeTheme === 'terracotta' ? GLASS.terracotta : activeTheme === 'material' ? GLASS.material
+    : activeTheme === 'premium' ? GLASS.premium : GLASS.flat,
   tint: TINT,
 };

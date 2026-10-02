@@ -43,22 +43,31 @@ const HEADING_FAMILIES = {
     bold: 'SourceSerif4_700Bold',
   },
 };
-// Premium keeps the brand pairing -- Outfit headings, IBM Plex Sans body --
-// and earns its character from hierarchy and spacing, not a new face.
+// Premium sets everything in one geometric humanist face, Plus Jakarta Sans:
+// hierarchy comes from weight at small sizes, not from a second family.
+const JAKARTA = {
+  regular: 'PlusJakartaSans_400Regular',
+  medium: 'PlusJakartaSans_500Medium',
+  semibold: 'PlusJakartaSans_600SemiBold',
+  bold: 'PlusJakartaSans_700Bold',
+};
 const HEADING_BY_THEME = {
   classic: HEADING_FAMILIES.classic, journal: HEADING_FAMILIES.journal,
-  premium: HEADING_FAMILIES.classic, material: HEADING_FAMILIES.classic, terracotta: HEADING_FAMILIES.classic,
+  premium: JAKARTA, material: HEADING_FAMILIES.classic, terracotta: HEADING_FAMILIES.classic,
+};
+const PLEX = {
+  regular: 'IBMPlexSans_400Regular',
+  medium: 'IBMPlexSans_500Medium',
+  semibold: 'IBMPlexSans_600SemiBold',
+  bold: 'IBMPlexSans_700Bold',
 };
 
 export const fonts = {
   heading: HEADING_BY_THEME[activeTheme],
-  body: {
-    regular: 'IBMPlexSans_400Regular',
-    medium: 'IBMPlexSans_500Medium',
-    semibold: 'IBMPlexSans_600SemiBold',
-    bold: 'IBMPlexSans_700Bold',
-  },
-} as const;
+  body: activeTheme === 'premium' ? JAKARTA : PLEX,
+  /** Premium's display weight, for the one hero line a screen may have. */
+  display: activeTheme === 'premium' ? 'PlusJakartaSans_800ExtraBold' : HEADING_BY_THEME[activeTheme].bold,
+};
 
 const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32 } as const;
 // Material runs a touch tighter -- about 12-15% less at every step -- so its
@@ -70,12 +79,16 @@ export const spacing: { [K in keyof typeof SPACING]: number } =
   isMaterialFamily ? MATERIAL_SPACING : SPACING;
 
 const RADIUS = {
-  classic: { sm: 8, md: 10, lg: 12, xl: 14, pill: 999, input: 12, button: 14, card: 12, sheet: 16 },
-  journal: { sm: 8, md: 10, lg: 12, xl: 14, pill: 999, input: 12, button: 14, card: 12, sheet: 16 },
-  premium: { sm: 8, md: 10, lg: 12, xl: 16, pill: 999, input: 10, button: 10, card: 14, sheet: 20 },
+  classic: { sm: 8, md: 10, lg: 12, xl: 14, pill: 999, input: 12, button: 14, card: 12, sheet: 16, tag: 8 },
+  journal: { sm: 8, md: 10, lg: 12, xl: 14, pill: 999, input: 12, button: 14, card: 12, sheet: 16, tag: 8 },
+  // Premium: three shape tiers. Anything you tap is a pill (buttons, search,
+  // filters); containers are soft rectangles (cards 16, inner panels 12);
+  // classification is a crisp 4px tag (a specialty, a status) -- a label,
+  // never mistaken for a button.
+  premium: { sm: 6, md: 10, lg: 12, xl: 16, pill: 999, input: 12, button: 999, card: 16, sheet: 24, tag: 4 },
   // Material: soft, tactile rounding -- cards 18, sheets 24 -- with tags and
   // floating controls as pills, inputs and buttons in between.
-  material: { sm: 8, md: 12, lg: 14, xl: 17, pill: 999, input: 14, button: 14, card: 18, sheet: 24 },
+  material: { sm: 8, md: 12, lg: 14, xl: 17, pill: 999, input: 14, button: 14, card: 18, sheet: 24, tag: 8 },
 };
 
 /** Corner radii. `input`, `button`, `card` and `sheet` name the use; prefer them. */
@@ -117,10 +130,10 @@ const CLASSIC_TYPOGRAPHY = {
 } as const;
 
 /**
- * Premium type scale. Larger, tighter display sizes and real line heights:
- * the important line is visibly louder, the metadata visibly quieter.
+ * The refined type scale Material is built on (Premium's former scale, kept
+ * exactly so Material and Terracotta are unchanged by Premium's redesign).
  */
-const PREMIUM_TYPOGRAPHY = {
+const REFINED_TYPOGRAPHY = {
   h1: { fontSize: 30, lineHeight: 36, fontFamily: fonts.heading.bold, letterSpacing: -0.6 },
   h2: { fontSize: 22, lineHeight: 28, fontFamily: fonts.heading.semibold, letterSpacing: -0.3 },
   h3: { fontSize: 17, lineHeight: 23, fontFamily: fonts.heading.semibold, letterSpacing: -0.15 },
@@ -138,9 +151,33 @@ const PREMIUM_TYPOGRAPHY = {
   },
 } as const;
 
-/** Material: Premium's scale with a larger display size for heroes. */
+/**
+ * Premium (clinical) type scale: compact and weighted. Body copy is 14px with
+ * a relaxed line height; titles are bold rather than large; metadata is 12px;
+ * labels are uppercase and wide-tracked. Hierarchy comes from weight and
+ * colour at small sizes -- dense clinical information that stays legible.
+ */
+const PREMIUM_TYPOGRAPHY = {
+  h1: { fontSize: 26, lineHeight: 32, fontFamily: fonts.display, letterSpacing: -0.6 },
+  h2: { fontSize: 20, lineHeight: 26, fontFamily: fonts.heading.bold, letterSpacing: -0.3 },
+  h3: { fontSize: 16, lineHeight: 22, fontFamily: fonts.heading.bold, letterSpacing: -0.15 },
+  body: { fontSize: 14, lineHeight: 22, fontFamily: fonts.body.regular },
+  bodyStrong: { fontSize: 14, lineHeight: 22, fontFamily: fonts.body.semibold },
+  label: { fontSize: 13, lineHeight: 18, fontFamily: fonts.body.bold },
+  caption: { fontSize: 13, lineHeight: 19, fontFamily: fonts.body.regular },
+  small: { fontSize: 12, lineHeight: 16, fontFamily: fonts.body.medium },
+  overline: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontFamily: fonts.body.bold,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+} as const;
+
+/** Material: the refined scale with a larger display size for heroes. */
 const MATERIAL_TYPOGRAPHY = {
-  ...PREMIUM_TYPOGRAPHY,
+  ...REFINED_TYPOGRAPHY,
   h1: { fontSize: 32, lineHeight: 38, fontFamily: fonts.heading.semibold, letterSpacing: -0.8 },
   h2: { fontSize: 23, lineHeight: 29, fontFamily: fonts.heading.semibold, letterSpacing: -0.4 },
 } as const;
@@ -190,11 +227,14 @@ const ELEVATION = {
     standard: CLASSIC_CARD_SHADOW,
     featured: { ...CLASSIC_CARD_SHADOW, shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
   },
+  // Premium: Material 3 tonal elevation -- slate-tinted, barely there at rest.
+  // Cards separate by a hairline border and a whisper of shadow; depth is
+  // spent on the one dark anchor and the one gradient hero, not on every card.
   premium: {
     none: {},
-    subtle: { shadowColor: '#0B1E33', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-    standard: { shadowColor: '#0B1E33', shadowOpacity: 0.06, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 2 },
-    featured: { shadowColor: '#0B1E33', shadowOpacity: 0.08, shadowRadius: 20, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
+    subtle: { shadowColor: '#0F172A', shadowOpacity: 0.06, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+    standard: { shadowColor: '#0F172A', shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+    featured: { shadowColor: '#0F766E', shadowOpacity: 0.12, shadowRadius: 22, shadowOffset: { width: 0, height: 12 }, elevation: 6 },
   },
   // Material: soft, wide, teal-tinted shadows -- depth you feel rather than see.
   material: {

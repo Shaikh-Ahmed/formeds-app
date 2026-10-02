@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { Platform, View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { colors, spacing, radius, typography, fonts, shadow } from '../../theme';
+import { colors, spacing, radius, typography, fonts, shadow, isPremium } from '../../theme';
+import { GradientFill } from '../material/Surfaces';
 import { useAuth } from '../../context/AuthContext';
 import { kycCopy, useKycStatus } from '../../hooks/useKycStatus';
 import { apiFetch } from '../../utils/api';
@@ -70,6 +71,7 @@ export function FeedRail() {
         </View>
       ) : null}
 
+      {isPremium && user && user.role !== 'recruiter' ? <AedAnchor /> : null}
       <Trending />
       <PeopleYouMayKnow />
       {user?.role === 'healthcare_professional' ? <Opportunities /> : null}
@@ -82,6 +84,36 @@ export function FeedRail() {
         </Hoverable>
         <Text style={styles.footerBrand}>ForMeds © {new Date().getFullYear()}</Text>
       </View>
+    </View>
+  );
+}
+
+/**
+ * Premium: AED as the rail's one dark anchor -- the clinical AI, always a
+ * click away. A shortcut to the existing AED screen; nothing new behind it.
+ */
+function AedAnchor() {
+  const router = useRouter();
+  return (
+    <View style={styles.aedCard} testID="rail-aed">
+      <GradientFill name="featured" style={StyleSheet.absoluteFill} pointerEvents="none" />
+      <Ionicons name="pulse" size={132} color="rgba(255,255,255,0.04)" style={styles.aedMark} />
+      <View style={styles.aedTop}>
+        <View style={styles.aedLive}>
+          <View style={styles.aedDot} />
+          <Text style={styles.aedLiveText}>Clinical AI · live</Text>
+        </View>
+        <Text style={styles.aedMono}>EVIDENCE-LINKED</Text>
+      </View>
+      <Text style={styles.aedTitle} accessibilityRole="header">AED Assist</Text>
+      <Text style={styles.aedBody}>
+        Differentials, drug checks, lab reads and guideline summaries, with sources to verify.
+      </Text>
+      <Hoverable testID="rail-aed-open" onPress={() => router.push('/aed-chat' as any)}
+        accessibilityRole="link" accessibilityLabel="Ask AED" style={styles.aedCta} hoverStyle={styles.aedCtaHover}>
+        <Ionicons name="sparkles" size={15} color={colors.white} />
+        <Text style={styles.aedCtaText}>Ask AED</Text>
+      </Hoverable>
     </View>
   );
 }
@@ -298,6 +330,31 @@ function Opportunities() {
 }
 
 const styles = StyleSheet.create({
+  // -- Premium: the AED anchor ------------------------------------------------
+  aedCard: {
+    borderRadius: radius.card, overflow: 'hidden', padding: spacing.xl, gap: spacing.sm,
+    ...(Platform.OS === 'web' ? ({ boxShadow: '0 12px 28px -12px rgba(15,23,42,0.55)' } as object) : shadow.card),
+  },
+  aedMark: { position: 'absolute', right: -18, bottom: -26 },
+  aedTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  aedLive: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.sm + 2, paddingVertical: 3,
+    borderRadius: radius.pill, backgroundColor: 'rgba(16,185,129,0.14)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.32)',
+  },
+  aedDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#34D399' },
+  aedLiveText: { fontSize: 11, fontFamily: fonts.body.bold, color: '#6EE7B7' },
+  aedMono: {
+    fontSize: 9, letterSpacing: 0.8, color: 'rgba(148,163,184,0.85)',
+    fontFamily: Platform.OS === 'web' ? 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' : undefined,
+  },
+  aedTitle: { fontSize: 18, lineHeight: 24, fontFamily: fonts.heading.bold, color: colors.white, marginTop: spacing.xs },
+  aedBody: { fontSize: 13, lineHeight: 19, fontFamily: fonts.body.regular, color: '#CBD5E1' },
+  aedCta: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 42, marginTop: spacing.xs,
+    borderRadius: radius.pill, backgroundColor: colors.action,
+  },
+  aedCtaHover: { backgroundColor: '#0D9488' },
+  aedCtaText: { fontSize: 13, fontFamily: fonts.body.bold, color: colors.white },
   wrap: { gap: spacing.lg },
   kycCard: {
     backgroundColor: colors.warningBg,

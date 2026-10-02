@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../context/AuthContext';
-import { colors, fonts, radius, spacing, typography, useBreakpoint, MIN_TOUCH_TARGET, isMaterial, gloss } from '../../../theme';
+import { colors, fonts, radius, spacing, typography, useBreakpoint, MIN_TOUCH_TARGET, isMaterial, isPremium, gloss } from '../../../theme';
 import { Avatar } from '../../Avatar';
 import { Button } from '../../Button';
 import { Chip } from '../../Chip';
@@ -178,7 +178,7 @@ export function OrganizationProfile({ orgId }: { orgId: string }) {
     <View testID="org-header">
       <View style={[styles.cover, isMobile ? styles.coverMobile : styles.coverWide]}>
         {/* Material: an architectural gradient cover until the organisation uploads one. */}
-        {isMaterial && !org.cover_photo ? <CoverArt variant="organization" /> : null}
+        {(isMaterial || isPremium) && !org.cover_photo ? <CoverArt variant="organization" /> : null}
         {org.cover_photo ? (
           <Image source={{ uri: mediaUri(org.cover_photo) }} style={StyleSheet.absoluteFill} resizeMode="cover"
             accessibilityLabel={`${org.name} cover photo`} />
@@ -795,7 +795,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.teal, borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center',
   },
   logoEdit: {
-    position: 'absolute', left: -4, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.navy,
+    position: 'absolute', left: -4, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: colors.primaryFill,
     borderWidth: 2, borderColor: colors.white, alignItems: 'center', justifyContent: 'center',
   },
 

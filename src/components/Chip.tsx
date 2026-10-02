@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, StyleSheet, View, Pressable, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts, compactAction } from '../theme';
+import { colors, radius, spacing, typography, fonts, compactAction, isPremium } from '../theme';
 
 export type ChipTone = 'neutral' | 'teal' | 'navy';
 
@@ -47,7 +47,7 @@ export function Chip({ label, tone = 'neutral', icon, onPress, onRemove, style, 
     return (
       <View
         testID={testID}
-        style={[styles.chip, { backgroundColor: toneStyle.bg, borderColor: toneStyle.border }, style]}
+        style={[styles.chip, { backgroundColor: toneStyle.bg, borderColor: toneStyle.border }, isPremium && styles.pStatic, style]}
       >
         {body}
       </View>
@@ -65,6 +65,7 @@ export function Chip({ label, tone = 'neutral', icon, onPress, onRemove, style, 
       style={({ pressed }) => [
         styles.chip,
         { backgroundColor: toneStyle.bg, borderColor: toneStyle.border },
+        isPremium && styles.pInteractive,
         pressed && styles.pressed,
         style,
       ]}
@@ -74,7 +75,14 @@ export function Chip({ label, tone = 'neutral', icon, onPress, onRemove, style, 
   );
 }
 
-const TONES: Record<ChipTone, { bg: string; border: string; fg: string }> = {
+// Premium: a static chip is a crisp label (a skill, a specialty) on a quiet
+// well; a pressable one stays a pill, so the shape says which is which.
+const TONES: Record<ChipTone, { bg: string; border: string; fg: string }> = isPremium ? {
+  neutral: { bg: colors.bgMuted, border: colors.bgMuted, fg: colors.textBody },
+  teal: { bg: colors.tealBg, border: colors.tealLine, fg: colors.tealInk },
+  // A held credential (an accreditation): solid teal, the trust colour.
+  navy: { bg: colors.teal, border: colors.teal, fg: colors.white },
+} : {
   neutral: { bg: colors.bgMuted, border: colors.border, fg: colors.textSecondary },
   teal: { bg: colors.tealBg, border: colors.tealLight, fg: colors.teal },
   navy: { bg: colors.navy, border: colors.navy, fg: colors.white },
@@ -92,7 +100,9 @@ const styles = StyleSheet.create({
   },
   // Opacity only — a transform here would shift neighbouring chips in the row.
   pressed: { opacity: 0.65 },
-  label: { ...typography.caption, fontFamily: fonts.body.medium },
+  label: isPremium ? { fontSize: 12, lineHeight: 16, fontFamily: fonts.body.semibold } : { ...typography.caption, fontFamily: fonts.body.medium },
+  pStatic: { borderRadius: radius.sm, paddingHorizontal: spacing.sm + 2, paddingVertical: 4 },
+  pInteractive: { paddingHorizontal: spacing.md + 2, paddingVertical: 7 },
   icon: { marginRight: spacing.xs + 1 },
   remove: { marginLeft: spacing.xs + 1 },
 });

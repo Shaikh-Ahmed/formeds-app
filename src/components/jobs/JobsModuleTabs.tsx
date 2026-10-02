@@ -1,9 +1,9 @@
 import React from 'react';
 import { LocumIcon } from '../icons/ForMedsIcons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, fonts, useBreakpoint, isRefined, gloss } from '../../theme';
+import { colors, radius, spacing, fonts, useBreakpoint, isRefined, isPremium, gloss, elevation } from '../../theme';
 
 export type JobsModule = 'jobs' | 'locum';
 
@@ -28,7 +28,7 @@ export function JobsModuleTabs({ active }: { active: JobsModule }) {
   const router = useRouter();
   const { isMobile } = useBreakpoint();
   return (
-    <View style={[styles.bar, !isMobile && styles.barWide]} accessibilityRole="tablist"
+    <View style={[styles.bar, !isMobile && styles.barWide, isPremium && styles.cBar, isPremium && isMobile && styles.cBarMobile]} accessibilityRole="tablist"
       testID="jobs-module-tabs">
       {MODULES.map(module => {
         const selected = module.key === active;
@@ -40,20 +40,21 @@ export function JobsModuleTabs({ active }: { active: JobsModule }) {
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={module.label}
-            style={({ pressed }) => [styles.tab, selected && styles.tabActive, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.tab, selected && styles.tabActive, isPremium && styles.cTab,
+              isPremium && selected && styles.cTabActive, pressed && styles.pressed]}
           >
             {isRefined && module.key === 'locum' ? (
               // Premium's shift mark: a day with a clock -- cover, not a job.
-              <LocumIcon size={16} color={selected ? colors.white : colors.textSecondary}
-                badgeBg={selected ? colors.navy : colors.bgMuted} />
+              <LocumIcon size={16} color={selected ? (isPremium ? colors.teal : colors.white) : colors.textSecondary}
+                badgeBg={selected ? (isPremium ? colors.tealBg : colors.navy) : colors.bgMuted} />
             ) : (
               <Ionicons
                 name={module.icon}
                 size={16}
-                color={selected ? colors.white : colors.textSecondary}
+                color={selected ? (isPremium ? colors.teal : colors.white) : colors.textSecondary}
               />
             )}
-            <Text style={[styles.label, selected && styles.labelActive]}>{module.label}</Text>
+            <Text style={[styles.label, selected && styles.labelActive, isPremium && selected && styles.cLabelActive]}>{module.label}</Text>
           </Pressable>
         );
       })}
@@ -92,4 +93,14 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   labelActive: { color: colors.white },
   pressed: { opacity: 0.8 },
+  // Premium: a Material 3 segmented control -- a quiet slate track, the
+  // chosen segment lifted onto a white thumb in teal.
+  cBar: { backgroundColor: colors.bgMuted, borderColor: colors.bgMuted, padding: 4, gap: 4, borderRadius: radius.pill },
+  cTab: { backgroundColor: 'transparent', borderRadius: radius.pill, paddingVertical: 9 },
+  cTabActive: {
+    backgroundColor: colors.white,
+    ...(Platform.OS === 'web' ? ({ boxShadow: '0 1px 3px rgba(15,23,42,0.10), 0 1px 2px rgba(15,23,42,0.06)' } as object) : elevation.subtle),
+  },
+  cLabelActive: { color: colors.teal, fontFamily: fonts.body.bold },
+  cBarMobile: { marginHorizontal: spacing.lg, marginVertical: spacing.sm },
 });

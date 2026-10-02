@@ -1,7 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../../theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET, gloss, isPremium } from '../../theme';
 import { SORT_LABELS, type JobFilters, type JobSort } from '../../types/jobs';
 
 const SORTS: JobSort[] = ['newest', 'pay_high', 'closing_soon', 'urgent'];
@@ -146,6 +147,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     minHeight: MIN_TOUCH_TARGET,
+    // Premium: search is a recessed pill, as in the header.
+    ...(isPremium ? {
+      backgroundColor: colors.bgMuted, borderColor: 'transparent', borderRadius: radius.pill, paddingHorizontal: spacing.lg,
+      ...(Platform.OS === 'web' ? ({ boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)' } as object) : {}),
+    } : {}),
   },
   searchInput: { flex: 1, ...typography.body, color: colors.text, paddingVertical: spacing.sm },
 
@@ -155,7 +161,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs + 2,
     paddingHorizontal: spacing.md,
     minHeight: MIN_TOUCH_TARGET,
-    borderRadius: radius.lg,
+    borderRadius: isPremium ? radius.pill : radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.white,

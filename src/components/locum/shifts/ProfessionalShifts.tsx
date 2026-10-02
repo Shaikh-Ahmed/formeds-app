@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
   blocked: { borderColor: '#FECACA', backgroundColor: colors.redBg },
   blockedHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   blockedTitle: { ...typography.h3, color: colors.redText, flex: 1 },
-  request: { borderColor: colors.navy, borderWidth: 1.5 },
+  request: { borderColor: colors.primaryFill, borderWidth: 1.5 },
   todayCard: { borderColor: colors.teal, borderWidth: 1.5 },
   arrive: { minHeight: 52 },
   notice: {

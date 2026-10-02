@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   },
   filterText: { fontSize: 15, fontFamily: fonts.body.semibold, color: colors.navy },
   filterCount: {
-    minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.navy, alignItems: 'center',
+    minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.primaryFill, alignItems: 'center',
     justifyContent: 'center', paddingHorizontal: 5,
   },
   filterCountText: { color: colors.white, fontSize: 12, fontFamily: fonts.body.bold },

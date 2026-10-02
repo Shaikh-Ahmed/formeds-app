@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   readBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 3,
     borderRadius: radius.pill,

@@ -636,7 +636,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   activeTabButton: {
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
   },
   tabText: {
     ...typography.bodyStrong,
@@ -792,7 +792,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     paddingVertical: 14,
     borderRadius: radius.pill,
     marginTop: spacing.xl,
@@ -890,7 +890,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
     borderRadius: radius.pill,
   },
   backLinkText: {

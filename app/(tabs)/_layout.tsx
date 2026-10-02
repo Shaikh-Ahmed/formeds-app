@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts, elevation, useBreakpoint, isRefined, isMaterial } from '../../src/theme';
+import { colors, fonts, elevation, useBreakpoint, isRefined, isMaterial, isPremium } from '../../src/theme';
 import { MobileTopBar, AppDrawer } from '../../src/components/mobile';
 import { AedLogo } from '../../src/components/aed/AedLogo';
 import { apiFetch } from '../../src/utils/api';
@@ -47,6 +47,15 @@ const MATERIAL_BAR_GAP = 10;
  */
 function tabIcon(name: keyof typeof Ionicons.glyphMap) {
   const TabIcon = ({ color, size, focused }: { color: string; size: number; focused: boolean }) => {
+    // Premium: a Material 3 navigation bar -- the current tab's icon sits in a
+    // pale teal indicator pill.
+    if (isPremium) {
+      return (
+        <View style={[tabStyles.indicator, focused && tabStyles.indicatorActive]}>
+          <Ionicons name={name} size={size - 2} color={color} />
+        </View>
+      );
+    }
     if (!isMaterial) return <Ionicons name={name} size={size} color={color} />;
     return (
       <View style={[tabStyles.disc, focused && tabStyles.discActive]}>
@@ -61,6 +70,8 @@ function tabIcon(name: keyof typeof Ionicons.glyphMap) {
 const tabStyles = StyleSheet.create({
   disc: { width: 40, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   discActive: { backgroundColor: '#FFFFFF' },
+  indicator: { width: 56, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  indicatorActive: { backgroundColor: colors.tealBg },
 });
 
 const bubbleStyles = StyleSheet.create({
@@ -126,7 +137,7 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: isMaterial ? colors.white : colors.navy,
+          tabBarActiveTintColor: isMaterial ? colors.white : isPremium ? colors.teal : colors.navy,
           tabBarInactiveTintColor: isMaterial ? 'rgba(255,255,255,0.72)' : colors.textSecondary,
           // React Navigation adds the bottom inset itself, but only while the
           // height is left unset — an explicit height overrides it and drops
@@ -157,7 +168,9 @@ export default function TabLayout() {
             : { display: 'none' },
           // Premium sets the labels in the brand body face rather than the
           // system font a bare fontWeight falls back to.
-          tabBarLabelStyle: isRefined
+          tabBarLabelStyle: isPremium
+            ? { fontSize: 11, fontFamily: fonts.body.bold, marginTop: 3 }
+            : isRefined
             ? { fontSize: 10.5, fontFamily: fonts.body.semibold, marginTop: 2 }
             : { fontSize: 10, fontWeight: '600', marginTop: 2 },
           tabBarItemStyle: { paddingVertical: 2 },

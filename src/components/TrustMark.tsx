@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { Platform, View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, typography, isRefined } from '../theme';
+import { colors, fonts, typography, isRefined, isPremium } from '../theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -32,6 +32,22 @@ export function TrustMark({
   testID?: string;
 }) {
   const icon: IconName = isRefined ? 'shield-checkmark' : classicIcon;
+  // Premium: the verified tick -- a filled teal disc with a white check and a
+  // soft halo of its own colour, the same mark beside every verified name.
+  if (isPremium) {
+    const seal = (
+      <View style={[styles.seal, { width: size, height: size, borderRadius: size / 2 }]}>
+        <Ionicons name="checkmark" size={Math.round(size * 0.72)} color={colors.white} />
+      </View>
+    );
+    if (!text) return <View accessible accessibilityLabel={label} testID={testID}>{seal}</View>;
+    return (
+      <View style={styles.row} accessible accessibilityLabel={label} testID={testID}>
+        {seal}
+        <Text style={styles.text}>{text}</Text>
+      </View>
+    );
+  }
   if (!text) {
     return <Ionicons name={icon} size={size} color={colors.verified} accessibilityLabel={label} testID={testID} />;
   }
@@ -46,4 +62,8 @@ export function TrustMark({
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   text: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.verified },
+  seal: {
+    backgroundColor: colors.verified, alignItems: 'center', justifyContent: 'center',
+    ...(Platform.OS === 'web' ? ({ boxShadow: '0 0 0 2px #FFFFFF, 0 0 6px rgba(13,148,136,0.45)' } as object) : {}),
+  },
 });

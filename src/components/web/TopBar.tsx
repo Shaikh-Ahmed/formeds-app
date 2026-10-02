@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
-import { colors, spacing, radius, fonts, layout, useBreakpoint, MIN_TOUCH_TARGET, activeTheme, isRefined, isMaterial, isTerracotta, elevation, materials } from '../../theme';
+import { colors, spacing, radius, fonts, layout, useBreakpoint, MIN_TOUCH_TARGET, activeTheme, isRefined, isMaterial, isPremium, isTerracotta, elevation, materials, getRoleMeta } from '../../theme';
+import { TrustMark } from '../TrustMark';
 import { Platform } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../Avatar';
@@ -168,6 +169,110 @@ export function TopBar({
     );
   }
 
+
+  // Premium wears a two-tier header. The first tier is identity and tools --
+  // brand, search, AED, Messages, Alerts and your account; the second is the
+  // section tabs, underlined. Same items, same destinations as every theme;
+  // below desktop it falls back to the icon bar.
+  if (isPremium && isDesktop) {
+    const toolKeys = ['messages', 'notifications'];
+    const sections = items.filter(i => !toolKeys.includes(i.key));
+    const tools = items.filter(i => toolKeys.includes(i.key));
+    const roleMeta = getRoleMeta(user?.role);
+    return (
+      <View style={styles.cBar} role="banner">
+        <View style={styles.cRow}>
+          <Hoverable onPress={() => router.push(homeHref as any)} accessibilityLabel="ForMeds home"
+            style={styles.brand} hoverStyle={styles.brandHover} testID="topbar-brand">
+            <Image source={require('../../../assets/images/formeds-logo.png')} style={styles.logo}
+              resizeMode="contain" accessibilityLabel="ForMeds" />
+          </Hoverable>
+
+          {isRecruiter ? <View style={{ flex: 1 }} /> : (
+            <View style={styles.cSearch}>
+              <Ionicons name="search" size={16} color={colors.textSubtle} />
+              <TextInput testID="topbar-search" style={styles.cSearchInput}
+                placeholder="Search clinicians, cases, jobs and hospitals"
+                placeholderTextColor={colors.textMuted} value={query} onChangeText={setQuery}
+                onSubmitEditing={submitSearch} returnKeyType="search" accessibilityLabel="Search ForMeds" />
+            </View>
+          )}
+
+          <View style={styles.cTools}>
+            {user?.verified && !isRecruiter ? (
+              <View style={styles.cCred} accessible accessibilityLabel={`Verified ${roleMeta.label}`} testID="topbar-verified">
+                <Ionicons name="shield-checkmark" size={14} color={colors.teal} />
+                <Text style={styles.cCredText}>Verified</Text>
+                <Text style={styles.cCredRole} numberOfLines={1}>{roleMeta.label}</Text>
+              </View>
+            ) : null}
+
+            {isRecruiter ? null : (
+              <Hoverable testID="topnav-aed" onPress={() => router.push('/aed-chat' as any)} accessibilityRole="link"
+                accessibilityLabel="Open AED Assist" style={styles.cAed} hoverStyle={styles.cAedHover}>
+                <AedLogo size={20} />
+                <Text style={styles.cAedText}>AED</Text>
+                <View style={styles.cLive} />
+              </Hoverable>
+            )}
+
+            {tools.map(item => {
+              const active = isActive(item.href);
+              return (
+                <Hoverable key={item.key} testID={`topnav-${item.key}`} onPress={() => router.push(item.href as any)}
+                  accessibilityRole="link"
+                  accessibilityLabel={item.badge ? `${item.label}, ${item.badge} unread` : item.label}
+                  accessibilityState={{ selected: active }}
+                  style={[styles.cIconBtn, active && styles.cIconBtnActive]} hoverStyle={styles.cIconBtnHover}>
+                  <Ionicons name={active ? item.iconActive : item.icon} size={20}
+                    color={active ? colors.teal : colors.textSecondary} />
+                  {item.badge ? <View style={styles.cDot} /> : null}
+                </Hoverable>
+              );
+            })}
+
+            <View style={styles.cDivider} />
+
+            <MeMenu profileHref={profileHref} isRecruiter={isRecruiter} trigger={(open, isOpen) => (
+              <Hoverable testID="topnav-profile" onPress={open} accessibilityRole="button"
+                accessibilityLabel="Your account menu" accessibilityState={{ selected: isActive(profileHref) }}
+                style={styles.cMe} hoverStyle={styles.cIconBtnHover}>
+                <View>
+                  <Avatar name={user?.name} role={user?.role} uri={user?.avatar} size={36} />
+                  {user?.verified ? (
+                    <View style={styles.cMeSeal}><TrustMark size={14} label="Verified" /></View>
+                  ) : null}
+                </View>
+                <View style={styles.cMeText}>
+                  <Text style={styles.cMeName} numberOfLines={1}>{user?.name || 'Me'}</Text>
+                  <Text style={styles.cMeRole} numberOfLines={1}>{roleMeta.label}</Text>
+                </View>
+                <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSubtle} />
+              </Hoverable>
+            )} />
+          </View>
+        </View>
+
+        <View style={styles.cTabs} role="navigation">
+          {sections.map(item => {
+            const active = isActive(item.href) && !(item.key === 'recruiter' && isActive(profileHref));
+            return (
+              <Hoverable key={item.key} testID={`topnav-${item.key}`} onPress={() => router.push(item.href as any)}
+                accessibilityRole="link" accessibilityLabel={item.label} accessibilityState={{ selected: active }}
+                style={styles.cTab} hoverStyle={styles.cTabHover}>
+                <Ionicons name={active ? item.iconActive : item.icon} size={17}
+                  color={active ? colors.teal : colors.textSubtle} />
+                <Text style={[styles.cTabText, active && styles.cTabTextActive]} numberOfLines={1}>{item.label}</Text>
+                {/* Underline AND colour + weight: the state never rests on colour alone. */}
+                <View style={[styles.cUnderline, active && styles.cUnderlineActive]} />
+              </Hoverable>
+            );
+          })}
+        </View>
+      </View>
+    );
+  }
+
   return (
     // "banner", not "header": react-native-web renders accessibilityRole
     // "header" as an <h1>, which announced the whole navigation bar as a page
@@ -319,6 +424,67 @@ export function TopBar({
 }
 
 const styles = StyleSheet.create({
+  // -- ForMeds Premium: the two-tier header ------------------------------------
+  cBar: {
+    backgroundColor: Platform.OS === 'web' ? 'rgba(255,255,255,0.95)' : colors.white,
+    borderBottomWidth: 1, borderBottomColor: colors.border, zIndex: 100,
+    ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' } as object) : {}),
+    ...elevation.subtle,
+  },
+  cRow: {
+    height: 64, flexDirection: 'row', alignItems: 'center', alignSelf: 'center', width: '100%',
+    maxWidth: layout.maxWidth, paddingHorizontal: spacing.xxl, gap: spacing.lg,
+  },
+  cSearch: {
+    flex: 1, maxWidth: 520, height: 40, flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    paddingHorizontal: spacing.lg, borderRadius: radius.pill, backgroundColor: colors.bgMuted,
+    ...(Platform.OS === 'web' ? ({ boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)' } as object) : {}),
+  },
+  cSearchInput: {
+    flex: 1, height: '100%', fontSize: 13, fontFamily: fonts.body.medium, color: colors.text,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}),
+  },
+  cTools: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginLeft: 'auto' },
+  cCred: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, height: 32, paddingHorizontal: spacing.md,
+    borderRadius: radius.pill, backgroundColor: colors.tealBg, borderWidth: 1, borderColor: colors.tealLine,
+  },
+  cCredText: { fontSize: 12, fontFamily: fonts.body.bold, color: colors.tealInk },
+  cCredRole: { fontSize: 11, fontFamily: fonts.body.semibold, color: colors.teal, opacity: 0.85, maxWidth: 160 },
+  // AED: the one navy anchor in the bar, with its red mark and a live dot.
+  cAed: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingLeft: 6, paddingRight: spacing.md,
+    borderRadius: radius.pill, backgroundColor: colors.navy,
+    ...(Platform.OS === 'web' ? ({ boxShadow: '0 4px 12px -4px rgba(15,23,42,0.45)', transition: 'background-color 200ms cubic-bezier(0.2,0,0,1)' } as object) : {}),
+  },
+  cAedHover: { backgroundColor: colors.navyLight },
+  cAedText: { fontSize: 13, fontFamily: fonts.body.bold, color: colors.white, letterSpacing: 0.4 },
+  cLive: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.online, marginLeft: 2 },
+  cIconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  cIconBtnHover: { backgroundColor: colors.bgMuted },
+  cIconBtnActive: { backgroundColor: colors.tealBg },
+  cDot: {
+    position: 'absolute', top: 8, right: 9, width: 9, height: 9, borderRadius: 5,
+    backgroundColor: '#F43F5E', borderWidth: 2, borderColor: colors.white,
+  },
+  cDivider: { width: 1, height: 28, backgroundColor: colors.border, marginHorizontal: spacing.xs },
+  cMe: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 4, paddingLeft: 4, paddingRight: spacing.sm, borderRadius: radius.pill },
+  cMeSeal: { position: 'absolute', right: -3, bottom: -2 },
+  cMeText: { maxWidth: 150 },
+  cMeName: { fontSize: 13, lineHeight: 17, fontFamily: fonts.body.bold, color: colors.text },
+  cMeRole: { fontSize: 11, lineHeight: 14, fontFamily: fonts.body.medium, color: colors.textSubtle },
+  cTabs: {
+    height: 46, flexDirection: 'row', alignItems: 'stretch', alignSelf: 'center', width: '100%',
+    maxWidth: layout.maxWidth, paddingHorizontal: spacing.xxl, gap: spacing.xxl + 4,
+    borderTopWidth: 1, borderTopColor: colors.borderLight,
+  },
+  cTab: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 2 },
+  cTabHover: { opacity: 0.85 },
+  cTabText: { fontSize: 14, fontFamily: fonts.body.semibold, color: colors.textSecondary },
+  cTabTextActive: { color: colors.teal, fontFamily: fonts.body.bold },
+  cUnderline: { position: 'absolute', left: 0, right: 0, bottom: -1, height: 2, borderRadius: 2, backgroundColor: 'transparent' },
+  cUnderlineActive: { backgroundColor: colors.teal },
+
   bar: {
     height: layout.topBar,
     backgroundColor: colors.white,
@@ -385,7 +551,7 @@ const styles = StyleSheet.create({
   navLabelActive: { color: colors.navy, fontWeight: '700' },
   meLabel: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   underline: { position: 'absolute', bottom: 0, left: 8, right: 8, height: 2, backgroundColor: 'transparent' },
-  underlineActive: { backgroundColor: colors.navy },
+  underlineActive: { backgroundColor: colors.primaryFill },
 
   aedItem: {
     flexDirection: 'row',

@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
     backgroundColor: colors.white,
   },
-  checkOn: { borderColor: colors.navy, backgroundColor: colors.bg },
+  checkOn: { borderColor: colors.primaryFill, backgroundColor: colors.bg },
   checkText: { ...typography.body, color: colors.text },
 
   summary: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md },

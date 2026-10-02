@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   windows: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center', minHeight: 40 },
   window: {
     flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, minHeight: 34,
-    borderRadius: radius.pill, backgroundColor: '#EFF6FF',
+    borderRadius: radius.pill, backgroundColor: colors.tintBg,
   },
   windowText: { fontSize: 13, fontFamily: fonts.body.semibold, color: colors.navy },
   plus: {

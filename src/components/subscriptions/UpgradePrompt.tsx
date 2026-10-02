@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
   compact: { padding: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   lock: {
-    width: 26, height: 26, borderRadius: 13, backgroundColor: '#EFF6FF',
+    width: 26, height: 26, borderRadius: 13, backgroundColor: colors.tintBg,
     alignItems: 'center', justifyContent: 'center',
   },
   title: { ...typography.label, fontFamily: fonts.body.semibold, color: colors.text, flex: 1 },

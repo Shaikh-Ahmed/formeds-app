@@ -5,7 +5,7 @@ import {
   type StyleProp, type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../theme';
+import { colors, radius, spacing, typography, fonts, isPremium, MIN_TOUCH_TARGET } from '../theme';
 import { FieldError, useFieldError } from './FieldError';
 
 /**
@@ -101,6 +101,7 @@ export function SelectField({
         {...err.inputProps}
         style={({ pressed }) => [
           styles.trigger,
+          isPremium && styles.pTrigger,
           error ? styles.triggerError : null,
           disabled && styles.triggerDisabled,
           pressed && !disabled && styles.triggerPressed,
@@ -254,7 +255,14 @@ const styles = StyleSheet.create({
   triggerPressed: { backgroundColor: colors.bgMuted, borderColor: colors.textMuted },
   triggerDisabled: { opacity: 0.6 },
   icon: { marginRight: spacing.xs },
-  triggerText: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: spacing.md },
+  triggerText: isPremium
+    ? { flex: 1, fontSize: 15, fontFamily: fonts.body.medium, color: colors.text, paddingVertical: spacing.md }
+    : { flex: 1, fontSize: 16, color: colors.text, paddingVertical: spacing.md },
+  // Premium: the same recessed well as FormInput.
+  pTrigger: {
+    backgroundColor: colors.bgMuted, borderColor: 'transparent', borderRadius: radius.input, minHeight: 48,
+    ...(Platform.OS === 'web' ? ({ boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)' } as object) : {}),
+  },
   triggerPlaceholder: { color: colors.textMuted },
   helper: { ...typography.small, color: colors.textMuted, marginTop: 4 },
 

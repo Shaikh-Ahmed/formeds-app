@@ -1,10 +1,10 @@
 import React from 'react';
 import { Platform, StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, elevation, isTerracotta, materials, radius, spacing } from '../../theme';
+import { colors, elevation, isPremium, isTerracotta, materials, radius, spacing } from '../../theme';
 
 /** The soft pool of light low on a hero: brand-light blue, or apricot in Terracotta. */
-const POOL = isTerracotta ? '230,140,100' : '47,109,181';
+const POOL = isTerracotta ? '230,140,100' : isPremium ? '34,211,238' : '47,109,181';
 
 type GradientName = keyof typeof materials.gradients;
 

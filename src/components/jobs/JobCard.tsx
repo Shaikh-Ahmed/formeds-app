@@ -3,7 +3,8 @@ import { useReducedMotion } from '../../hooks/useReducedMotion';
 import { TrustMark } from '../TrustMark';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts, shadow, isRefined, isMaterial, motion, MIN_TOUCH_TARGET, gloss } from '../../theme';
+import { colors, radius, spacing, typography, fonts, shadow, isRefined, isMaterial, isPremium, motion, MIN_TOUCH_TARGET, gloss } from '../../theme';
+import { Platform } from 'react-native';
 import { postedAgo } from '../../utils/time';
 import { Avatar } from '../Avatar';
 import { Chip } from '../Chip';
@@ -59,7 +60,8 @@ export const JobCard = React.memo(function JobCard({
   const canQuickApply = !!onQuickApply && !item.has_applied && !item.can_manage && item.status === 'active';
 
   return (
-    <View style={[styles.card, compact && styles.cardCompact, isRefined && styles.pCard, selected && styles.cardSelected]}>
+    <View style={[styles.card, compact && styles.cardCompact, isRefined && styles.pCard, isPremium && styles.cCard,
+      selected && styles.cardSelected]}>
       <Pressable
         testID={`job-card-${item.id}`}
         onPress={onPress}
@@ -71,12 +73,18 @@ export const JobCard = React.memo(function JobCard({
         }
         style={({ pressed, hovered }: any) => [
           styles.hit,
-          (pressed || hovered) && !selected && styles.cardPressed,
+          (pressed || hovered) && !selected && (isPremium ? styles.cHover : styles.cardPressed),
         ]}
       />
 
       <View style={styles.topRow} pointerEvents="box-none">
         <View style={styles.titleBlock} pointerEvents="none">
+          {/* Premium: the specialty leads, as a crisp classification tag. */}
+          {isPremium && item.specialty ? (
+            <View style={styles.cSpecialty}>
+              <Text style={styles.cSpecialtyText} numberOfLines={1}>{item.specialty}</Text>
+            </View>
+          ) : null}
           <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
 
           <View style={styles.employerRow}>
@@ -119,8 +127,9 @@ export const JobCard = React.memo(function JobCard({
             spec's decision order -- and set to read before the metadata. */}
         {isRefined ? (pay ? (
           <View style={[styles.pPayRow, isMaterial && styles.mPayRow]}>
-            <Ionicons name="wallet-outline" size={16} color={isMaterial ? colors.teal : colors.navy} />
-            <Text style={styles.pPay}>{pay}</Text>
+            <Ionicons name={isPremium ? 'cash-outline' : 'wallet-outline'} size={16}
+              color={isMaterial || isPremium ? colors.teal : colors.navy} />
+            <Text style={[styles.pPay, isPremium && styles.cPay]}>{pay}</Text>
           </View>
         ) : (
           <Text style={styles.payHidden}>Pay not disclosed</Text>
@@ -169,6 +178,9 @@ export const JobCard = React.memo(function JobCard({
 
       <View style={styles.footer} pointerEvents="box-none">
         <View style={styles.footerInfo} pointerEvents="none">
+          {isPremium && item.employer_verified ? (
+            <Text style={styles.cVerifiedLine} numberOfLines={1}>Verified employer ·</Text>
+          ) : null}
           <Text style={styles.posted}>{postedAgo(item.created_at)}</Text>
           {!item.has_applied && item.applicant_count > 0 ? (
             <Text style={styles.posted}>
@@ -202,7 +214,7 @@ export const JobCard = React.memo(function JobCard({
               accessibilityLabel={`Quick apply to ${item.title}`}
               style={({ pressed, hovered }: any) => [styles.quick, hovered && styles.quickHover, pressed && styles.iconPressed]}
             >
-              <Ionicons name="flash" size={14} color={colors.white} />
+              <Ionicons name={isPremium ? 'paper-plane' : 'flash'} size={14} color={colors.white} />
               <Text style={styles.quickText}>Quick apply</Text>
             </Pressable>
           ) : null}
@@ -251,7 +263,7 @@ const styles = StyleSheet.create({
   cardCompact: { borderRadius: radius.lg, padding: spacing.md + 2, gap: spacing.xs + 2 },
   // A 2px left edge rather than a fill: the selected row has to read as
   // selected without changing how legible its text is.
-  cardSelected: { borderColor: colors.navy, backgroundColor: colors.selected },
+  cardSelected: { borderColor: colors.primaryFill, backgroundColor: colors.selected },
   cardPressed: { backgroundColor: colors.bgMuted },
   // The card's own tap target, filling it behind the content.
   hit: { ...StyleSheet.absoluteFillObject, borderRadius: radius.xl + 2 },
@@ -311,6 +323,19 @@ const styles = StyleSheet.create({
   pCard: { borderRadius: radius.card, ...shadow.card },
   pPayRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
   pPay: { ...typography.h3, color: colors.navy },
+  // Premium: a crisp card that answers a hover with a teal edge.
+  cCard: Platform.OS === 'web'
+    ? ({ transition: 'border-color 200ms cubic-bezier(0.2,0,0,1), box-shadow 200ms cubic-bezier(0.2,0,0,1)' } as object)
+    : {},
+  cSpecialty: {
+    alignSelf: 'flex-start', marginBottom: 2, paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: radius.tag, borderWidth: 1, borderColor: colors.tealLine, backgroundColor: colors.tealBg,
+  },
+  cSpecialtyText: { fontSize: 10, lineHeight: 14, fontFamily: fonts.body.bold, color: colors.tealInk, letterSpacing: 0.6, textTransform: 'uppercase' },
+  cPay: { color: colors.teal, fontSize: 15 },
+  // The hover edge is drawn by the card's own tap target, which fills it.
+  cHover: { borderWidth: 1, borderColor: 'rgba(20,184,166,0.45)', backgroundColor: 'rgba(240,253,250,0.35)' },
+  cVerifiedLine: { ...typography.small, color: colors.textSubtle },
   // Material: the salary sits in a soft teal well -- the decision number.
   mPayRow: {
     alignSelf: 'flex-start', backgroundColor: colors.tealBg,

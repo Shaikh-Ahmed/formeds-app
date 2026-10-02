@@ -5,7 +5,7 @@ import { INVITATION_LABELS, type InvitationStatus } from '../../types/recruiters
 
 export const INVITE_TONES: Record<InvitationStatus, { bg: string; fg: string }> = {
   SENT: { bg: colors.bgMuted, fg: colors.textSecondary },
-  VIEWED: { bg: '#EFF6FF', fg: colors.navy },
+  VIEWED: { bg: colors.tintBg, fg: colors.navy },
   ACCEPTED: { bg: colors.successBg, fg: colors.teal },
   DECLINED: { bg: colors.redBg, fg: colors.redText },
   EXPIRED: { bg: colors.bgMuted, fg: colors.textMuted },

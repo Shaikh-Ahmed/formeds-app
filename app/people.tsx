@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   requestedBtn: { backgroundColor: colors.bgMuted },
   connectText: { color: '#FFF', fontSize: 13, fontWeight: '600' },
   requestedText: { color: colors.textMuted },
-  msgIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
+  msgIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.tintBg, alignItems: 'center', justifyContent: 'center' },
   pendingTime: { fontSize: 12, color: '#D97706', marginTop: 2 },
   pendingActions: { flexDirection: 'row', gap: 8 },
   acceptBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0F766E', alignItems: 'center', justifyContent: 'center' },

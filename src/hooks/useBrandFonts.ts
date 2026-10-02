@@ -16,6 +16,11 @@ import { SourceSerif4_400Regular } from '@expo-google-fonts/source-serif-4/400Re
 import { SourceSerif4_500Medium } from '@expo-google-fonts/source-serif-4/500Medium';
 import { SourceSerif4_600SemiBold } from '@expo-google-fonts/source-serif-4/600SemiBold';
 import { SourceSerif4_700Bold } from '@expo-google-fonts/source-serif-4/700Bold';
+import { PlusJakartaSans_400Regular } from '@expo-google-fonts/plus-jakarta-sans/400Regular';
+import { PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans/500Medium';
+import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold';
+import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/700Bold';
+import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans/800ExtraBold';
 import { activeTheme } from '../theme/activeTheme';
 
 /**
@@ -34,14 +39,23 @@ const HEADING_FACES: Record<string, number> = activeTheme === 'journal'
   ? { SourceSerif4_400Regular, SourceSerif4_500Medium, SourceSerif4_600SemiBold, SourceSerif4_700Bold }
   : { Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold };
 
-export function useBrandFonts(): boolean {
-  const [loaded, error] = useFonts({
+// Premium sets everything in Plus Jakarta Sans, so it fetches only that
+// family -- five faces -- and none of the others.
+const FACES: Record<string, number> = activeTheme === 'premium'
+  ? {
+    PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold,
+  }
+  : {
     ...HEADING_FACES,
     IBMPlexSans_400Regular,
     IBMPlexSans_500Medium,
     IBMPlexSans_600SemiBold,
     IBMPlexSans_700Bold,
-  });
+  };
+
+export function useBrandFonts(): boolean {
+  const [loaded, error] = useFonts(FACES);
 
   const [timedOut, setTimedOut] = useState(false);
 

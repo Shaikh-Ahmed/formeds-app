@@ -167,7 +167,7 @@ export default function SettingsScreen() {
 const SWATCHES: Record<ThemeId, { ground: string; card: string; ink: string; accent: string; serif: boolean }> = {
   classic: { ground: '#F8FAFC', card: '#FFFFFF', ink: '#1A3A5C', accent: '#0F766E', serif: false },
   journal: { ground: '#FAF8F4', card: '#FFFFFF', ink: '#1C2430', accent: '#0F5E57', serif: true },
-  premium: { ground: '#F3F5F8', card: '#FFFFFF', ink: '#15304D', accent: '#0B7268', serif: false },
+  premium: { ground: '#F8FAFC', card: '#FFFFFF', ink: '#0F172A', accent: '#0F766E', serif: false },
   material: { ground: '#EEF2FB', card: '#FFFFFF', ink: '#0B2545', accent: '#003A72', serif: false },
   terracotta: { ground: '#F3ECE2', card: '#FCF9F4', ink: '#4A2314', accent: '#A3472A', serif: false },
 };
@@ -194,7 +194,8 @@ function ThemeOption({ id, label, description, selected }: {
     >
       <View style={[styles.themePreview, { backgroundColor: sw.ground }]}>
         <View style={[styles.themePreviewCard, { backgroundColor: sw.card }]}>
-          <Text style={[styles.themePreviewTitle, { color: sw.ink }, sw.serif && styles.serif]}>Aa</Text>
+          <Text style={[styles.themePreviewTitle, { color: sw.ink }, sw.serif && styles.serif,
+            id === 'premium' && styles.jakarta]}>Aa</Text>
           <View style={[styles.themePreviewBar, { backgroundColor: sw.accent }]} />
         </View>
       </View>
@@ -235,6 +236,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)',
   },
   themePreviewTitle: { fontSize: 20, fontFamily: 'Outfit_700Bold' },
+  // Premium previews in its own face, Plus Jakarta Sans.
+  jakarta: { fontFamily: 'PlusJakartaSans_800ExtraBold' },
   // The serif face itself only loads under Journal, so the preview uses the
   // platform serif to show the difference from either theme.
   serif: { fontFamily: Platform.select({ web: 'Georgia, serif', ios: 'Georgia', default: 'serif' }) },

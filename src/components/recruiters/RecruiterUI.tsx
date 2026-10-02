@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   navLabel: { fontSize: 14, fontFamily: fonts.body.medium, color: colors.textSecondary },
   navLabelActive: { color: colors.navy, fontFamily: fonts.body.bold },
   navUnderline: { position: 'absolute', left: spacing.sm, right: spacing.sm, bottom: 0, height: 3, borderRadius: 2 },
-  navUnderlineActive: { backgroundColor: colors.navy },
+  navUnderlineActive: { backgroundColor: colors.primaryFill },
 
   wideRow: {
     // Same width and gutters as the desktop TopBar, so the rail lines up
