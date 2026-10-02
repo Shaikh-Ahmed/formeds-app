@@ -52,8 +52,10 @@ export const ROLE_META: Record<Role, RoleMeta> = {
   official: {
     label: 'Official',
     longLabel: 'Official Newsletter',
-    color: '#4338CA',
-    bg: '#EEF2FF',
+    // The trust colour: an official, verified source. Follows the theme
+    // (teal in Classic, blue in Material, terracotta in Terracotta).
+    color: colors.verified,
+    bg: colors.verifiedBg,
     icon: 'checkmark-circle',
     description: 'Verified Formeds Medical Publication',
   },

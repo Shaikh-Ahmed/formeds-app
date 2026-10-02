@@ -83,7 +83,7 @@ export function ArticleFeedCard({
           <View style={styles.authorRow}>
             <Text style={styles.authorName}>Formeds Newsletter</Text>
             <View style={styles.officialPill}>
-              <Ionicons name="checkmark-circle" size={13} color="#4338CA" style={{ marginRight: 3 }} />
+              <Ionicons name="checkmark-circle" size={13} color={colors.verified} style={{ marginRight: 3 }} />
               <Text style={styles.officialText}>Official</Text>
             </View>
           </View>
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderLeftWidth: 4,
-    borderLeftColor: '#4338CA', // Indigo indicator for Official Publications
+    borderLeftColor: colors.verified, // Official publications: the theme's trust colour
     ...shadow.card,
   },
   header: {
@@ -219,9 +219,9 @@ const styles = StyleSheet.create({
   officialPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: colors.verifiedBg,
     borderWidth: 1,
-    borderColor: '#E0E7FF',
+    borderColor: colors.border,
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: radius.sm,
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   officialText: {
     fontSize: 10,
     fontFamily: fonts.heading.bold,
-    color: '#4338CA',
+    color: colors.verified,
     letterSpacing: 0.2,
   },
   timeRow: {

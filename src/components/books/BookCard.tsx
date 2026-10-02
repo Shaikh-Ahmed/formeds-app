@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E0E7FF',
+    backgroundColor: colors.tealBg,
   },
   miniProgressWrap: {
     position: 'absolute',
