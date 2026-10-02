@@ -2,17 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ComingSoon } from '../../src/components';
+import { ComingSoon, BooksCatalog, ResearchCatalog } from '../../src/components';
+import { useAuth } from '../../src/context/AuthContext';
+import { useRouter } from 'expo-router';
 import { PageGrid, ProfileRail } from '../../src/components/web';
 import { colors, spacing, radius, typography, useBreakpoint, gloss } from '../../src/theme';
-
-/**
- * Learning Hub — Books, CME and Research all ship in a later phase.
- * The tabs stay visible so the roadmap is legible, but each renders a
- * coming-soon panel. The working Research implementation (PubMed via
- * GET /api/learning/research) is preserved at the bottom of this file;
- * see "DISABLED — Research implementation" for how to switch it back on.
- */
 
 type TabKey = 'books' | 'cme' | 'research';
 
@@ -28,9 +22,9 @@ const TABS: {
     key: 'books',
     label: 'Books',
     icon: 'book-outline',
-    title: 'Medical books are coming soon',
+    title: 'Medical Reference E-Books',
     description: 'A curated library of reference texts and clinical handbooks, readable inside the app.',
-    bullets: ['Specialty-filtered catalogue', 'Offline reading', 'Bookmarks and highlights'],
+    bullets: ['Specialty-filtered catalogue', 'Continue reading shelf', 'Bookmarks and highlights'],
   },
   {
     key: 'cme',
@@ -51,6 +45,8 @@ const TABS: {
 ];
 
 export default function LearningScreen() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('books');
   const active = TABS.find(t => t.key === activeTab)!;
   const { isMobile } = useBreakpoint();
@@ -59,10 +55,28 @@ export default function LearningScreen() {
     <SafeAreaView style={styles.safe} edges={[]}>
       <PageGrid left={<ProfileRail />} testID="learning-grid">
       <View style={[styles.wideTitleWrap, isMobile && styles.titleWrapMobile]}>
-        <Text style={styles.wideTitle} accessibilityRole="header">Learning Hub</Text>
-        <Text style={styles.wideSubtitle}>
-          Reference texts, accredited CME and peer-reviewed research, in one place.
-        </Text>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.wideTitle} accessibilityRole="header">Learning Hub</Text>
+            <Text style={styles.wideSubtitle}>
+              Reference texts, accredited CME and peer-reviewed research, in one place.
+            </Text>
+          </View>
+          {user?.is_admin && (
+            <TouchableOpacity
+              style={styles.adminHeaderUploadBtn}
+              onPress={() => router.push(`/admin/upload?tab=${activeTab === 'research' ? 'research' : 'books'}` as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Upload Content"
+              testID="learning-header-upload-btn"
+            >
+              <Ionicons name="cloud-upload" size={16} color={colors.white} style={{ marginRight: 6 }} />
+              <Text style={styles.adminHeaderUploadBtnText}>
+                {activeTab === 'books' ? 'Upload Book' : activeTab === 'research' ? 'Upload Research Paper' : 'Upload Content'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
@@ -74,7 +88,7 @@ export default function LearningScreen() {
             onPress={() => setActiveTab(t.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === t.key }}
-            accessibilityLabel={`${t.label} — coming soon`}
+            accessibilityLabel={t.key === 'books' ? t.label : `${t.label} — coming soon`}
           >
             <Ionicons name={t.icon} size={16} color={activeTab === t.key ? colors.textOnDark : colors.textSubtle} />
             <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
@@ -82,19 +96,29 @@ export default function LearningScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.body}>
-        <ComingSoon
-          testID={`coming-soon-${active.key}`}
-          icon={active.icon}
-          title={active.title}
-          description={active.description}
-          bullets={active.bullets}
-        />
+      {activeTab === 'books' ? (
+        <View style={styles.booksWrapper}>
+          <BooksCatalog />
+        </View>
+      ) : activeTab === 'research' ? (
+        <View style={styles.booksWrapper}>
+          <ResearchCatalog />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.body}>
+          <ComingSoon
+            testID={`coming-soon-${active.key}`}
+            icon={active.icon}
+            title={active.title}
+            description={active.description}
+            bullets={active.bullets}
+          />
 
-        <Text style={styles.footnote}>
-          Books, CME and Research all arrive in a later phase. Nothing to do here yet.
-        </Text>
-      </ScrollView>
+          <Text style={styles.footnote}>
+            {active.label} arrives in a later phase. Stay tuned for updates.
+          </Text>
+        </ScrollView>
+      )}
       </PageGrid>
     </SafeAreaView>
   );
@@ -142,148 +166,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     lineHeight: 18,
   },
-});
+  booksWrapper: {
+    flex: 1,
+    padding: spacing.lg,
+    paddingBottom: 0,
+  },
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DISABLED — Research implementation (re-enable in a later phase)
-//
-// This worked against GET /api/learning/research, which is STILL LIVE in
-// backend/routes/learning.py — the endpoint was not removed, only the UI that
-// consumed it. Verify with: curl $BACKEND/api/learning/research
-//
-// To switch Research back on:
-//   1. Restore these imports at the top of the file:
-//        import React, { useState, useEffect, useCallback } from 'react';
-//        import { ..., FlatList, RefreshControl, Linking } from 'react-native';
-//        import { useAuth } from '../../src/context/AuthContext';
-//        import { apiFetch } from '../../src/utils/api';
-//        import { ComingSoon, LoadingState, ErrorState } from '../../src/components';
-//   2. Uncomment the state, loader, renderers and styles below.
-//   3. In the body, branch on the active tab:
-//        {activeTab === 'research' ? renderResearch() : <ScrollView …><ComingSoon …/></ScrollView>}
-//   4. Drop the "— coming soon" suffix from the Research tab's accessibilityLabel
-//      and consider defaulting useState<TabKey> to 'research'.
-//
-// Note: the backend still serves a fixed set of PMIDs (PUBMED_IDS in
-// routes/learning.py). Free-text search (OpenAlex) is the unbuilt part.
-//
-// interface Article {
-//   id: string;
-//   title: string;
-//   abstract: string;
-//   /** Comma-joined by the backend — see parse_pubmed_xml in routes/learning.py. */
-//   authors: string;
-//   date: string;
-//   url: string;
-// }
-//
-// const { token } = useAuth();
-// const [articles, setArticles] = useState<Article[]>([]);
-// const [loading, setLoading] = useState(true);
-// const [refreshing, setRefreshing] = useState(false);
-// const [error, setError] = useState<string | null>(null);
-//
-// const loadResearch = useCallback(async () => {
-//   setError(null);
-//   try {
-//     setArticles(await apiFetch('/api/learning/research', token));
-//   } catch (e: any) {
-//     setError(e?.message || 'Could not reach the research service.');
-//   } finally {
-//     setLoading(false);
-//     setRefreshing(false);
-//   }
-// }, [token]);
-//
-// useEffect(() => { loadResearch(); }, [loadResearch]);
-//
-// const renderArticle = ({ item }: { item: Article }) => {
-//   const authors = item.authors ? item.authors.split(', ') : [];
-//   return (
-//     <TouchableOpacity
-//       testID={`research-card-${item.id}`}
-//       style={styles.card}
-//       onPress={() => item.url && Linking.openURL(item.url)}
-//       disabled={!item.url}
-//       accessibilityRole="link"
-//       accessibilityLabel={`Open on PubMed: ${item.title}`}
-//     >
-//       <View style={styles.cardHeader}>
-//         <View style={styles.cardIcon}><Ionicons name="document-text" size={20} color={colors.navy} /></View>
-//         <View style={styles.sourceBadge}><Text style={styles.sourceText}>PubMed</Text></View>
-//         {item.date ? <Text style={styles.date}>{item.date}</Text> : null}
-//       </View>
-//       <Text style={styles.cardTitle}>{item.title}</Text>
-//       {authors.length > 0 && (
-//         <Text style={styles.authors}>
-//           {authors.slice(0, 3).join(', ')}{authors.length > 3 ? ` +${authors.length - 3} more` : ''}
-//         </Text>
-//       )}
-//       <Text style={styles.abstract} numberOfLines={4}>{item.abstract}</Text>
-//       <View style={styles.cardFooter}>
-//         <Ionicons name="open-outline" size={14} color={colors.textMuted} />
-//         <Text style={styles.footerText}>Read on PubMed</Text>
-//       </View>
-//     </TouchableOpacity>
-//   );
-// };
-//
-// const renderResearch = () => {
-//   if (loading) return <LoadingState label="Loading research…" />;
-//   if (error) return <ErrorState message={error} onRetry={() => { setLoading(true); loadResearch(); }} />;
-//   return (
-//     <FlatList
-//       data={articles}
-//       renderItem={renderArticle}
-//       keyExtractor={item => item.id}
-//       contentContainerStyle={styles.list}
-//       refreshControl={
-//         <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadResearch(); }} tintColor={colors.navy} />
-//       }
-//       ListEmptyComponent={
-//         <View style={styles.center}>
-//           <Ionicons name="flask-outline" size={48} color={colors.textMuted} />
-//           <Text style={styles.emptyText}>No articles available right now</Text>
-//         </View>
-//       }
-//     />
-//   );
-// };
-//
-// ── styles used by the above (merge back into StyleSheet.create) ──
-// list: { padding: spacing.lg, paddingBottom: 100 },
-// card: {
-//   backgroundColor: colors.card,
-//   borderRadius: radius.xl + 2,
-//   padding: spacing.lg,
-//   marginBottom: spacing.md,
-//   borderWidth: 1,
-//   borderColor: colors.border,
-//   borderLeftWidth: 4,
-//   borderLeftColor: colors.navy,
-// },
-// cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md - 2 },
-// cardIcon: {
-//   width: 36,
-//   height: 36,
-//   borderRadius: radius.md,
-//   backgroundColor: colors.bgMuted,
-//   alignItems: 'center',
-//   justifyContent: 'center',
-// },
-// sourceBadge: {
-//   backgroundColor: colors.tealBg,
-//   paddingHorizontal: spacing.sm + 2,
-//   paddingVertical: spacing.xs,
-//   borderRadius: radius.sm,
-// },
-// sourceText: { fontSize: 11, fontWeight: '700', color: colors.teal },
-// date: { ...typography.small, color: colors.textMuted, marginLeft: 'auto' },
-// cardTitle: { ...typography.h3, fontSize: 16, color: colors.text, lineHeight: 22, marginBottom: 6 },
-// authors: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.sm },
-// abstract: { fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: spacing.md - 2 },
-// cardFooter: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-// footerText: { ...typography.small, color: colors.textMuted, fontWeight: '600' },
-// center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-// emptyText: { ...typography.body, fontSize: 16, color: colors.textMuted, marginTop: spacing.md },
-// ─────────────────────────────────────────────────────────────────────────────
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  adminHeaderUploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.teal,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    alignSelf: 'center',
+  },
+  adminHeaderUploadBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.white,
+  },
+});

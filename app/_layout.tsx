@@ -154,6 +154,7 @@ function RootNavigator() {
       <Stack.Screen name="checkout" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="help" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="lesson/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="learning/reader/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="post/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="case/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="case/new" options={{ animation: 'slide_from_bottom' }} />
@@ -168,11 +169,11 @@ function RootNavigator() {
       <Stack.Screen name="people" options={{ animation: 'slide_from_right' }} />
       {/* Another professional's profile. Distinct from /(tabs)/profile,
           which is the signed-in user's own. */}
-      <Stack.Screen name="profile/[id]" options={{ animation: 'slide_from_right' }} />
-      {/* Fades rather than slides: search is a mode you enter from the header,
+        <Stack.Screen name="profile/[id]" options={{ animation: 'slide_from_right' }} />
+        {/* Fades rather than slides: search is a mode you enter from the header,
           not a place further along the stack. */}
-      <Stack.Screen name="search" options={{ animation: 'fade' }} />
-    </Stack>
+        <Stack.Screen name="search" options={{ animation: 'fade' }} />
+      </Stack>
     </View>
   );
 }

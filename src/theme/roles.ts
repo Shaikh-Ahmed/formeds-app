@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from './colors';
 import { isMaterial } from './activeTheme';
 
-export type Role = 'healthcare_professional' | 'hospital' | 'clinic' | 'recruiter';
+export type Role = 'healthcare_professional' | 'hospital' | 'clinic' | 'recruiter' | 'official';
 
 export interface RoleMeta {
   /** Short label for badges (feed, people cards). */
@@ -49,6 +49,14 @@ export const ROLE_META: Record<Role, RoleMeta> = {
     icon: 'fitness',
     description: 'Find visiting specialists',
   },
+  official: {
+    label: 'Official',
+    longLabel: 'Official Newsletter',
+    color: '#4338CA',
+    bg: '#EEF2FF',
+    icon: 'checkmark-circle',
+    description: 'Verified Formeds Medical Publication',
+  },
   recruiter: {
     label: 'Recruiter',
     longLabel: 'Healthcare Recruiter',
@@ -64,5 +72,6 @@ const FALLBACK = ROLE_META.healthcare_professional;
 /** Safe lookup with the same fallback behaviour the screens used inline. */
 export function getRoleMeta(role?: string | null): RoleMeta {
   if (!role) return FALLBACK;
-  return ROLE_META[role as Role] ?? FALLBACK;
+  const normalized = role.toLowerCase().replace(/[\s-_]+/g, '_');
+  return ROLE_META[normalized as Role] ?? ROLE_META[role as Role] ?? FALLBACK;
 }

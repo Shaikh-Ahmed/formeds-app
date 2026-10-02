@@ -6,13 +6,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { sharePost } from '../../src/utils/share';
 import { CopiedToast, useCopiedToast } from '../../src/components/CopiedToast';
+import { PostActions } from '../../src/components/PostActions';
+import * as WebBrowser from 'expo-web-browser';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
 import { timeAgo } from '../../src/utils/time';
-import { Avatar, RoleBadge, MediaViewer } from '../../src/components';
+import { Avatar, RoleBadge, MediaViewer, TagChip, formatArticleUrl } from '../../src/components';
 import { PageColumn } from '../../src/components/web';
-import { colors, fonts, spacing, radius, typography, compactAction, gloss } from '../../src/theme';
+import { colors, fonts, spacing, radius, typography, gloss } from '../../src/theme';
 import { mediaUri } from '../../src/utils/media';
 
 export default function PostDetailScreen() {
@@ -114,74 +116,91 @@ export default function PostDetailScreen() {
             </View>
           </View>
         </View>
-        <Text style={styles.postContent}>{post.content}</Text>
-        {post.image_url ? (
-          <Pressable
-            testID="post-detail-image"
-            onPress={() => setViewerOpen(true)}
-            accessibilityRole="imagebutton"
-            accessibilityLabel="Open image full screen"
-            style={({ pressed }) => [styles.postImageWrap, pressed && { opacity: 0.9 }]}
-          >
-            <Image source={{ uri: mediaUri(post.image_url) }} style={styles.postImage} resizeMode="cover" />
-            <View style={styles.expandHint} pointerEvents="none">
-              <Ionicons name="expand-outline" size={14} color={colors.white} />
-            </View>
-          </Pressable>
-        ) : null}
-        {/* Matches the feed's compact row: 32px painted, 44px effective via
-            hit slop. Previously these were bare icon+text with no minimum
-            target at all. */}
-        <View style={styles.postActions}>
-          <Pressable
-            testID="post-like-btn"
-            style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
-            onPress={handleLike}
-            hitSlop={compactAction.hitSlop}
-            accessibilityRole="button"
-            accessibilityLabel={`${isLiked ? 'Unlike' : 'Like'}, ${post.like_count} likes`}
-          >
-            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? colors.redText : colors.textSecondary} />
-            <Text style={[styles.actionText, isLiked && { color: colors.redText }]}>{post.like_count}</Text>
-          </Pressable>
-          {/* Not pressable — you are already on the post; this is a count. */}
-          <View style={styles.actionBtn} accessible accessibilityLabel={`${post.comment_count} comments`}>
-            <Ionicons name="chatbubble" size={18} color={colors.navy} />
-            <Text style={[styles.actionText, { color: colors.navy }]}>{post.comment_count}</Text>
+        {post.post_type === 'article' ? (
+          <View style={styles.articleDetails}>
+            <Text style={styles.articleTitle}>{post.content}</Text>
+            {post.journal ? (
+              <View style={styles.articleMetaRow}>
+                <Text style={styles.journalText} numberOfLines={1}>
+                  {post.journal}
+                </Text>
+              </View>
+            ) : null}
+
+            {post.authors ? (
+              <View style={styles.authorsRow}>
+                <Ionicons name="person-outline" size={13} color={colors.textMuted} style={{ marginRight: 4 }} />
+                <Text style={styles.authorsText}>{post.authors}</Text>
+              </View>
+            ) : null}
+
+            {post.abstract ? (
+              <View style={styles.abstractContainer}>
+                <Text style={styles.abstractTitle}>Abstract</Text>
+                <Text style={styles.abstractText}>{post.abstract}</Text>
+              </View>
+            ) : null}
+
+            {post.keywords && post.keywords.length > 0 ? (
+              <View style={styles.keywordsRow}>
+                {post.keywords.map((kw: string, idx: number) => (
+                  <TagChip key={`${kw}-${idx}`} label={kw} />
+                ))}
+              </View>
+            ) : null}
+
+            {post.article_url ? (
+              <TouchableOpacity
+                style={styles.readPaperBtn}
+                onPress={async () => {
+                  const url = formatArticleUrl(post.article_url);
+                  if (!url) return;
+                  if (Platform.OS === 'web') {
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  } else {
+                    await WebBrowser.openBrowserAsync(url, {
+                      toolbarColor: colors.navy,
+                      presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+                    });
+                  }
+                }}
+              >
+                <Text style={styles.readPaperText}>Read Full Paper</Text>
+                <Ionicons name="open-outline" size={14} color={colors.navy} />
+              </TouchableOpacity>
+            ) : null}
           </View>
-          <Pressable
-            testID="post-repost-btn"
-            style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
-            onPress={handleRepost}
-            hitSlop={compactAction.hitSlop}
-            accessibilityRole="button"
-            accessibilityLabel={`${post.reposted ? 'Undo repost' : 'Repost'}, ${post.repost_count ?? 0} reposts`}
-          >
-            <Ionicons name="repeat" size={19} color={post.reposted ? colors.action : colors.textSecondary} />
-            <Text style={[styles.actionText, post.reposted && { color: colors.action }]}>{post.repost_count ?? 0}</Text>
-          </Pressable>
-          <Pressable
-            testID="post-share-btn"
-            style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
-            onPress={handleShare}
-            hitSlop={compactAction.hitSlop}
-            accessibilityRole="button"
-            accessibilityLabel="Share this post"
-          >
-            <Ionicons name="share-social-outline" size={18} color={colors.textSecondary} />
-          </Pressable>
-          <Pressable
-            testID="post-save-btn"
-            style={({ pressed }) => [styles.actionBtn, styles.saveBtn, pressed && styles.actionBtnPressed]}
-            onPress={handleSave}
-            hitSlop={compactAction.hitSlop}
-            accessibilityRole="button"
-            accessibilityLabel={post.saved ? 'Remove from saved' : 'Save for later'}
-          >
-            <Ionicons name={post.saved ? 'bookmark' : 'bookmark-outline'} size={18}
-              color={post.saved ? colors.action : colors.textSecondary} />
-          </Pressable>
-        </View>
+        ) : (
+          <>
+            <Text style={styles.postContent}>{post.content}</Text>
+            {post.image_url ? (
+              <Pressable
+                testID="post-detail-image"
+                onPress={() => setViewerOpen(true)}
+                accessibilityRole="imagebutton"
+                accessibilityLabel="Open image full screen"
+                style={({ pressed }) => [styles.postImageWrap, pressed && { opacity: 0.9 }]}
+              >
+                <Image source={{ uri: mediaUri(post.image_url) }} style={styles.postImage} resizeMode="cover" />
+                <View style={styles.expandHint} pointerEvents="none">
+                  <Ionicons name="expand-outline" size={14} color={colors.white} />
+                </View>
+              </Pressable>
+            ) : null}
+          </>
+        )}
+        {/* The same actions as in the feed; the comment count is not a
+            button here -- you are already on the post. */}
+        <PostActions
+          post={post}
+          liked={isLiked}
+          noun={post.post_type === 'article' ? 'paper' : 'post'}
+          onLike={handleLike}
+          onRepost={handleRepost}
+          onShare={handleShare}
+          onSave={handleSave}
+          testIDs={{ like: 'post-like-btn', repost: 'post-repost-btn', share: 'post-share-btn', save: 'post-save-btn' }}
+        />
         <View style={styles.commentsHeader}>
           <Text style={styles.commentsTitle}>Comments</Text>
         </View>
@@ -304,25 +323,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  postActions: {
-    flexDirection: 'row',
-    marginTop: spacing.xs,
-    marginBottom: spacing.sm,
-    marginLeft: -spacing.sm,
-    gap: spacing.xs,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    height: compactAction.height,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.sm,
-  },
-  actionBtnPressed: { backgroundColor: colors.bgMuted },
-  saveBtn: { marginLeft: 'auto' },
-  actionText: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   
   commentsHeader: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 },
   commentsTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
@@ -344,4 +344,78 @@ const styles = StyleSheet.create({
   commentInput: { flex: 1, backgroundColor: colors.bg, borderRadius: 20, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, fontSize: 15, color: colors.text, maxHeight: 100, borderWidth: 1, borderColor: colors.border },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.action, ...gloss.fill, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   sendBtnDisabled: { opacity: 0.5 },
+
+  articleDetails: {
+    marginBottom: spacing.lg,
+  },
+  articleTitle: {
+    ...typography.h2,
+    fontSize: 20,
+    lineHeight: 28,
+    color: colors.text,
+    fontFamily: fonts.heading.bold,
+    marginBottom: spacing.sm,
+  },
+  articleMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs + 2,
+  },
+  journalText: {
+    ...typography.small,
+    color: colors.textSecondary,
+    fontFamily: fonts.body.medium,
+    flex: 1,
+  },
+  authorsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  authorsText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontFamily: fonts.body.regular,
+    flex: 1,
+  },
+  abstractContainer: {
+    backgroundColor: colors.bgMuted,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginVertical: spacing.sm,
+  },
+  abstractTitle: {
+    ...typography.label,
+    fontSize: 12,
+    color: colors.navy,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  abstractText: {
+    ...typography.body,
+    fontSize: 14,
+    lineHeight: 22,
+    color: colors.text,
+  },
+  keywordsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs + 2,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  readPaperBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  readPaperText: {
+    ...typography.caption,
+    fontFamily: fonts.body.semibold,
+    color: colors.navy,
+  },
 });

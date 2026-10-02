@@ -54,7 +54,7 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
   const kyc = kycCopy(kycStatus?.status);
 
   useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => { });
   }, []);
 
   useEffect(() => {

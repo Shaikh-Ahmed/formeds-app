@@ -13,9 +13,11 @@ import { sharePost } from '../../src/utils/share';
 import { CopiedToast, useCopiedToast } from '../../src/components/CopiedToast';
 import * as ImagePicker from 'expo-image-picker';
 import { timeAgo } from '../../src/utils/time';
-import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer, EmptyState } from '../../src/components';
+import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer, EmptyState, ArticleFeedCard } from '../../src/components';
+import type { ArticleFeedPost } from '../../src/types/feed';
+import { PostActions } from '../../src/components/PostActions';
 import { PageGrid, ProfileRail, FeedRail, Hoverable } from '../../src/components/web';
-import { colors, fonts, spacing, radius, typography, shadow, elevation, compactAction, useBreakpoint, activeTheme, isRefined, isMaterial, isTerracotta, gloss } from '../../src/theme';
+import { colors, fonts, spacing, radius, typography, shadow, elevation, useBreakpoint, activeTheme, isRefined, isMaterial, isTerracotta, gloss } from '../../src/theme';
 import { useCollapsibleHeader, focusScrollInset } from '../../src/hooks/useCollapsibleHeader';
 import { mediaUri } from '../../src/utils/media';
 
@@ -212,16 +214,35 @@ export default function FeedScreen() {
     // A repost shows its original; every action acts on the original.
     const item = row.original ?? row;
     const isLiked = item.likes?.includes(user?.id || '');
+    const repostedBy = row.original ? (
+      <View style={styles.repostedBy} testID={`reposted-by-${row.id}`}>
+        <Ionicons name="repeat" size={14} color={colors.textSecondary} />
+        <Text style={styles.repostedByText} numberOfLines={1}>
+          {row.author_id === user?.id ? 'You reposted' : `${row.author_name} reposted`}
+        </Text>
+      </View>
+    ) : null;
+
+    if (item.post_type === 'article') {
+      return (
+        <ArticleFeedCard
+          // Articles are feed rows with extra fields (journal, authors, link).
+          post={item as unknown as ArticleFeedPost}
+          testID={row.original ? `feed-post-${row.id}` : undefined}
+          header={repostedBy}
+          isLiked={isLiked}
+          onLike={handleLike}
+          onComment={(id) => router.push({ pathname: '/post/[id]', params: { id } } as any)}
+          onRepost={handleRepost}
+          onSave={handleSave}
+          onShare={(p) => { handleShare(p as unknown as Post); }}
+        />
+      );
+    }
+
     return (
       <View testID={`feed-post-${row.id}`} style={[styles.postCard, !isMobile && styles.postCardWide, isRefined && styles.pPostCard]}>
-        {row.original ? (
-          <View style={styles.repostedBy} testID={`reposted-by-${row.id}`}>
-            <Ionicons name="repeat" size={14} color={colors.textSecondary} />
-            <Text style={styles.repostedByText} numberOfLines={1}>
-              {row.author_id === user?.id ? 'You reposted' : `${row.author_name} reposted`}
-            </Text>
-          </View>
-        ) : null}
+        {repostedBy}
         {/* The author block opens the post on desktop, where a pointer user
             expects the header to be clickable; on mobile the dedicated
             comment button stays the only route in. */}
@@ -262,68 +283,16 @@ export default function FeedScreen() {
             </View>
           </Pressable>
         ) : null}
-        {/* Compact action row: the buttons are drawn at 32px but carry
-            the shared compactAction hit slop, so the area a finger actually has to hit stays 44px.
-            Shrinking the painted box instead of the target is what buys the
-            height back without making the row harder to use. */}
-        <View style={styles.postActions}>
-          <Hoverable
-            testID={`like-btn-${item.id}`}
-            style={styles.actionBtn}
-            hoverStyle={styles.actionBtnHover}
-            hitSlop={compactAction.hitSlop}
-            onPress={() => handleLike(item.id)}
-            accessibilityLabel={`${isLiked ? 'Unlike' : 'Like'}, ${item.like_count} likes`}
-          >
-            {/* redText, not red: the bright brand red is only 3.9:1 on the
-                card, which is fine for a glyph but below the minimum for the
-                count beside it. One colour for both keeps the pair matched. */}
-            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={18} color={isLiked ? colors.redText : colors.textSecondary} />
-            <Text style={[styles.actionText, isLiked && { color: colors.redText }]}>{item.like_count}</Text>
-          </Hoverable>
-          <Hoverable
-            style={styles.actionBtn}
-            hoverStyle={styles.actionBtnHover}
-            hitSlop={compactAction.hitSlop}
-            onPress={() => router.push({ pathname: '/post/[id]', params: { id: item.id } } as any)}
-            accessibilityLabel={`Comments, ${item.comment_count}`}
-          >
-            <Ionicons name="chatbubble-outline" size={18} color={colors.textSecondary} />
-            <Text style={styles.actionText}>{item.comment_count}</Text>
-          </Hoverable>
-          <Hoverable
-            testID={`repost-btn-${item.id}`}
-            style={styles.actionBtn}
-            hoverStyle={styles.actionBtnHover}
-            hitSlop={compactAction.hitSlop}
-            onPress={() => handleRepost(item.id)}
-            accessibilityLabel={`${item.reposted ? 'Undo repost' : 'Repost'}, ${item.repost_count ?? 0} reposts`}
-          >
-            <Ionicons name="repeat" size={19} color={item.reposted ? colors.action : colors.textSecondary} />
-            <Text style={[styles.actionText, item.reposted && { color: colors.action }]}>{item.repost_count ?? 0}</Text>
-          </Hoverable>
-          <Hoverable
-            style={styles.actionBtn}
-            hoverStyle={styles.actionBtnHover}
-            hitSlop={compactAction.hitSlop}
-            onPress={() => handleShare(item)}
-            accessibilityLabel="Share this post"
-          >
-            <Ionicons name="share-social-outline" size={18} color={colors.textSecondary} />
-          </Hoverable>
-          {/* Save sits apart, at the end of the row: it is for you, not the author. */}
-          <Hoverable
-            testID={`save-btn-${item.id}`}
-            style={[styles.actionBtn, styles.saveBtn]}
-            hoverStyle={styles.actionBtnHover}
-            hitSlop={compactAction.hitSlop}
-            onPress={() => handleSave(item.id)}
-            accessibilityLabel={item.saved ? 'Remove from saved' : 'Save for later'}
-          >
-            <Ionicons name={item.saved ? 'bookmark' : 'bookmark-outline'} size={18}
-              color={item.saved ? colors.action : colors.textSecondary} />
-          </Hoverable>
-        </View>
+        <PostActions
+          post={item}
+          liked={isLiked}
+          onLike={() => handleLike(item.id)}
+          onComment={() => router.push({ pathname: '/post/[id]', params: { id: item.id } } as any)}
+          onRepost={() => handleRepost(item.id)}
+          onShare={() => handleShare(item)}
+          onSave={() => handleSave(item.id)}
+          testIDs={{ like: `like-btn-${item.id}`, repost: `repost-btn-${item.id}`, save: `save-btn-${item.id}` }}
+        />
       </View>
     );
   };
@@ -675,27 +644,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  postActions: {
-    flexDirection: 'row',
-    // No divider rule and minimal lead-in: the reference treatment separates
-    // actions from body with whitespace alone. A rule plus padding was costing
-    // ~10px per card for a boundary the eye already reads.
-    marginTop: spacing.xs,
-    marginLeft: -spacing.sm,
-    gap: spacing.xs,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    // 32 painted + 6 hit-slop top and bottom = the 44 a finger needs.
-    height: compactAction.height,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radius.sm,
-  },
-  actionBtnHover: { backgroundColor: colors.bgMuted },
-  saveBtn: { marginLeft: 'auto' },
   repostedBy: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
   repostedByText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   savedBar: {
@@ -706,9 +654,6 @@ const styles = StyleSheet.create({
   savedBarText: { ...typography.label, color: colors.teal },
   savedBarClose: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 6 },
   savedBarCloseText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.textSecondary },
-  // textMuted reaches only 2.6:1 on white — fine for a placeholder, not for a
-  // count that carries meaning.
-  actionText: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   emptyText: { fontSize: 16, color: colors.textMuted, marginTop: 12 },
 });
