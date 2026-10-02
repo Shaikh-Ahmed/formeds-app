@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../../theme';
 import { SORT_LABELS, type JobFilters, type JobSort } from '../../types/jobs';
 
 const SORTS: JobSort[] = ['newest', 'pay_high', 'closing_soon', 'urgent'];
@@ -159,8 +159,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.white,
+    ...gloss.glass,
   },
-  filterBtnActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  filterBtnActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   filterText: { ...typography.label, color: colors.text },
   filterTextActive: { color: colors.white },
 
@@ -176,8 +177,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     minHeight: 36,
     justifyContent: 'center',
+    ...gloss.glass,
   },
-  sortChipActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  sortChipActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   sortText: { ...typography.caption, color: colors.textSecondary },
   sortTextActive: { color: colors.white, fontFamily: fonts.body.semibold },
 

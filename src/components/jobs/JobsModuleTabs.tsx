@@ -1,8 +1,9 @@
 import React from 'react';
+import { LocumIcon } from '../icons/ForMedsIcons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, fonts, useBreakpoint } from '../../theme';
+import { colors, radius, spacing, fonts, useBreakpoint, isRefined, gloss } from '../../theme';
 
 export type JobsModule = 'jobs' | 'locum';
 
@@ -41,11 +42,17 @@ export function JobsModuleTabs({ active }: { active: JobsModule }) {
             accessibilityLabel={module.label}
             style={({ pressed }) => [styles.tab, selected && styles.tabActive, pressed && styles.pressed]}
           >
-            <Ionicons
-              name={module.icon}
-              size={16}
-              color={selected ? colors.white : colors.textSecondary}
-            />
+            {isRefined && module.key === 'locum' ? (
+              // Premium's shift mark: a day with a clock -- cover, not a job.
+              <LocumIcon size={16} color={selected ? colors.white : colors.textSecondary}
+                badgeBg={selected ? colors.navy : colors.bgMuted} />
+            ) : (
+              <Ionicons
+                name={module.icon}
+                size={16}
+                color={selected ? colors.white : colors.textSecondary}
+              />
+            )}
             <Text style={[styles.label, selected && styles.labelActive]}>{module.label}</Text>
           </Pressable>
         );
@@ -79,8 +86,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: radius.md,
     backgroundColor: colors.bgMuted,
+    ...gloss.glass,
   },
-  tabActive: { backgroundColor: colors.navy },
+  tabActive: { backgroundColor: colors.action, ...gloss.fill },
   label: { fontSize: 14, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   labelActive: { color: colors.white },
   pressed: { opacity: 0.8 },

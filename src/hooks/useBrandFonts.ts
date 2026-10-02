@@ -12,6 +12,11 @@ import { IBMPlexSans_400Regular } from '@expo-google-fonts/ibm-plex-sans/400Regu
 import { IBMPlexSans_500Medium } from '@expo-google-fonts/ibm-plex-sans/500Medium';
 import { IBMPlexSans_600SemiBold } from '@expo-google-fonts/ibm-plex-sans/600SemiBold';
 import { IBMPlexSans_700Bold } from '@expo-google-fonts/ibm-plex-sans/700Bold';
+import { SourceSerif4_400Regular } from '@expo-google-fonts/source-serif-4/400Regular';
+import { SourceSerif4_500Medium } from '@expo-google-fonts/source-serif-4/500Medium';
+import { SourceSerif4_600SemiBold } from '@expo-google-fonts/source-serif-4/600SemiBold';
+import { SourceSerif4_700Bold } from '@expo-google-fonts/source-serif-4/700Bold';
+import { activeTheme } from '../theme/activeTheme';
 
 /**
  * Fonts are worth waiting for, but never worth being blocked by.
@@ -24,12 +29,14 @@ import { IBMPlexSans_700Bold } from '@expo-google-fonts/ibm-plex-sans/700Bold';
 const FONT_TIMEOUT_MS = 3000;
 
 /** True once it is safe to render — fonts ready, failed, or simply too slow. */
+// Only the active theme's heading face is fetched.
+const HEADING_FACES: Record<string, number> = activeTheme === 'journal'
+  ? { SourceSerif4_400Regular, SourceSerif4_500Medium, SourceSerif4_600SemiBold, SourceSerif4_700Bold }
+  : { Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold };
+
 export function useBrandFonts(): boolean {
   const [loaded, error] = useFonts({
-    Outfit_400Regular,
-    Outfit_500Medium,
-    Outfit_600SemiBold,
-    Outfit_700Bold,
+    ...HEADING_FACES,
     IBMPlexSans_400Regular,
     IBMPlexSans_500Medium,
     IBMPlexSans_600SemiBold,

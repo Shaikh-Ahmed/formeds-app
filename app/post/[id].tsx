@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Pressable, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Share, Image } from 'react-native';
+import { useSubmit } from '../../src/hooks/useSubmit';
+import { FieldError } from '../../src/components/FieldError';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Pressable, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { sharePost } from '../../src/utils/share';
+import { CopiedToast, useCopiedToast } from '../../src/components/CopiedToast';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
 import { timeAgo } from '../../src/utils/time';
 import { Avatar, RoleBadge, MediaViewer } from '../../src/components';
 import { PageColumn } from '../../src/components/web';
-import { colors, fonts, spacing, radius, typography, compactAction } from '../../src/theme';
+import { colors, fonts, spacing, radius, typography, compactAction, gloss } from '../../src/theme';
+import { mediaUri } from '../../src/utils/media';
 
 export default function PostDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -19,7 +24,8 @@ export default function PostDetailScreen() {
   const [comments, setComments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, run: runComment } = useSubmit();
+  const [commentError, setCommentError] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -53,32 +59,43 @@ export default function PostDetailScreen() {
     } catch (e) { console.log('Like error:', e); }
   };
 
-  const handleShare = async () => {
+  const handleSave = async () => {
     if (!post) return;
     try {
-      await Share.share({
-        message: `${post.author_name} shared on ForMeds:\n\n"${post.content}"`
-      });
-    } catch (error) {
-      console.log('Share error:', error);
-    }
+      const { saved } = await apiFetch(`/api/feed/${post.id}/save`, token, { method: 'POST' });
+      setPost({ ...post, saved });
+    } catch (e: any) { alert(e?.message || 'Could not save this post. Please try again.'); }
   };
 
-  const handleComment = async () => {
-    if (!newComment.trim()) return;
-    setSubmitting(true);
+  const handleRepost = async () => {
+    if (!post) return;
     try {
-      await apiFetch(`/api/feed/${id}/comment`, token, { 
-        method: 'POST', 
-        body: JSON.stringify({ content: newComment }) 
-      });
-      setNewComment('');
-      loadData(); // Reload to show new comment and updated count
-    } catch (e) {
-      console.log('Comment error:', e);
-    } finally {
-      setSubmitting(false);
-    }
+      const { reposted, repost_count } = await apiFetch(`/api/feed/${post.id}/repost`, token, { method: 'POST' });
+      setPost({ ...post, reposted, repost_count });
+    } catch (e: any) { alert(e?.message || 'Could not repost. Please try again.'); }
+  };
+
+  const copiedToast = useCopiedToast();
+  const handleShare = async () => { if (post) copiedToast.report(await sharePost(post)); };
+
+  const handleComment = () => {
+    if (!newComment.trim()) return;
+    const content = newComment;
+    return runComment(async key => {
+      setCommentError(null);
+      try {
+        await apiFetch(`/api/feed/${id}/comment`, token, {
+          method: 'POST',
+          body: JSON.stringify({ content }),
+          idempotencyKey: key,
+        });
+        setNewComment('');
+        loadData(); // Reload to show new comment and updated count
+      } catch (e: any) {
+        // Never silent: the comment stays in the box and the reason shows above it.
+        setCommentError(e?.message || 'Could not post your comment. Please try again.');
+      }
+    }, { id, content });
   };
 
   const renderPostHeader = () => {
@@ -106,7 +123,7 @@ export default function PostDetailScreen() {
             accessibilityLabel="Open image full screen"
             style={({ pressed }) => [styles.postImageWrap, pressed && { opacity: 0.9 }]}
           >
-            <Image source={{ uri: post.image_url }} style={styles.postImage} resizeMode="cover" />
+            <Image source={{ uri: mediaUri(post.image_url) }} style={styles.postImage} resizeMode="cover" />
             <View style={styles.expandHint} pointerEvents="none">
               <Ionicons name="expand-outline" size={14} color={colors.white} />
             </View>
@@ -133,6 +150,17 @@ export default function PostDetailScreen() {
             <Text style={[styles.actionText, { color: colors.navy }]}>{post.comment_count}</Text>
           </View>
           <Pressable
+            testID="post-repost-btn"
+            style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
+            onPress={handleRepost}
+            hitSlop={compactAction.hitSlop}
+            accessibilityRole="button"
+            accessibilityLabel={`${post.reposted ? 'Undo repost' : 'Repost'}, ${post.repost_count ?? 0} reposts`}
+          >
+            <Ionicons name="repeat" size={19} color={post.reposted ? colors.action : colors.textSecondary} />
+            <Text style={[styles.actionText, post.reposted && { color: colors.action }]}>{post.repost_count ?? 0}</Text>
+          </Pressable>
+          <Pressable
             testID="post-share-btn"
             style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
             onPress={handleShare}
@@ -141,6 +169,17 @@ export default function PostDetailScreen() {
             accessibilityLabel="Share this post"
           >
             <Ionicons name="share-social-outline" size={18} color={colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            testID="post-save-btn"
+            style={({ pressed }) => [styles.actionBtn, styles.saveBtn, pressed && styles.actionBtnPressed]}
+            onPress={handleSave}
+            hitSlop={compactAction.hitSlop}
+            accessibilityRole="button"
+            accessibilityLabel={post.saved ? 'Remove from saved' : 'Save for later'}
+          >
+            <Ionicons name={post.saved ? 'bookmark' : 'bookmark-outline'} size={18}
+              color={post.saved ? colors.action : colors.textSecondary} />
           </Pressable>
         </View>
         <View style={styles.commentsHeader}>
@@ -168,7 +207,7 @@ export default function PostDetailScreen() {
       <PageColumn testID="post-column">
       <View style={styles.header}>
         <TouchableOpacity testID="back-btn" style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#1A3A5C" />
+          <Ionicons name="arrow-back" size={24} color={colors.navy} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Post</Text>
         <View style={{ width: 44 }} />
@@ -176,7 +215,7 @@ export default function PostDetailScreen() {
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         {loading ? (
-          <View style={styles.center}><ActivityIndicator size="large" color="#1A3A5C" /></View>
+          <View style={styles.center}><ActivityIndicator size="large" color={colors.navy} /></View>
         ) : (
           <FlatList
             data={comments}
@@ -186,7 +225,7 @@ export default function PostDetailScreen() {
             contentContainerStyle={styles.list}
             ListEmptyComponent={
               <View style={styles.emptyBox}>
-                <Ionicons name="chatbubble-ellipses-outline" size={40} color="#CBD5E1" />
+                <Ionicons name="chatbubble-ellipses-outline" size={40} color={colors.iconFaint} />
                 <Text style={styles.emptyText}>No comments yet</Text>
                 <Text style={styles.emptyHint}>Be the first to share your thoughts!</Text>
               </View>
@@ -194,12 +233,13 @@ export default function PostDetailScreen() {
           />
         )}
 
+        {commentError ? <View style={styles.commentErrorWrap}><FieldError message={commentError} /></View> : null}
         <View style={styles.inputBar}>
           <TextInput maxLength={2000} 
             testID="comment-input" 
             style={styles.commentInput} 
             placeholder="Write a comment..." 
-            placeholderTextColor="#94A3B8" 
+            placeholderTextColor={colors.textMuted} 
             value={newComment} 
             onChangeText={setNewComment} 
             multiline 
@@ -225,19 +265,21 @@ export default function PostDetailScreen() {
           onClose={() => setViewerOpen(false)}
         />
       ) : null}
+      <CopiedToast visible={copiedToast.visible} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
-  backBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
+  commentErrorWrap: { paddingHorizontal: 16, paddingTop: 6 },
+  safe: { flex: 1, backgroundColor: colors.bg },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: colors.border },
+  backBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.bgMuted, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { paddingBottom: 20 },
   
-  postCard: { backgroundColor: '#FFFFFF', padding: 16, marginBottom: 8, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  postCard: { backgroundColor: '#FFFFFF', padding: 16, marginBottom: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
   postHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: 12 },
   // The spacing lives on the row itself. It used to sit on an inline avatar
   // style that stopped being used when the shared Avatar replaced it, which
@@ -248,7 +290,7 @@ const styles = StyleSheet.create({
   // textSecondary, not the lighter textMuted: the time is read, and the
   // lighter grey falls below text contrast on white.
   timeText: { ...typography.small, color: colors.textSecondary },
-  postContent: { fontSize: 16, color: '#334155', lineHeight: 24, marginBottom: 16 },
+  postContent: { fontSize: 16, color: colors.textBody, lineHeight: 24, marginBottom: 16 },
   postImageWrap: { marginBottom: 16, borderRadius: 12, overflow: 'hidden' },
   postImage: { width: '100%', height: 250 },
   expandHint: {
@@ -279,26 +321,27 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   actionBtnPressed: { backgroundColor: colors.bgMuted },
+  saveBtn: { marginLeft: 'auto' },
   actionText: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   
-  commentsHeader: { borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16 },
-  commentsTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
+  commentsHeader: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 },
+  commentsTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
   
-  commentCard: { flexDirection: 'row', padding: 16, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  commentAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  commentAvatarText: { color: '#64748B', fontSize: 15, fontWeight: '700' },
+  commentCard: { flexDirection: 'row', padding: 16, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+  commentAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  commentAvatarText: { color: colors.textSubtle, fontSize: 15, fontWeight: '700' },
   commentContent: { flex: 1 },
   commentMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  commentAuthor: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
-  commentTime: { fontSize: 12, color: '#94A3B8' },
+  commentAuthor: { fontSize: 14, fontWeight: '600', color: colors.text },
+  commentTime: { fontSize: 12, color: colors.textMuted },
   commentText: { fontSize: 14, color: '#475569', lineHeight: 20 },
   
   emptyBox: { alignItems: 'center', paddingTop: 40, paddingBottom: 20 },
-  emptyText: { fontSize: 16, color: '#94A3B8', marginTop: 12 },
-  emptyHint: { fontSize: 13, color: '#CBD5E1', marginTop: 4 },
+  emptyText: { fontSize: 16, color: colors.textMuted, marginTop: 12 },
+  emptyHint: { fontSize: 13, color: colors.iconFaint, marginTop: 4 },
   
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', padding: 12, paddingBottom: Platform.OS === 'ios' ? 24 : 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0', gap: 8 },
-  commentInput: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 20, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, fontSize: 15, color: '#0F172A', maxHeight: 100, borderWidth: 1, borderColor: '#E2E8F0' },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1A3A5C', alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', padding: 12, paddingBottom: Platform.OS === 'ios' ? 24 : 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: colors.border, gap: 8 },
+  commentInput: { flex: 1, backgroundColor: colors.bg, borderRadius: 20, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, fontSize: 15, color: colors.text, maxHeight: 100, borderWidth: 1, borderColor: colors.border },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.action, ...gloss.fill, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   sendBtnDisabled: { opacity: 0.5 },
 });

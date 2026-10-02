@@ -1,7 +1,8 @@
 import React from 'react';
+import { TrustMark } from '../../TrustMark';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, radius, shadow, spacing, typography, MIN_TOUCH_TARGET } from '../../../theme';
+import { colors, fonts, radius, shadow, spacing, typography, MIN_TOUCH_TARGET, gloss } from '../../../theme';
 import { Avatar } from '../../Avatar';
 import { Skeleton } from '../../Skeleton';
 import { ScreeningAnswersView } from '../Screening';
@@ -109,7 +110,7 @@ export function ApplicantDetailPanel({
             <Text style={styles.name} accessibilityRole="header" testID="applicant-name">{p.name}</Text>
             {verified ? (
               <View style={styles.verified}>
-                <Ionicons name="shield-checkmark" size={14} color={colors.teal} />
+                <TrustMark size={14} classicIcon="shield-checkmark" />
                 <Text style={styles.verifiedText}>{verified}</Text>
               </View>
             ) : (
@@ -346,7 +347,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 42, paddingHorizontal: spacing.lg,
     borderRadius: radius.pill, borderWidth: 1, borderColor: colors.navy, backgroundColor: colors.white,
   },
-  actionPrimary: { backgroundColor: colors.navy },
+  actionPrimary: { backgroundColor: colors.action, ...gloss.fill },
   actionIcon: { paddingHorizontal: spacing.md },
   actionHover: { backgroundColor: colors.bgMuted },
   actionText: { ...typography.label, color: colors.navy },

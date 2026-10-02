@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from './colors';
+import { isMaterial } from './activeTheme';
 
 export type Role = 'healthcare_professional' | 'hospital' | 'clinic' | 'recruiter';
 
@@ -27,7 +28,8 @@ export const ROLE_META: Record<Role, RoleMeta> = {
     label: 'Professional',
     longLabel: 'Healthcare Professional',
     color: colors.teal,
-    bg: colors.successBg,
+    // Material's accent is blue, so its tint is too (success stays green).
+    bg: isMaterial ? colors.tealBg : colors.successBg,
     icon: 'medkit',
     description: 'Doctor, Nurse, or Allied Health Worker',
   },

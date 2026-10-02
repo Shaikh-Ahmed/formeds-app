@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET, gloss } from '../../theme';
 import { JobsModuleTabs } from './JobsModuleTabs';
 
 export type JobsSegment = 'discover' | 'saved' | 'applications' | 'posted';
@@ -119,8 +119,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     minHeight: MIN_TOUCH_TARGET - 6,
     justifyContent: 'center',
+    ...gloss.glass,
   },
-  segmentActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  segmentActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   label: { ...typography.caption, color: colors.textSecondary },
   labelActive: { color: colors.white, fontFamily: fonts.body.semibold },
   pressed: { opacity: 0.7 },

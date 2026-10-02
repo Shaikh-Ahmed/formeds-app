@@ -105,7 +105,7 @@ describe('AED screen', () => {
     fireEvent.changeText(screen.getByTestId('aed-chat-input'), 'Case: 35M fever and cough');
     await act(async () => { fireEvent.press(screen.getByTestId('aed-send-btn')); });
 
-    expect(mockAsk).toHaveBeenCalledWith('t', 'Case: 35M fever and cough', null, 'analyze_case');
+    expect(mockAsk).toHaveBeenCalledWith('t', 'Case: 35M fever and cough', null, 'analyze_case', expect.any(String));
     await waitFor(() => expect(screen.getByText('Clinical Summary')).toBeTruthy());
   });
 

@@ -47,11 +47,12 @@ export function LocumInterviewSheet({
 
   const submit = () => {
     if (result === 'scheduled' && at) {
+      // Under the date field, where it can be fixed.
       if (!AT_RE.test(at)) { setLocalError('Please choose a valid interview date and time.'); return; }
       if (at <= nowMinuteString()) { setLocalError('Interview time cannot be in the past.'); return; }
     }
     setLocalError(null);
-    onSubmit({
+    return onSubmit({
       result,
       interview_at: result === 'scheduled' && at ? at : undefined,
       notes: notes.trim() || undefined,
@@ -67,7 +68,7 @@ export function LocumInterviewSheet({
       footer={
         <>
           <Button label="Cancel" variant="outline" onPress={onClose} style={styles.flex} />
-          <Button label="Save" onPress={submit} loading={submitting} style={styles.flex}
+          <Button label="Save" loadingLabel="Saving…" onPress={submit} loading={submitting} style={styles.flex}
             testID="locum-interview-save" />
         </>
       }
@@ -85,8 +86,9 @@ export function LocumInterviewSheet({
           testID="locum-interview-result"
         />
         {result === 'scheduled' ? (
-          <DateTimeField label="When (optional)" value={at} onChange={setAt} min={nowMinuteString()} clearable
-            helper="Before the shift starts." testID="locum-interview-at" />
+          <DateTimeField label="When (optional)" value={at} min={nowMinuteString()} clearable
+            helper="Before the shift starts." testID="locum-interview-at" error={localError}
+            onChange={v => { setAt(v); setLocalError(null); }} />
         ) : (
           <Text style={styles.hint}>
             {result === 'passed'
@@ -96,7 +98,7 @@ export function LocumInterviewSheet({
         )}
         <FormInput label="Private notes (only your team sees these)" value={notes}
           onChangeText={setNotes} multiline rows={3} maxLength={1000} testID="locum-interview-notes" />
-        <ErrorBanner message={localError || error} />
+        <ErrorBanner message={error} />
       </View>
     </Sheet>
   );

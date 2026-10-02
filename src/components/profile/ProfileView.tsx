@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { FormScrollView } from '../FormScrollView';
+import { useSubmit } from '../../hooks/useSubmit';
+import { errorFields } from '../../utils/api';
 import { View, Text, StyleSheet, ScrollView, Modal, Pressable, Share, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -23,6 +26,8 @@ import { AvailabilitySection, MentorshipSection, ProfessionalLinksSection } from
 import { ProfileCompletion } from './ProfileCompletion';
 import { EntrySheet } from './EntrySheet';
 import { SCALAR_FORMS, ScalarFormKey } from './entryForms';
+import { AccountOrganizationProfile, ORG_ACCOUNT_ROLES } from '../organizations/profile/AccountOrganizationProfile';
+import { ConnectActions } from '../network/ConnectActions';
 
 interface Props {
   /** Omit for the signed-in user's own profile. */
@@ -52,6 +57,8 @@ export function ProfileView({ userId }: Props) {
   const [comingSoon, setComingSoon] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [sheetError, setSheetError] = useState<string | null>(null);
+  const [sheetFieldErrors, setSheetFieldErrors] = useState<Record<string, string>>({});
+  const entryGuard = useSubmit();
 
   const editable = !!profile?.is_self;
 
@@ -74,24 +81,29 @@ export function ProfileView({ userId }: Props) {
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
-  const saveEntry = async (data: Record<string, any>) => {
+  const saveEntry = (data: Record<string, any>) => entryGuard.run(async key => {
     if (!token || !entrySheet) return;
     setSaving(true);
     setSheetError(null);
+    setSheetFieldErrors({});
     try {
       if (entrySheet.entry) {
         await profileApi.updateEntry(token, entrySheet.entry.id, { data });
       } else {
-        await profileApi.createEntry(token, entrySheet.kind, data);
+        // Keyed: "Add" pressed twice (or retried) adds one entry, not two.
+        await profileApi.createEntry(token, entrySheet.kind, data, undefined, key);
       }
       setEntrySheet(null);
       await load();
     } catch (e: any) {
-      setSheetError(e?.message || 'Could not save. Please check the fields and try again.');
+      const fields = errorFields(e);
+      setSheetFieldErrors(fields);
+      setSheetError(Object.keys(fields).length ? null
+        : e?.message || 'Could not save. Please check the fields and try again.');
     } finally {
       setSaving(false);
     }
-  };
+  }, { entry: entrySheet?.entry?.id ?? entrySheet?.kind, data });
 
   const removeEntry = async () => {
     if (!token || !entrySheet?.entry) return;
@@ -184,6 +196,15 @@ export function ProfileView({ userId }: Props) {
 
   // ── States ─────────────────────────────────────────────────────────────────
 
+  // A hospital or clinic account IS an organisation: it gets the institution's
+  // profile, never the professional CV below. Decided from the account's own
+  // role (the server's), not from anything the viewer chose.
+  const ownOrgAccount = !userId && ORG_ACCOUNT_ROLES.includes(user?.role ?? '');
+  if (ownOrgAccount && user) return <AccountOrganizationProfile accountUserId={user.id} />;
+  if (userId && profile && ORG_ACCOUNT_ROLES.includes(profile.role ?? '')) {
+    return <AccountOrganizationProfile accountUserId={profile.id} />;
+  }
+
   if (loading) return <LoadingState label="Loading profile…" />;
   if (loadError && !profile) return <ErrorState message={loadError} onRetry={load} />;
   if (!profile) return <ErrorState message="Profile not found." onRetry={load} />;
@@ -224,6 +245,8 @@ export function ProfileView({ userId }: Props) {
         isMobile={isMobile}
         onEdit={() => setScalarSheet('identity')}
         onShare={share}
+        // Someone else's profile: Connect, or Message once connected.
+        networkAction={!editable ? <ConnectActions userId={profile.id} name={profile.name ?? ""} testID="profile-connect" /> : null}
       />
     </>
   );
@@ -399,6 +422,7 @@ export function ProfileView({ userId }: Props) {
         initial={entrySheet?.entry?.data as Record<string, any> | undefined}
         saving={saving}
         error={sheetError}
+        serverFieldErrors={sheetFieldErrors}
         onSave={saveEntry}
         onDelete={entrySheet?.entry ? removeEntry : undefined}
         onClose={() => { setEntrySheet(null); setSheetError(null); }}
@@ -503,7 +527,7 @@ export function ProfileView({ userId }: Props) {
           fluid
           testID="profile-grid"
         >
-          <ScrollView
+          <FormScrollView
             style={styles.sheetScroll}
             contentContainerStyle={styles.sheetScrollContent}
             showsVerticalScrollIndicator={false}
@@ -529,7 +553,7 @@ export function ProfileView({ userId }: Props) {
                 </View>
               </>
             ) : null}
-          </ScrollView>
+          </FormScrollView>
         </PageGrid>
         {sheets}
       </View>
@@ -539,7 +563,7 @@ export function ProfileView({ userId }: Props) {
   // Mobile is unchanged: one column, one scroll, full-bleed.
   return (
     <View style={styles.rootMobile}>
-      <ScrollView
+      <FormScrollView
         contentContainerStyle={styles.scrollMobile}
         showsVerticalScrollIndicator={false}
         testID="profile-scroll"
@@ -552,7 +576,7 @@ export function ProfileView({ userId }: Props) {
           {expertise}
           {engagement}
         </View>
-      </ScrollView>
+      </FormScrollView>
       {sheets}
     </View>
   );

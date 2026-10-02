@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSubmit } from '../../hooks/useSubmit';
+import { ApiError } from '../../utils/api';
 import {
   ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, layout, radius, spacing, typography, fonts, useBreakpoint } from '../../theme';
+import { colors, layout, radius, spacing, typography, fonts, useBreakpoint, gloss } from '../../theme';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { PageGrid } from '../web';
 import { Button } from '../Button';
@@ -90,7 +92,7 @@ export function LocumScreen({ selectedId = null }: { selectedId?: string | null 
 
   const { canApply, reason } = applyBlocker(user, isKycApproved);
   const [applyFor, setApplyFor] = useState<Locum | null>(null);
-  const [applying, setApplying] = useState(false);
+  const { submitting: applying, run: runApply } = useSubmit();
   const [applyError, setApplyError] = useState<string | null>(null);
 
   const open = useCallback((locum: Locum) => {
@@ -105,22 +107,21 @@ export function LocumScreen({ selectedId = null }: { selectedId?: string | null 
     setApplyFor(locum);
   }, [reason, open]);
 
-  const submit = useCallback(async (note: string) => {
+  const submit = useCallback((note: string) => runApply(async key => {
     if (!token || !applyFor) return;
-    setApplying(true);
     setApplyError(null);
     try {
-      const mine = await applyToLocum(token, applyFor.id, note);
+      // Keyed: a second tap or a retry returns this same application.
+      const mine = await applyToLocum(token, applyFor.id, note, key);
       const patch = (l: Locum) => (l.id === applyFor.id ? { ...l, my_application: mine } : l);
       list.setItems(prev => prev.map(patch));
       setDetail(prev => (prev ? patch(prev) : prev));
       setApplyFor(null);
     } catch (e: any) {
-      setApplyError(e?.message || 'Could not send your application.');
-    } finally {
-      setApplying(false);
+      if (e instanceof ApiError && e.code === 'already_applied') { setApplyFor(null); list.refresh?.(); }
+      setApplyError(e?.message || 'Could not send your application. Please try again.');
     }
-  }, [token, applyFor, list]);
+  }, { locum: applyFor?.id, note }), [token, applyFor, list, runApply]);
 
   const filterCount = activeLocumFilterCount(filters);
 
@@ -272,8 +273,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.navy,
     backgroundColor: colors.white,
+    ...gloss.glass,
   },
-  filterBtnOn: { backgroundColor: colors.navy },
+  filterBtnOn: { backgroundColor: colors.action, ...gloss.fill },
   filterText: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.navy },
   filterTextOn: { color: colors.white },
   pressed: { opacity: 0.7 },

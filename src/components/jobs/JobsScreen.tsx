@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useSubmit } from '../../hooks/useSubmit';
+import { ApiError } from '../../utils/api';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -86,7 +88,7 @@ export function JobsScreen({
   const [applyFor, setApplyFor] = useState<Job | null>(null);
   const [appliedIds, setAppliedIds] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
-  const [applying, setApplying] = useState(false);
+  const { submitting: applying, run: runApply } = useSubmit();
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -128,21 +130,23 @@ export function JobsScreen({
     if ((await shareJob(detail)) === 'copied') { setCopied(true); setTimeout(() => setCopied(false), 2200); }
   }, [detail]);
 
-  const submitApplication = useCallback(async (note: string, extras?: ApplyExtras) => {
+  const submitApplication = useCallback((note: string, extras?: ApplyExtras) => runApply(async key => {
     if (!token || !applyFor) return;
-    setApplying(true);
     setActionError(null);
-    try {
-      await applyToJob(token, applyFor.id, note, extras);
+    const markApplied = () => {
       setApplyFor(null);
       setAppliedIds(prev => [...prev, applyFor.id]);
       setDetail(prev => (prev && prev.id === applyFor.id ? { ...prev, has_applied: true } : prev));
+    };
+    try {
+      // Keyed: a second tap or a retry returns this same application.
+      await applyToJob(token, applyFor.id, note, extras, key);
+      markApplied();
     } catch (e: any) {
-      setActionError(e?.message || 'Could not submit your application.');
-    } finally {
-      setApplying(false);
+      if (e instanceof ApiError && e.code === 'already_applied') markApplied();
+      setActionError(e?.message || 'Could not submit your application. Please try again.');
     }
-  }, [token, applyFor]);
+  }, { job: applyFor?.id, note, extras }), [token, applyFor, runApply]);
 
   /**
    * Turns the filters that just returned nothing into a saved search, so the

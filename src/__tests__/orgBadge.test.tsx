@@ -37,14 +37,14 @@ describe('OrgVerifiedBadge', () => {
 
   it('spells out the claim rather than relying on a tick', () => {
     render(<OrgVerifiedBadge status="verified" />);
-    expect(screen.getByText('Verified organisation')).toBeTruthy();
+    expect(screen.getByText('Verified healthcare organisation')).toBeTruthy();
     expect(screen.getByTestId('org-verification-verified')).toBeTruthy();
   });
 
   it('does not imply verification while a review is in progress', () => {
     render(<OrgVerifiedBadge status="pending" />);
     expect(screen.getByText('Verification in review')).toBeTruthy();
-    expect(screen.queryByText('Verified organisation')).toBeNull();
+    expect(screen.queryByText('Verified healthcare organisation')).toBeNull();
   });
 
   it('says a declined review is declined, not merely unverified', () => {
@@ -54,13 +54,13 @@ describe('OrgVerifiedBadge', () => {
 
   it('announces the compact tick, which is otherwise silent to a screen reader', () => {
     render(<OrgVerifiedBadge status="verified" compact />);
-    expect(screen.getByLabelText('Verified organisation')).toBeTruthy();
+    expect(screen.getByLabelText('Verified healthcare organisation')).toBeTruthy();
   });
 
   it('renders no compact tick for anything unverified', () => {
     for (const status of ['unverified', 'pending', 'rejected'] as const) {
       const { unmount } = render(<OrgVerifiedBadge status={status} compact />);
-      expect(screen.queryByLabelText('Verified organisation')).toBeNull();
+      expect(screen.queryByLabelText('Verified healthcare organisation')).toBeNull();
       unmount();
     }
   });

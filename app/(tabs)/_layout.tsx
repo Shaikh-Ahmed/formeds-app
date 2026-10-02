@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { View, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, useBreakpoint } from '../../src/theme';
+import { colors, fonts, elevation, useBreakpoint, isRefined, isMaterial } from '../../src/theme';
 import { MobileTopBar, AppDrawer } from '../../src/components/mobile';
 import { AedLogo } from '../../src/components/aed/AedLogo';
 import { apiFetch } from '../../src/utils/api';
@@ -26,7 +26,7 @@ function AEDBubble({ bottomInset }: { bottomInset: number }) {
         bubbleStyles.bubble,
         // Rides above the tab bar, which itself grows by the bottom inset on
         // gesture-navigation Android and on iPhones with a home indicator.
-        { bottom: TAB_BAR_HEIGHT + bottomInset + 16 },
+        { bottom: TAB_BAR_HEIGHT + bottomInset + 16 + (isMaterial ? MATERIAL_BAR_GAP + 6 : 0) },
         pressed && bubbleStyles.pressed,
       ]}
     >
@@ -38,6 +38,30 @@ function AEDBubble({ bottomInset }: { bottomInset: number }) {
 
 /** Tab bar height excluding the bottom safe-area inset. */
 const TAB_BAR_HEIGHT = 60;
+/** Material: the bar floats this far above the bottom edge. */
+const MATERIAL_BAR_GAP = 10;
+
+/**
+ * Material's tab icon: the current tab sits in a white disc on the dark
+ * floating bar -- a clear, tactile "you are here". Same icon, same tab.
+ */
+function tabIcon(name: keyof typeof Ionicons.glyphMap) {
+  const TabIcon = ({ color, size, focused }: { color: string; size: number; focused: boolean }) => {
+    if (!isMaterial) return <Ionicons name={name} size={size} color={color} />;
+    return (
+      <View style={[tabStyles.disc, focused && tabStyles.discActive]}>
+        <Ionicons name={name} size={size - 2} color={focused ? colors.navy : 'rgba(255,255,255,0.78)'} />
+      </View>
+    );
+  };
+  TabIcon.displayName = `TabIcon(${name})`;
+  return TabIcon;
+}
+
+const tabStyles = StyleSheet.create({
+  disc: { width: 40, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  discActive: { backgroundColor: '#FFFFFF' },
+});
 
 const bubbleStyles = StyleSheet.create({
   bubble: {
@@ -102,13 +126,26 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: colors.navy,
-          tabBarInactiveTintColor: colors.textSecondary,
+          tabBarActiveTintColor: isMaterial ? colors.white : colors.navy,
+          tabBarInactiveTintColor: isMaterial ? 'rgba(255,255,255,0.72)' : colors.textSecondary,
           // React Navigation adds the bottom inset itself, but only while the
           // height is left unset — an explicit height overrides it and drops
           // the labels behind the Android gesture bar / iPhone home indicator.
           // Since we do want a fixed height, the inset is added back by hand.
-          tabBarStyle: showChrome
+          tabBarStyle: showChrome && isMaterial
+            ? {
+                // Material: a deep-teal pill floating above the page.
+                backgroundColor: colors.navyDark,
+                borderTopWidth: 0,
+                borderRadius: 30,
+                marginHorizontal: 14,
+                marginBottom: MATERIAL_BAR_GAP + insets.bottom,
+                height: TAB_BAR_HEIGHT + 6,
+                paddingBottom: 8,
+                paddingTop: 7,
+                ...elevation.featured,
+              }
+            : showChrome
             ? {
                 backgroundColor: colors.white,
                 borderTopWidth: StyleSheet.hairlineWidth,
@@ -118,32 +155,36 @@ export default function TabLayout() {
                 paddingTop: 6,
               }
             : { display: 'none' },
-          tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginTop: 2 },
+          // Premium sets the labels in the brand body face rather than the
+          // system font a bare fontWeight falls back to.
+          tabBarLabelStyle: isRefined
+            ? { fontSize: 10.5, fontFamily: fonts.body.semibold, marginTop: 2 }
+            : { fontSize: 10, fontWeight: '600', marginTop: 2 },
           tabBarItemStyle: { paddingVertical: 2 },
         }}
       >
         {/* "chatbubbles", not "people" — the Specialists tab already owns the
             people glyph, and these read as the same shape at tab-bar size. */}
-        <Tabs.Screen name="community" options={{ title: 'Home', tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} /> }} />
+        <Tabs.Screen name="community" options={{ title: 'Home', tabBarIcon: tabIcon(isRefined ? 'home' : 'chatbubbles') }} />
         {/* Every account type can now browse AND advertise work, so this tab
             is no longer role-gated and no longer renames itself. */}
         <Tabs.Screen name="jobs" options={{
           title: 'Jobs',
-          tabBarIcon: ({ color, size }) => <Ionicons name="briefcase" size={size} color={color} />,
+          tabBarIcon: tabIcon('briefcase'),
         }} />
         <Tabs.Screen name="learning" options={{
           title: 'Learning',
-          tabBarIcon: ({ color, size }) => <Ionicons name="book" size={size} color={color} />,
+          tabBarIcon: tabIcon('book'),
           href: role === 'healthcare_professional' ? '/(tabs)/learning' : null,
         }} />
         <Tabs.Screen name="specialists" options={{
           title: role === 'clinic' ? 'Listings' : 'Specialists',
-          tabBarIcon: ({ color, size }) => <Ionicons name="people" size={size} color={color} />,
+          tabBarIcon: tabIcon('people'),
           href: role === 'hospital' || role === 'recruiter' ? null : '/(tabs)/specialists',
         }} />
         <Tabs.Screen name="alerts" options={{
           title: 'Alerts',
-          tabBarIcon: ({ color, size }) => <Ionicons name="notifications" size={size} color={color} />,
+          tabBarIcon: tabIcon('notifications'),
           tabBarBadge: unreadNotifs > 0 ? (unreadNotifs > 9 ? '9+' : unreadNotifs) : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.red, fontSize: 10 },
         }} />

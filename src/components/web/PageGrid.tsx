@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
-import { colors, spacing, layout, useBreakpoint } from '../../theme';
+import { colors, spacing, layout, radius, elevation, useBreakpoint, isMaterial } from '../../theme';
+import { PageBackdrop } from '../material/Surfaces';
 
 /**
  * The responsive shell every signed-in page renders into.
@@ -41,6 +42,7 @@ export function PageGrid({
   if (isMobile) {
     return (
       <View style={styles.mobileRoot} testID={testID}>
+        {isMaterial ? <PageBackdrop /> : null}
         {children}
       </View>
     );
@@ -51,11 +53,12 @@ export function PageGrid({
 
   return (
     <View style={styles.wideRoot} testID={testID}>
+      {isMaterial ? <PageBackdrop /> : null}
       <View style={styles.grid}>
         {showLeft && (
           <ScrollView
-            style={styles.railLeft}
-            contentContainerStyle={styles.railContent}
+            style={[styles.railLeft, isMaterial && styles.railBleedLeft]}
+            contentContainerStyle={[styles.railContent, isMaterial && styles.railContentMaterial]}
             showsVerticalScrollIndicator={false}
           >
             {left}
@@ -66,8 +69,8 @@ export function PageGrid({
 
         {showRight && (
           <ScrollView
-            style={styles.railRight}
-            contentContainerStyle={styles.railContent}
+            style={[styles.railRight, isMaterial && styles.railBleedRight]}
+            contentContainerStyle={[styles.railContent, isMaterial && styles.railContentMaterial]}
             showsVerticalScrollIndicator={false}
           >
             {right}
@@ -97,6 +100,7 @@ export function PageColumn({
   if (isMobile) {
     return (
       <View style={styles.mobileRoot} testID={testID}>
+        {isMaterial ? <PageBackdrop /> : null}
         {children}
       </View>
     );
@@ -104,10 +108,14 @@ export function PageColumn({
 
   return (
     <View style={styles.wideRoot} testID={testID}>
-      <View style={[styles.column, { maxWidth }]}>{children}</View>
+      {isMaterial ? <PageBackdrop /> : null}
+      <View style={[styles.column, isMaterial && styles.columnMaterial, { maxWidth }]}>{children}</View>
     </View>
   );
 }
+
+/** Must stay below the grid gutter, or the rails would overlap the centre. */
+const RAIL_BLEED = 16;
 
 const styles = StyleSheet.create({
   mobileRoot: { flex: 1, backgroundColor: colors.bg },
@@ -123,6 +131,13 @@ const styles = StyleSheet.create({
   railLeft: { width: layout.railLeft, flexGrow: 0, flexShrink: 0 },
   railRight: { width: layout.railRight, flexGrow: 0, flexShrink: 0 },
   railContent: { paddingVertical: layout.gutter, gap: spacing.lg },
+  // Room for Material's softer, longer card shadows before the rail clips them.
+  // Material's card shadows are soft and wide, and a scroll view clips at its
+  // edges. Each rail reaches RAIL_BLEED into the gutter on both sides and pads
+  // its content back by the same amount: cards stay put, shadows get room.
+  railContentMaterial: { paddingBottom: layout.gutter * 2, paddingHorizontal: RAIL_BLEED },
+  railBleedLeft: { width: layout.railLeft + RAIL_BLEED * 2, marginHorizontal: -RAIL_BLEED },
+  railBleedRight: { width: layout.railRight + RAIL_BLEED * 2, marginHorizontal: -RAIL_BLEED },
   centre: { flex: 1, minWidth: 0 },
   column: {
     flex: 1,
@@ -131,5 +146,17 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: colors.border,
+  },
+  // Material: the column is a sheet raised off the page -- it starts below the
+  // top bar with rounded top corners and runs off the bottom edge.
+  columnMaterial: {
+    marginTop: spacing.xl,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: colors.borderLight,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
+    overflow: 'hidden',
+    ...elevation.standard,
   },
 });

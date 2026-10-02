@@ -1,8 +1,9 @@
 import React from 'react';
+import { CoverArt } from '../material';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, spacing, MIN_TOUCH_TARGET, isMaterial } from '../../theme';
 import { Avatar } from '../Avatar';
 import { Profile } from '../../types/profile';
 import { absoluteMediaUrl } from '../../api/profile';
@@ -33,6 +34,8 @@ export function ProfileHeader({
   return (
     <View testID="profile-header">
       <View style={[styles.cover, isMobile ? styles.coverMobile : styles.coverWide]}>
+        {/* Material: a gradient cover until the person uploads their own. */}
+        {isMaterial && !cover ? <CoverArt /> : null}
         {cover ? (
           <Image
             source={{ uri: cover }}

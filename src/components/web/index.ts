@@ -11,4 +11,4 @@ export { PageGrid, PageColumn } from './PageGrid';
 export { TopBar } from './TopBar';
 export { RailCard, ProfileRail } from './Rail';
 export { FeedRail } from './FeedRail';
-export { AuthShell } from './AuthShell';
+export { AuthShell, AuthRow, AuthTopRow } from './AuthShell';

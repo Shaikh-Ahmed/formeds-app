@@ -43,9 +43,11 @@ export async function createEntry(
   kind: EntryKind,
   data: Record<string, unknown>,
   visibility?: Visibility,
+  idempotencyKey?: string,
 ): Promise<ProfileEntry> {
   return apiFetch('/api/profile/entries', token, {
     method: 'POST',
+    idempotencyKey,
     body: JSON.stringify({ kind, data, ...(visibility ? { visibility } : {}) }),
   });
 }
@@ -136,5 +138,5 @@ export async function removeCover(token: string) {
 /** Storage may hand back a relative path in the dev/mock backend. */
 export function absoluteMediaUrl(url?: string | null): string | undefined {
   if (!url) return undefined;
-  return url.startsWith('http') ? url : `${API_URL}${url}`;
+  return url.startsWith('/') && !url.startsWith('//') ? `${API_URL}${url}` : url;
 }

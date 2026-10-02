@@ -175,6 +175,8 @@ function Availability() {
   const [start, setStart] = useState('09:00');
   const [end, setEnd] = useState('17:00');
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Problems that belong to one input: shown under that input, not the section.
+  const [fieldError, setFieldError] = useState<{ end?: string; date?: string; overrideEnd?: string }>({});
   const [override, setOverride] = useState({ on_date: '', available: false, allDay: true, start: '09:00', end: '17:00' });
 
   useEffect(() => {
@@ -189,20 +191,23 @@ function Availability() {
   // or a window overlapping one already on that day, are not.
   const addWeekly = (weekday: number) => {
     const problem = validateTimeRange(start, end, { allowOvernight: true });
-    if (problem) { setError(problem); return; }
+    setFieldError({ end: problem ?? undefined });
+    if (problem) { setError(null); return; }
     const slot: AvailabilitySlot = { kind: 'weekly', weekday, start_time: start, end_time: end, available: true };
+    // An overlap involves two windows, not one input: it stays a section message.
     if (overlaps(slots, slot)) { setError(`Availability periods overlap on ${FULL_DAYS[weekday]}.`); return; }
     setError(null);
     change([...slots, slot]);
     setAdding(null);
   };
   const addOverride = () => {
-    if (!override.on_date) { setError('Please choose the date.'); return; }
-    if (override.on_date < todayString()) { setError('Availability exceptions cannot be in the past.'); return; }
+    const dateProblem = !override.on_date ? 'Please choose the date.'
+      : override.on_date < todayString() ? 'Availability exceptions cannot be in the past.' : null;
     const st = override.allDay ? '00:00' : override.start;
     const en = override.allDay ? '23:59' : override.end;
     const problem = override.allDay ? null : validateTimeRange(st, en, { allowOvernight: true });
-    if (problem) { setError(problem); return; }
+    setFieldError({ date: dateProblem ?? undefined, overrideEnd: problem ?? undefined });
+    if (dateProblem || problem) { setError(null); return; }
     const slot: AvailabilitySlot = { kind: 'date', on_date: override.on_date, start_time: st, end_time: en, available: override.available };
     if (overlaps(slots, slot)) { setError(`You already have an exception covering ${displayDate(override.on_date)}.`); return; }
     setError(null);
@@ -252,7 +257,8 @@ function Availability() {
                         <TimeField label="From" value={start} onChange={setStart} testID="avail-start" />
                       </View>
                       <View style={styles.timeCol}>
-                        <TimeField label="To" value={end} onChange={setEnd} testID="avail-end" />
+                        <TimeField label="To" value={end} testID="avail-end" error={fieldError.end}
+                          onChange={v => { setEnd(v); setFieldError(f => ({ ...f, end: undefined })); }} />
                       </View>
                     </View>
                     {error ? <ErrorBanner message={error} /> : null}
@@ -294,7 +300,8 @@ function Availability() {
         ))}
         <View style={styles.overrideForm}>
           <DateField label="Date" value={override.on_date} min={todayString()} testID="override-date"
-            onChange={v => setOverride({ ...override, on_date: v })} />
+            error={fieldError.date}
+            onChange={v => { setOverride({ ...override, on_date: v }); setFieldError(f => ({ ...f, date: undefined })); }} />
           <ChoiceChips value={override.available ? 'yes' : 'no'} testID="override-kind"
             onChange={v => v && setOverride({ ...override, available: v === 'yes' })}
             choices={[{ value: 'no', label: 'Unavailable' }, { value: 'yes', label: 'Available' }]} />
@@ -305,7 +312,8 @@ function Availability() {
                 <TimeField label="From" value={override.start} onChange={v => setOverride({ ...override, start: v })} />
               </View>
               <View style={styles.timeCol}>
-                <TimeField label="To" value={override.end} onChange={v => setOverride({ ...override, end: v })} />
+                <TimeField label="To" value={override.end} error={fieldError.overrideEnd}
+                  onChange={v => { setOverride({ ...override, end: v }); setFieldError(f => ({ ...f, overrideEnd: undefined })); }} />
               </View>
             </View>
           ) : null}

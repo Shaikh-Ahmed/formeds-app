@@ -3,10 +3,10 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET, gloss } from '../../theme';
 import { JobsModuleTabs } from '../jobs/JobsModuleTabs';
 
-export type LocumSegment = 'discover' | 'applications' | 'mine' | 'applicants';
+export type LocumSegment = 'discover' | 'applications' | 'mine' | 'applicants' | 'shifts';
 
 interface Segment {
   key: LocumSegment;
@@ -23,6 +23,9 @@ const MINE: Segment = { key: 'mine', label: 'My locums', icon: 'calendar-outline
 const APPLICANTS: Segment = {
   key: 'applicants', label: 'Applicants', icon: 'people-outline', href: '/jobs/locum/applicants',
 };
+// After selection: My shifts for a professional, the attendance board for a hospital.
+const MY_SHIFTS: Segment = { key: 'shifts', label: 'My shifts', icon: 'time-outline', href: '/jobs/locum/shifts' };
+const SHIFTS: Segment = { key: 'shifts', label: 'Shifts', icon: 'time-outline', href: '/jobs/locum/shifts' };
 
 /**
  * Locum's own navigation, under the same Jobs | Locum switch as Jobs.
@@ -43,9 +46,9 @@ export function LocumNav({ active }: { active: LocumSegment }) {
 
   const isProfessional = user?.role === 'healthcare_professional';
   const segments = isProfessional
-    ? [DISCOVER, APPLICATIONS, MINE]
+    ? [DISCOVER, APPLICATIONS, MY_SHIFTS, MINE]
     : user?.role
-      ? [DISCOVER, MINE, APPLICANTS]
+      ? [DISCOVER, MINE, APPLICANTS, SHIFTS]
       : [DISCOVER];
 
   const content = (
@@ -99,8 +102,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     minHeight: MIN_TOUCH_TARGET - 6,
     justifyContent: 'center',
+    ...gloss.glass,
   },
-  segmentActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  segmentActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   label: { ...typography.caption, color: colors.textSecondary },
   labelActive: { color: colors.white, fontFamily: fonts.body.semibold },
   pressed: { opacity: 0.7 },

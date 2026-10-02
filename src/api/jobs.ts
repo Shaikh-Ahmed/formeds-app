@@ -115,8 +115,8 @@ export const fetchJobAlerts = (token: string): Promise<JobAlert[]> =>
 
 // ── Writes ───────────────────────────────────────────────────────────────────
 
-export const createJob = (token: string, data: Record<string, unknown>): Promise<Job> =>
-  apiFetch('/api/jobs/', token, { method: 'POST', body: JSON.stringify(data) });
+export const createJob = (token: string, data: Record<string, unknown>, idempotencyKey?: string): Promise<Job> =>
+  apiFetch('/api/jobs/', token, { method: 'POST', body: JSON.stringify(data), idempotencyKey });
 
 export const updateJob = (
   token: string, jobId: string, patch: Record<string, unknown>,
@@ -139,9 +139,10 @@ export const toggleSaveJob = (token: string, jobId: string): Promise<{ saved: bo
 export const applyToJob = (
   token: string, jobId: string, coverNote = '',
   extra: { answers?: Record<string, unknown>; include_resume?: boolean } = {},
+  idempotencyKey?: string,
 ): Promise<{ status: string }> =>
   apiFetch(`/api/jobs/${jobId}/apply`, token, {
-    method: 'POST', body: JSON.stringify({ cover_note: coverNote, ...extra }),
+    method: 'POST', body: JSON.stringify({ cover_note: coverNote, ...extra }), idempotencyKey,
   });
 
 /**

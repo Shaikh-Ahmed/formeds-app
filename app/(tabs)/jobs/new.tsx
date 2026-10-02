@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useSubmit } from '../../../src/hooks/useSubmit';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,7 +28,7 @@ export default function NewJobScreen() {
   const router = useRouter();
 
   const [orgs, setOrgs] = useState<Organization[] | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, run } = useSubmit();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   // Recruiters only: who the role is for, and whether candidates see the name.
@@ -42,29 +43,37 @@ export default function NewJobScreen() {
     fetchMyOrganizations(token).then(setOrgs).catch(() => setOrgs([]));
     if (isRecruiter) fetchRecruiterAccount(token).then(a => setAgencyId(a.org_id || '')).catch(() => setAgencyId(''));
   }, [token, isRecruiter]);
-  const agencies = isRecruiter && orgs ? orgs.filter(o => o.id === agencyId) : orgs ?? [];
+  // A hospital's or clinic's own organisation is the account itself, so it is
+  // not offered as a second "posting as" identity: they post as themselves,
+  // and those jobs appear on their organisation profile anyway.
+  const agencies = isRecruiter && orgs
+    ? orgs.filter(o => o.id === agencyId)
+    : (orgs ?? []).filter(o => o.account_user_id !== user?.id);
   const ready = orgs !== null && (!isRecruiter || agencyId !== null);
 
-  const submit = useCallback(async (
+  const submit = useCallback((
     payload: Record<string, unknown>, { publish }: { publish: boolean },
   ) => {
-    if (!token) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      // Created as a draft either way, then published as a second step. That
-      // ordering means a failure to publish still leaves the writing saved
-      // rather than discarding everything the person just typed.
-      const job = await createJob(token, { ...payload, ...(isRecruiter ? client : {}), status: 'draft' });
-      if (publish) await setJobStatus(token, job.id, 'active');
-      router.replace((isRecruiter ? '/recruiter/jobs' : '/jobs/posted') as any);
-    } catch (e: any) {
-      setError(e?.message || 'Could not save this posting.');
-      setFieldErrors(errorFields(e, JOB_ERROR_FIELDS));
-    } finally {
-      setSubmitting(false);
-    }
-  }, [token, router, isRecruiter, client]);
+    const body = { ...payload, ...(isRecruiter ? client : {}), status: 'draft' };
+    return run(async key => {
+      if (!token) return;
+      setError(null);
+      try {
+        // Created as a draft either way, then published as a second step. That
+        // ordering means a failure to publish still leaves the writing saved
+        // rather than discarding everything the person just typed. Keyed, so
+        // a repeat (double click, retry after a lost response) returns this
+        // same draft instead of creating a second job.
+        const job = await createJob(token, body, key);
+        if (publish) await setJobStatus(token, job.id, 'active');
+        router.replace((isRecruiter ? '/recruiter/jobs' : '/jobs/posted') as any);
+      } catch (e: any) {
+        const fields = errorFields(e, JOB_ERROR_FIELDS);
+        setFieldErrors(fields);
+        setError(Object.keys(fields).length ? null : e?.message || 'Could not save this posting. Please try again.');
+      }
+    }, body);
+  }, [token, router, isRecruiter, client, run]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -89,7 +98,6 @@ export default function NewJobScreen() {
             initial={isRecruiter && agencies[0] ? { org_id: agencies[0].id } : undefined}
             allowSelf={!isRecruiter || !agencies.length}
             firstStepExtra={isRecruiter ? <RecruiterClientFields value={client} onChange={setClient} /> : undefined}
-            onCreateOrganization={isRecruiter ? undefined : () => router.push('/org/new' as any)}
             onSubmit={submit}
             submitting={submitting}
             error={error}

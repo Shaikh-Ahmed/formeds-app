@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { FormScrollView } from '../FormScrollView';
 import {
   Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View, type StyleProp, type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { colors, fonts, layout, radius, shadow, spacing, typography, useBreakpoint, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, fonts, layout, radius, shadow, spacing, typography, useBreakpoint, MIN_TOUCH_TARGET, gloss } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../utils/api';
 import { fetchRecruiterAccount } from '../../api/recruiters';
@@ -222,10 +223,10 @@ export function RecruiterScreen({
       <SafeAreaView style={styles.safe} edges={['top']} testID={testID}>
         <PageColumn maxWidth={880}>
           <ScreenHeader title={title} right={right} />
-          <ScrollView style={styles.flex} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled"
+          <FormScrollView style={styles.flex} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled"
             refreshControl={refresh}>
             {children}
-          </ScrollView>
+          </FormScrollView>
         </PageColumn>
       </SafeAreaView>
     );
@@ -248,11 +249,11 @@ export function RecruiterScreen({
       <SafeAreaView style={styles.safe} edges={['top']} testID={testID}>
         <View style={styles.wideRow}>
           <PortalRail active={active} />
-          <ScrollView style={styles.flex} contentContainerStyle={styles.wideScroll} keyboardShouldPersistTaps="handled"
+          <FormScrollView style={styles.flex} contentContainerStyle={styles.wideScroll} keyboardShouldPersistTaps="handled"
             refreshControl={refresh}>
             {heading}
             {children}
-          </ScrollView>
+          </FormScrollView>
         </View>
       </SafeAreaView>
     );
@@ -265,11 +266,11 @@ export function RecruiterScreen({
           <ScreenHeader title={title} showBack={false} right={right ?? <PortalHeaderLinks />} />
         ) : null}
         <PortalNav active={active} />
-        <ScrollView style={styles.flex} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled"
+        <FormScrollView style={styles.flex} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled"
           refreshControl={refresh}>
           {isMobile ? (subtitle && !hideTitle ? <Text style={styles.pageSubtitle}>{subtitle}</Text> : null) : heading}
           {children}
-        </ScrollView>
+        </FormScrollView>
       </PageColumn>
     </SafeAreaView>
   );
@@ -510,9 +511,9 @@ const styles = StyleSheet.create({
   railLabelActive: { color: colors.navy, fontFamily: fonts.body.bold },
   railCta: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, minHeight: 48,
-    borderRadius: radius.lg, backgroundColor: colors.navy,
+    borderRadius: radius.lg, backgroundColor: colors.action, ...gloss.fill,
   },
-  railCtaHover: { backgroundColor: colors.navyLight },
+  railCtaHover: { backgroundColor: colors.actionHover },
   railCtaText: { fontSize: 15, fontFamily: fonts.body.bold, color: colors.white },
   railHelp: { ...typography.small, color: colors.textMuted, textAlign: 'center' },
 
@@ -531,7 +532,7 @@ const styles = StyleSheet.create({
   toggleLabel: { ...typography.bodyStrong, color: colors.text },
   toggleHint: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
 
-  fieldLabel: { ...typography.label, color: '#334155', marginBottom: 6 },
+  fieldLabel: { ...typography.label, color: colors.textBody, marginBottom: 6 },
   chipGroup: { marginBottom: spacing.lg },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
@@ -539,7 +540,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border,
     backgroundColor: colors.white,
   },
-  chipOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipOn: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   chipText: { fontSize: 14, fontFamily: fonts.body.medium, color: colors.text },
   chipTextOn: { color: colors.white },
 

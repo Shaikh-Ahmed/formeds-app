@@ -1,4 +1,9 @@
 import React, { useState } from 'react';
+import { FormScrollView } from '../src/components/FormScrollView';
+import { useSubmit } from '../src/hooks/useSubmit';
+import { useFormErrors } from '../src/hooks/useFormErrors';
+import { FieldError } from '../src/components/FieldError';
+import { ApiError } from '../src/utils/api';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -36,7 +41,11 @@ export default function KycScreen() {
   const [stateCouncil, setStateCouncil] = useState('');
   const [document, setDocument] = useState<PickedDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, run } = useSubmit();
+  const errs = useFormErrors<'number' | 'council' | 'document'>({
+    known: ['number', 'council', 'document'],
+    serverFields: { registration_number: 'number', state_council: 'council', document: 'document' },
+  });
 
   const docLabel = isProfessional
     ? 'Medical registration certificate'
@@ -45,6 +54,7 @@ export default function KycScreen() {
 
   const pickDocument = async () => {
     setError(null);
+    errs.clear('document');
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       setError('Photo access is needed to attach your certificate. Enable it in Settings.');
@@ -70,15 +80,18 @@ export default function KycScreen() {
     });
   };
 
-  const submit = async () => {
-    const problem = firstError(
-      validateRequired(registrationNumber, numberLabel),
-      isProfessional ? validateRequired(stateCouncil, 'State medical council') : null,
-      document ? null : 'Attach your registration certificate',
-    );
-    if (problem) { setError(problem); return; }
+  const submit = () => {
+    const valid = errs.check({
+      number: validateRequired(registrationNumber, numberLabel),
+      council: isProfessional ? validateRequired(stateCouncil, 'State medical council') : null,
+      document: document ? null : 'Attach your registration certificate.',
+    });
+    if (!valid) return;
+    // One submission per press; a retry of the same documents reuses its key.
+    return run(key => send(key), { registrationNumber, stateCouncil, doc: document?.uri });
+  };
 
-    setSubmitting(true);
+  const send = async (key: string) => {
     setError(null);
     try {
       const form = new FormData();
@@ -93,18 +106,17 @@ export default function KycScreen() {
       // multipart boundary, which apiFetch's JSON default would clobber.
       const res = await fetch(`${API_URL}/api/kyc/submit`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': key },
         body: form,
       });
       const body = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(detailToMessage(body, 'Could not submit your document.'));
+        throw new ApiError(detailToMessage(body, 'Could not submit your document.'), res.status, body);
       }
       await refresh();
     } catch (e: any) {
-      setError(e?.message || 'Could not submit your document. Please try again.');
-    } finally {
-      setSubmitting(false);
+      // A refused registration number goes under that field; anything else here.
+      if (!errs.fromError(e)) setError(e?.message || 'Could not submit your document. Please try again.');
     }
   };
 
@@ -150,7 +162,7 @@ export default function KycScreen() {
       <PageColumn maxWidth={640} testID="kyc-column">
       <ScreenHeader title="Verification" onBack={() => router.replace('/(tabs)/community')} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <FormScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           {status === 'rejected' && state?.reject_reason ? (
             <View style={styles.rejected} accessibilityRole="alert">
               <Ionicons name="close-circle" size={20} color={colors.red} />
@@ -174,7 +186,8 @@ export default function KycScreen() {
             label={numberLabel}
             icon="document-text-outline"
             value={registrationNumber}
-            onChangeText={setRegistrationNumber}
+            onChangeText={v => { setRegistrationNumber(v); errs.clear('number'); }}
+            error={errs.fields.number}
             placeholder={isProfessional ? 'e.g. MH-12345' : 'e.g. 1234567890123'}
             autoCapitalize="characters"
             maxLength={80}
@@ -186,7 +199,8 @@ export default function KycScreen() {
               label="State medical council"
               icon="business-outline"
               value={stateCouncil}
-              onChangeText={setStateCouncil}
+              onChangeText={v => { setStateCouncil(v); errs.clear('council'); }}
+              error={errs.fields.council}
               placeholder="e.g. Maharashtra Medical Council"
               autoCapitalize="words"
               maxLength={120}
@@ -221,6 +235,8 @@ export default function KycScreen() {
             )}
           </TouchableOpacity>
 
+          <FieldError message={errs.fields.document} />
+
           <Text style={styles.privacy}>
             Your document is stored privately and is only visible to our verification team.
           </Text>
@@ -228,6 +244,7 @@ export default function KycScreen() {
           <Button
             testID="kyc-submit-btn"
             label={status === 'rejected' ? 'Resubmit for review' : 'Submit for review'}
+            loadingLabel="Submitting…"
             onPress={submit}
             loading={submitting}
           />
@@ -240,7 +257,7 @@ export default function KycScreen() {
           >
             <Text style={styles.skipText}>I&apos;ll do this later</Text>
           </TouchableOpacity>
-        </ScrollView>
+        </FormScrollView>
       </KeyboardAvoidingView>
       </PageColumn>
     </SafeAreaView>
@@ -279,7 +296,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { padding: spacing.xxl, paddingBottom: spacing.xxxl + spacing.xl },
   lead: { ...typography.body, color: colors.textSecondary, lineHeight: 22, marginBottom: spacing.xl },
-  label: { ...typography.label, color: '#334155', marginBottom: 6 },
+  label: { ...typography.label, color: colors.textBody, marginBottom: 6 },
   picker: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
     backgroundColor: colors.bg, borderRadius: radius.lg, borderWidth: 1,

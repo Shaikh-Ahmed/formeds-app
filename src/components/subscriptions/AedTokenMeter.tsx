@@ -1,7 +1,7 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, radius, spacing, typography } from '../../theme';
+import { colors, fonts, radius, spacing, typography, gloss, isMaterial } from '../../theme';
 import { daysUntil, formatDay, type AedWallet } from '../../types/subscriptions';
 
 /**
@@ -28,7 +28,25 @@ export function AedTokenMeter({
       ? `${wallet.remaining.toLocaleString('en-IN')} AED tokens remaining.`
       : `${wallet.remaining.toLocaleString('en-IN')} / ${wallet.allocated.toLocaleString('en-IN')} tokens remaining`;
 
-  const body = (
+  // Material, inside AED: one small glass pill -- a progress ring, the
+  // balance, and when it resets -- instead of a three-line strip.
+  const body = compact && isMaterial ? (
+    <View style={styles.pill} testID={testID}>
+      <Ring pct={pct} color={fill} />
+      <Text style={styles.pillText} numberOfLines={1}>
+        {wallet.exhausted ? (
+          <Text style={styles.pillStrong}>Tokens used up</Text>
+        ) : (
+          <>
+            <Text style={styles.pillStrong}>{wallet.remaining.toLocaleString('en-IN')}</Text>
+            {` / ${wallet.allocated.toLocaleString('en-IN')} tokens`}
+          </>
+        )}
+        <Text style={styles.pillMuted}>{`  ·  resets ${daysUntil(wallet.resets_at)}`}</Text>
+      </Text>
+      {onPress ? <Ionicons name="chevron-forward" size={13} color={colors.textSecondary} /> : null}
+    </View>
+  ) : (
     <View style={[styles.wrap, compact && styles.wrapCompact]} testID={testID}>
       <View style={styles.row}>
         <Text style={[styles.text, compact && styles.textCompact]} numberOfLines={1}>{line}</Text>
@@ -36,7 +54,7 @@ export function AedTokenMeter({
       </View>
       <View style={styles.track} accessibilityRole="progressbar"
         accessibilityValue={{ min: 0, max: wallet.allocated, now: wallet.remaining }}>
-        <View style={[styles.bar, { width: `${pct * 100}%`, backgroundColor: fill }]} />
+        <View style={[styles.bar, { width: `${pct * 100}%`, backgroundColor: fill }, gloss.fill]} />
       </View>
       {compact ? (
         <Text style={styles.sub}>Resets {daysUntil(wallet.resets_at)}</Text>
@@ -56,9 +74,32 @@ export function AedTokenMeter({
   if (!onPress) return body;
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${line} View plans and usage.`}
-      style={({ pressed }) => pressed && styles.pressed}>
+      // The pill is centred; only the pill itself is the tap target.
+      style={({ pressed }) => [compact && isMaterial && styles.pillHit, pressed && styles.pressed]}>
       {body}
     </Pressable>
+  );
+}
+
+/**
+ * A small progress ring. On the web it is a conic gradient -- a glossy sweep
+ * of the fill colour -- punched out to a donut; natively, a plain ring.
+ */
+function Ring({ pct, color }: { pct: number; color: string }) {
+  const deg = Math.round(pct * 360);
+  const web = Platform.OS === 'web';
+  return (
+    <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.round(pct * 100) }}
+      style={[styles.ring, web
+        ? ({
+          backgroundImage: `conic-gradient(${color} 0deg, ${color}CC ${deg}deg, ${colors.bgMuted} ${deg}deg 360deg)`,
+          boxShadow: `0 2px 6px -2px ${color}88`,
+        } as object)
+        : { borderWidth: 3, borderColor: pct > 0 ? color : colors.bgMuted }]}>
+      <View style={styles.ringHole}>
+        <Ionicons name="sparkles" size={10} color={color} />
+      </View>
+    </View>
   );
 }
 
@@ -85,4 +126,20 @@ const styles = StyleSheet.create({
   statValue: { ...typography.label, color: colors.text },
   statLabel: { ...typography.small, color: colors.textSecondary },
   pressed: { opacity: 0.75 },
+
+  // Material pill.
+  pillHit: { alignSelf: 'center' },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm, alignSelf: 'center',
+    paddingVertical: 5, paddingLeft: 5, paddingRight: spacing.md, borderRadius: radius.pill,
+    borderWidth: 1, borderColor: colors.borderLight, backgroundColor: colors.surface, ...gloss.glass,
+  },
+  pillText: { ...typography.small, color: colors.textSecondary, flexShrink: 1 },
+  pillStrong: { fontFamily: fonts.body.semibold, color: colors.text },
+  pillMuted: { color: colors.textMuted },
+  ring: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  ringHole: {
+    width: 18, height: 18, borderRadius: 9, backgroundColor: colors.surface,
+    alignItems: 'center', justifyContent: 'center',
+  },
 });

@@ -15,6 +15,7 @@ export default function LocumLayout() {
       <Stack.Screen name="applications" />
       <Stack.Screen name="mine" />
       <Stack.Screen name="applicants" />
+      <Stack.Screen name="shifts" />
       <Stack.Screen name="[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="manage/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="new" options={{ animation: 'slide_from_bottom' }} />

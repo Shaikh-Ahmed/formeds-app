@@ -40,7 +40,7 @@ export function LocumApplySheet({
       footer={
         <>
           <Button label="Cancel" variant="outline" onPress={onClose} style={styles.flex} />
-          <Button label="Send application" onPress={() => onSubmit(note.trim())}
+          <Button label="Send application" loadingLabel="Sending…" onPress={() => onSubmit(note.trim())}
             loading={submitting} style={styles.flex} testID="locum-apply-submit" />
         </>
       }

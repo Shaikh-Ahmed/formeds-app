@@ -33,7 +33,7 @@ export function InterviewSheet({ visible, name, current, onClose, onSave, saving
   const [mode, setMode] = useState<InterviewMode>('in_person');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
-  const [local, setLocal] = useState<string | null>(null);
+  const [local, setLocal] = useState<{ at?: string; location?: string }>({});
 
   useEffect(() => {
     if (!visible) return;
@@ -41,17 +41,19 @@ export function InterviewSheet({ visible, name, current, onClose, onSave, saving
     setMode(current?.interview_mode ?? 'in_person');
     setLocation(current?.interview_location ?? '');
     setNotes(current?.notes ?? '');
-    setLocal(null);
+    setLocal({});
   }, [visible, current]);
 
   const save = () => {
-    if (!at) { setLocal('Please choose the interview date and time.'); return; }
-    if (at <= nowMinuteString()) { setLocal('Interview time cannot be in the past.'); return; }
-    if (mode === 'video' && location && !/^https?:\/\//i.test(location.trim())) {
-      setLocal('A video interview needs a meeting link starting with https://'); return;
-    }
-    setLocal(null);
-    onSave({ interview_at: at, mode, location: location.trim(), notes: notes.trim() });
+    const problems = {
+      at: !at ? 'Please choose the interview date and time.'
+        : at <= nowMinuteString() ? 'Interview time cannot be in the past.' : undefined,
+      location: mode === 'video' && location && !/^https?:\/\//i.test(location.trim())
+        ? 'A video interview needs a meeting link starting with https://' : undefined,
+    };
+    setLocal(problems);
+    if (problems.at || problems.location) return;
+    return onSave({ interview_at: at, mode, location: location.trim(), notes: notes.trim() });
   };
 
   const place = mode === 'video' ? 'Meeting link' : mode === 'phone' ? 'Number to call (optional)' : 'Address';
@@ -62,16 +64,19 @@ export function InterviewSheet({ visible, name, current, onClose, onSave, saving
       footer={(
         <View style={styles.footer}>
           <Button label="Cancel" variant="outline" onPress={onClose} style={styles.btn} />
-          <Button label={current ? 'Reschedule' : 'Schedule'} onPress={save} loading={saving} style={styles.btn}
+          <Button label={current ? 'Reschedule' : 'Schedule'} loadingLabel="Saving…" onPress={save} loading={saving}
+            style={styles.btn}
             testID="interview-save" />
         </View>
       )}>
       <View style={styles.body}>
-        <ErrorBanner message={local || error} />
-        <DateTimeField label="Date and time" value={at} onChange={setAt} min={nowMinuteString()} testID="interview-at" />
+        <ErrorBanner message={error} />
+        <DateTimeField label="Date and time" value={at} min={nowMinuteString()} testID="interview-at"
+          error={local.at} onChange={v => { setAt(v); setLocal(l => ({ ...l, at: undefined })); }} />
         <ChoiceChips label="How" value={mode} onChange={v => v && setMode(v)} testID="interview-mode"
           choices={(Object.keys(INTERVIEW_MODE_LABELS) as InterviewMode[]).map(m => ({ value: m, label: INTERVIEW_MODE_LABELS[m] }))} />
-        <FormInput label={place} value={location} onChangeText={setLocation} maxLength={300}
+        <FormInput label={place} value={location} maxLength={300} error={local.location}
+          onChangeText={v => { setLocation(v); setLocal(l => ({ ...l, location: undefined })); }}
           keyboardType={mode === 'video' ? 'url' : mode === 'phone' ? 'phone-pad' : 'default'}
           autoCapitalize={mode === 'video' ? 'none' : 'sentences'}
           placeholder={mode === 'video' ? 'https://meet.example.com/…' : mode === 'phone' ? '' : 'e.g. HR office, 2nd floor, main block'}

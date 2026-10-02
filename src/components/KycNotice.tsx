@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import { useKycStatus } from '../hooks/useKycStatus';
 import { colors, radius, spacing, typography, MIN_TOUCH_TARGET } from '../theme';
 
 /**
@@ -15,20 +16,29 @@ import { colors, radius, spacing, typography, MIN_TOUCH_TARGET } from '../theme'
 export function KycNotice({ action }: { action: string }) {
   const { isKycApproved, user } = useAuth();
   const router = useRouter();
+  const { state } = useKycStatus({ enabled: !!user && !isKycApproved });
 
   if (isKycApproved || !user) return null;
+  // Already submitted: say so, rather than asking them to do it again.
+  const reviewing = state?.status === 'pending';
+  const rejected = state?.status === 'rejected';
+  const title = reviewing ? 'Verification under review' : rejected ? 'Verification not approved' : 'Verification required';
+  const hint = reviewing
+    ? `You can ${action} once your documents are approved. We will notify you.`
+    : rejected ? `Resubmit your documents to ${action}.` : `Complete verification to ${action}.`;
 
   return (
     <TouchableOpacity
       style={styles.banner}
       onPress={() => router.push('/kyc')}
       accessibilityRole="button"
-      accessibilityLabel={`Verification required to ${action}. Tap to complete verification.`}
+      accessibilityLabel={`${title}. ${hint}`}
+      testID="kyc-notice"
     >
-      <Ionicons name="shield-outline" size={20} color={colors.warning} />
+      <Ionicons name={reviewing ? 'time-outline' : 'shield-outline'} size={20} color={colors.warning} />
       <View style={styles.body}>
-        <Text style={styles.title}>Verification required</Text>
-        <Text style={styles.hint}>Complete verification to {action}.</Text>
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.hint}>{hint}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.warning} />
     </TouchableOpacity>

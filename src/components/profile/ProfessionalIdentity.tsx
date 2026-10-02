@@ -1,7 +1,8 @@
 import React from 'react';
+import { TrustMark } from '../TrustMark';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../../theme';
 import { Profile, OPEN_TO_LABELS } from '../../types/profile';
 import { joinMeta } from './format';
 
@@ -13,6 +14,8 @@ interface Props {
   isMobile: boolean;
   onEdit?: () => void;
   onShare?: () => void;
+  /** Connect / Message, on someone else's profile. */
+  networkAction?: React.ReactNode;
 }
 
 /**
@@ -23,7 +26,7 @@ interface Props {
  * scan for in the first two seconds.
  */
 export function ProfessionalIdentity({
-  profile, credentials, editable, isMobile, onEdit, onShare,
+  profile, credentials, editable, isMobile, onEdit, onShare, networkAction,
 }: Props) {
   // Comma, not the meta separator: 'Hyderabad, Telangana' is one location,
   // whereas 'Hyderabad · Telangana' reads as two unrelated facts.
@@ -64,7 +67,7 @@ export function ProfessionalIdentity({
 
       {profile.account_verified ? (
         <View style={styles.verifiedRow}>
-          <Ionicons name="shield-checkmark" size={15} color={colors.teal} />
+          <TrustMark size={15} classicIcon="shield-checkmark" />
           <Text style={styles.verifiedText}>Verified healthcare professional</Text>
         </View>
       ) : null}
@@ -84,6 +87,7 @@ export function ProfessionalIdentity({
         {editable && onEdit ? (
           <Action label="Edit profile" icon="create-outline" primary onPress={onEdit} testID="profile-edit" />
         ) : null}
+        {networkAction}
         {onShare ? (
           <Action label="Share" icon="share-outline" onPress={onShare} testID="profile-share" />
         ) : null}
@@ -186,7 +190,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
   },
-  actionPrimary: { backgroundColor: colors.navy, borderColor: colors.navy },
+  actionPrimary: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   actionSecondary: { backgroundColor: colors.white, borderColor: colors.border },
   actionText: { ...typography.caption, fontFamily: fonts.body.semibold },
   actionTextPrimary: { color: colors.white },

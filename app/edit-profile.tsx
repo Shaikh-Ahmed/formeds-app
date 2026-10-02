@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { FormScrollView } from '../src/components/FormScrollView';
+import { focusFirstInvalid } from '../src/hooks/useFormErrors';
 import { StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -49,15 +51,19 @@ export default function EditProfileScreen() {
   };
 
   const [experienceError, setExperienceError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const isProfessional = user?.role === 'healthcare_professional';
   const isHospital = user?.role === 'hospital';
   const isClinic = user?.role === 'clinic';
 
   const save = async () => {
-    if (!name.trim()) { setError('Name is required.'); return; }
+    const nameProblem = name.trim() ? null : 'Name is required.';
     const expError = isProfessional ? validateInteger(experience, 'Years of experience', { max: 80 }) : null;
+    setNameError(nameProblem);
     setExperienceError(expError);
-    if (expError) { setError(expError); return; }
+    // Each problem is shown under its own field; nothing is sent.
+    if (nameProblem || expError) { setError(null); focusFirstInvalid(); return; }
+    if (saving) return;
     setSaving(true); setError(null);
     try {
       const payload: Record<string, any> = { name: name.trim() };
@@ -90,10 +96,11 @@ export default function EditProfileScreen() {
       <PageColumn maxWidth={640} testID="edit-profile-column">
       <ScreenHeader title="Edit Profile" />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <FormScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <ErrorBanner message={error} />
 
-          <FormInput label="Full name" icon="person-outline" value={name} onChangeText={setName} placeholder="Your name" maxLength={120} testID="edit-name" />
+          <FormInput label="Full name" icon="person-outline" value={name} onChangeText={v => { setName(v); setNameError(null); }} placeholder="Your name" maxLength={120}
+            error={nameError ?? undefined} testID="edit-name" />
 
           {isProfessional && (
             <>
@@ -163,8 +170,8 @@ export default function EditProfileScreen() {
             Your email and verification status can&apos;t be changed here. Contact support if they need updating.
           </Text>
 
-          <Button label="Save changes" onPress={save} loading={saving} testID="edit-save" />
-        </ScrollView>
+          <Button label="Save changes" loadingLabel="Saving…" onPress={save} loading={saving} testID="edit-save" />
+        </FormScrollView>
       </KeyboardAvoidingView>
       </PageColumn>
     </SafeAreaView>

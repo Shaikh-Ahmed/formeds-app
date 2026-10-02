@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts } from '../../theme';
+import { colors, radius, spacing, typography, fonts, gloss } from '../../theme';
 
 export interface Choice<T extends string> {
   value: T;
@@ -70,8 +70,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.white,
+    ...gloss.glass,
   },
-  chipOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipOn: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   text: { ...typography.caption, color: colors.textSecondary },
   textOn: { color: colors.white, fontFamily: fonts.body.semibold },
   pressed: { opacity: 0.7 },

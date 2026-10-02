@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { FieldError } from '../FieldError';
+import { FormScrollView } from '../FormScrollView';
+import { focusFirstInvalid } from '../../hooks/useFormErrors';
 import {
   View, Text, StyleSheet, Modal, ScrollView, Pressable, Switch,
   KeyboardAvoidingView, Platform, AccessibilityInfo, TextInput,
@@ -26,7 +29,9 @@ interface Props {
   initial?: Record<string, any>;
   saving?: boolean;
   error?: string | null;
-  onSave: (data: Record<string, any>) => void;
+  /** The server's per-field refusals from the last save, by field key. */
+  serverFieldErrors?: Record<string, string>;
+  onSave: (data: Record<string, any>) => void | Promise<unknown>;
   onDelete?: () => void;
   onClose: () => void;
 }
@@ -39,8 +44,14 @@ interface Props {
  * Animation is skipped entirely under reduce-motion, matching `AppDrawer`.
  */
 export function EntrySheet({
-  visible, kind, form: formOverride, initial, saving, error, onSave, onDelete, onClose,
+  visible, kind, form: formOverride, initial, saving, error, serverFieldErrors, onSave, onDelete, onClose,
 }: Props) {
+  // The server's word on a field shows under it until that field is edited.
+  const [serverErrors, setServerErrors] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setServerErrors(serverFieldErrors ?? {});
+    if (serverFieldErrors && Object.keys(serverFieldErrors).length) focusFirstInvalid();
+  }, [serverFieldErrors]);
   const { isMobile } = useBreakpoint();
   const [values, setValues] = useState<Record<string, any>>({});
   const [touched, setTouched] = useState(false);
@@ -64,8 +75,14 @@ export function EntrySheet({
 
   if (!form) return null;
 
-  const set = (key: string, value: any) =>
-    setValues((v) => {
+  const set = (key: string, value: any) => {
+    setServerErrors(prev => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    return setValues((v) => {
       const next = { ...v, [key]: value };
       // A city chosen under the old state is almost never in the new one, so
       // any lookup scoped to the field just changed starts over.
@@ -74,11 +91,16 @@ export function EntrySheet({
       }
       return next;
     });
+  };
 
   const submit = () => {
     setTouched(true);
-    if (Object.keys(fieldErrors).length) return;
-    onSave(pruneEmpty(normalizeEntryValues(form, values)));
+    if (Object.keys(fieldErrors).length) {
+      // Nothing is sent; the first field that needs work is brought into view.
+      focusFirstInvalid();
+      return;
+    }
+    return onSave(pruneEmpty(normalizeEntryValues(form, values)));
   };
 
   return (
@@ -116,7 +138,7 @@ export function EntrySheet({
             </Pressable>
           </View>
 
-          <ScrollView
+          <FormScrollView
             contentContainerStyle={styles.body}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
@@ -131,11 +153,11 @@ export function EntrySheet({
                   value={values[field.key]}
                   draft={values}
                   onChange={(v) => set(field.key, v)}
-                  error={touched ? fieldErrors[field.key] : undefined}
+                  error={(touched ? fieldErrors[field.key] : undefined) ?? serverErrors[field.key]}
                 />
               );
             })}
-          </ScrollView>
+          </FormScrollView>
 
           <View style={styles.footer}>
             {isEdit && onDelete ? (
@@ -153,6 +175,7 @@ export function EntrySheet({
               <Button label="Cancel" variant="outline" onPress={onClose} style={styles.footerBtn} />
               <Button
                 label={isEdit ? 'Save' : 'Add'}
+                loadingLabel={isEdit ? 'Saving…' : 'Adding…'}
                 onPress={submit}
                 loading={saving}
                 style={styles.footerBtn}
@@ -270,7 +293,7 @@ function Field({
           value={value ? String(value) : ''} placeholder="Year"
           options={yearOptions(1950, field.max ?? nowYear + 10)}
           onChange={v => onChange(v ? Number(v) : undefined)} testID={`entry-${field.key}`} />
-        {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
+        <FieldError message={error} />
       </View>
     );
   }
@@ -423,7 +446,7 @@ function Field({
         accessibilityLabel={field.label}
       />
       {showError ? (
-        <Text style={styles.error} accessibilityRole="alert">{error}</Text>
+        <FieldError message={error} />
       ) : field.helper ? (
         <Text style={styles.helper}>{field.helper}</Text>
       ) : null}

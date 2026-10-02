@@ -1,4 +1,5 @@
 import React from 'react';
+import { TrustMark } from '../TrustMark';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing, typography, fonts } from '../../theme';
@@ -103,8 +104,7 @@ export function LocumDetailPanel({
             role={locum.poster_role || undefined} size={28} />
           <Text style={styles.employer} numberOfLines={1}>{locum.employer_name}</Text>
           {locum.employer_verified ? (
-            <Ionicons name="checkmark-circle" size={16} color={colors.teal}
-              accessibilityLabel="Verified organisation" />
+            <TrustMark size={16} classicIcon="checkmark-circle" label="Verified organisation" />
           ) : null}
         </Pressable>
       </View>

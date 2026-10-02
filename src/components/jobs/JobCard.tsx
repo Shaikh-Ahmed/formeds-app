@@ -1,7 +1,9 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
+import { TrustMark } from '../TrustMark';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, radius, spacing, typography, fonts, shadow, isRefined, isMaterial, motion, MIN_TOUCH_TARGET, gloss } from '../../theme';
 import { postedAgo } from '../../utils/time';
 import { Avatar } from '../Avatar';
 import { Chip } from '../Chip';
@@ -57,7 +59,7 @@ export const JobCard = React.memo(function JobCard({
   const canQuickApply = !!onQuickApply && !item.has_applied && !item.can_manage && item.status === 'active';
 
   return (
-    <View style={[styles.card, compact && styles.cardCompact, selected && styles.cardSelected]}>
+    <View style={[styles.card, compact && styles.cardCompact, isRefined && styles.pCard, selected && styles.cardSelected]}>
       <Pressable
         testID={`job-card-${item.id}`}
         onPress={onPress}
@@ -86,13 +88,7 @@ export const JobCard = React.memo(function JobCard({
             />
             <Text style={styles.employer} numberOfLines={1}>{item.employer_name}</Text>
             {item.employer_verified ? (
-              <Ionicons
-                name="checkmark-circle"
-                size={14}
-                color={colors.teal}
-                // The tick is a claim, so it is announced rather than decorative.
-                accessibilityLabel="Verified organisation"
-              />
+              <TrustMark size={14} classicIcon="checkmark-circle" label="Verified organisation" />
             ) : null}
           </View>
           {item.posted_by_recruiter ? (
@@ -113,16 +109,22 @@ export const JobCard = React.memo(function JobCard({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={({ pressed }) => [styles.saveBtn, pressed && styles.iconPressed]}
           >
-            <Ionicons
-              name={item.saved ? 'bookmark' : 'bookmark-outline'}
-              size={20}
-              color={item.saved ? colors.navy : colors.textSecondary}
-            />
+            <SaveGlyph saved={!!item.saved} />
           </Pressable>
         ) : null}
       </View>
 
       <View pointerEvents="none" style={styles.body}>
+        {/* Premium: compensation straight after who is offering it -- the
+            spec's decision order -- and set to read before the metadata. */}
+        {isRefined ? (pay ? (
+          <View style={[styles.pPayRow, isMaterial && styles.mPayRow]}>
+            <Ionicons name="wallet-outline" size={16} color={isMaterial ? colors.teal : colors.navy} />
+            <Text style={styles.pPay}>{pay}</Text>
+          </View>
+        ) : (
+          <Text style={styles.payHidden}>Pay not disclosed</Text>
+        )) : null}
         <View style={styles.metaRow}>
           {item.location ? <MetaItem icon="location-outline" text={item.location} /> : null}
           <MetaItem icon="briefcase-outline" text={formatTypeLine(item)} />
@@ -136,7 +138,7 @@ export const JobCard = React.memo(function JobCard({
           </View>
         ) : null}
 
-        {pay ? (
+        {isRefined ? null : pay ? (
           <Text style={styles.pay}>{pay}</Text>
         ) : (
           <Text style={styles.payHidden}>Pay not disclosed</Text>
@@ -210,6 +212,33 @@ export const JobCard = React.memo(function JobCard({
   );
 });
 
+/**
+ * The bookmark. In Premium, becoming saved gives a brief scale "pop" -- the
+ * confirmation the spec asks for -- skipped under reduce-motion.
+ */
+function SaveGlyph({ saved }: { saved: boolean }) {
+  const reduced = useReducedMotion();
+  const scale = useRef(new Animated.Value(1)).current;
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    if (!isRefined || reduced || !saved) return;
+    Animated.sequence([
+      Animated.timing(scale, { toValue: 1.25, duration: motion.fast, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: motion.base, useNativeDriver: true }),
+    ]).start();
+  }, [saved, reduced, scale]);
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Ionicons
+        name={saved ? 'bookmark' : 'bookmark-outline'}
+        size={20}
+        color={saved ? colors.navy : colors.textSecondary}
+      />
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.card,
@@ -222,7 +251,7 @@ const styles = StyleSheet.create({
   cardCompact: { borderRadius: radius.lg, padding: spacing.md + 2, gap: spacing.xs + 2 },
   // A 2px left edge rather than a fill: the selected row has to read as
   // selected without changing how legible its text is.
-  cardSelected: { borderColor: colors.navy, backgroundColor: '#EFF6FF' },
+  cardSelected: { borderColor: colors.navy, backgroundColor: colors.selected },
   cardPressed: { backgroundColor: colors.bgMuted },
   // The card's own tap target, filling it behind the content.
   hit: { ...StyleSheet.absoluteFillObject, borderRadius: radius.xl + 2 },
@@ -273,8 +302,18 @@ const styles = StyleSheet.create({
   iconHover: { backgroundColor: colors.bgMuted },
   quick: {
     flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: spacing.md,
-    borderRadius: radius.pill, backgroundColor: colors.navy,
+    borderRadius: radius.pill, backgroundColor: colors.action, ...gloss.fill,
   },
-  quickHover: { backgroundColor: colors.navyLight },
+  quickHover: { backgroundColor: colors.actionHover },
   quickText: { ...typography.label, color: colors.white },
+
+  // ── ForMeds Premium ──────────────────────────────────────────────────────
+  pCard: { borderRadius: radius.card, ...shadow.card },
+  pPayRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  pPay: { ...typography.h3, color: colors.navy },
+  // Material: the salary sits in a soft teal well -- the decision number.
+  mPayRow: {
+    alignSelf: 'flex-start', backgroundColor: colors.tealBg,
+    paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.md,
+  },
 });

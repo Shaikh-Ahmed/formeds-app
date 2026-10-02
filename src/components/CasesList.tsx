@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { apiFetch } from '../utils/api';
 import { usePaginatedList } from '../hooks/usePaginatedList';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../theme';
 import { CaseCard } from './CaseCard';
 import { TagChip } from './TagChip';
 import { LoadingState, EmptyState, ErrorState } from './States';
@@ -23,7 +23,12 @@ const SEARCH_DEBOUNCE_MS = 400;
 export function CasesList({
   scrollProps,
   contentInsetTop = 0,
+  initialTag,
+  initialSaved,
 }: {
+  /** Opened from a link (Trending, Saved posts): start with this filter. */
+  initialTag?: string;
+  initialSaved?: boolean;
   /** Lets the parent screen's collapsing header ride this list's scrolling. */
   scrollProps?: CollapsibleScrollProps;
   /** Height of the overlaying header, so the first card clears it. */
@@ -33,8 +38,11 @@ export function CasesList({
   const router = useRouter();
 
   const [sort, setSort] = useState<CaseSort>('active');
-  const [tag, setTag] = useState<string | null>(null);
-  const [savedOnly, setSavedOnly] = useState(false);
+  const [tag, setTag] = useState<string | null>(initialTag ?? null);
+  const [savedOnly, setSavedOnly] = useState(!!initialSaved);
+  // A later link (another trending topic) while the list is mounted.
+  useEffect(() => { if (initialTag) { setTag(initialTag); setSavedOnly(false); } }, [initialTag]);
+  useEffect(() => { if (initialSaved) setSavedOnly(true); }, [initialSaved]);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [tags, setTags] = useState<CaseTag[]>([]);
@@ -234,8 +242,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm - 2,
+    ...gloss.glass,
   },
-  chipActive: { backgroundColor: colors.navy },
+  chipActive: { backgroundColor: colors.action, ...gloss.fill },
   chipText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   chipTextActive: { color: colors.white },
   list: { padding: spacing.lg, paddingBottom: 100 },

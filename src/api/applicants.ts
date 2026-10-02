@@ -31,7 +31,9 @@ export const fetchApplicantResume = (
 export const scheduleInterview = (
   token: string, applicationId: string,
   body: { interview_at: string; mode: InterviewMode; location: string; notes: string },
-) => apiFetch(`/api/jobs/applications/${encodeURIComponent(applicationId)}/interview`, token, json('POST', body));
+  idempotencyKey?: string,
+) => apiFetch(`/api/jobs/applications/${encodeURIComponent(applicationId)}/interview`, token,
+  { ...json('POST', body), idempotencyKey });
 
 export const bulkSetStatus = (
   token: string, jobId: string, applicationIds: string[], status: ApplicationStatusKey,

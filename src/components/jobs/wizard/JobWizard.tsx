@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { FormScrollView } from '../../FormScrollView';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../../theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../../../theme';
 import { Button } from '../../Button';
 import { FormInput } from '../../FormInput';
 import { SelectField } from '../../SelectField';
 import { ErrorBanner } from '../../States';
+import { focusFirstInvalid } from '../../../hooks/useFormErrors';
 import { OrgVerifiedBadge } from '../../organizations/OrgVerifiedBadge';
 import { DateField, NumberField, TimeField } from '../../InputFields';
 import { ScreeningEditor, questionErrors } from '../Screening';
@@ -96,7 +98,6 @@ export function JobWizard({
   initial,
   mode = 'create',
   organizations = [],
-  onCreateOrganization,
   onSubmit,
   submitting,
   error,
@@ -110,8 +111,7 @@ export function JobWizard({
   initial?: Partial<JobDraft>;
   mode?: 'create' | 'edit';
   organizations?: Organization[];
-  onCreateOrganization?: () => void;
-  onSubmit: (payload: Record<string, unknown>, opts: { publish: boolean }) => void;
+  onSubmit: (payload: Record<string, unknown>, opts: { publish: boolean }) => void | Promise<unknown>;
   submitting?: boolean;
   error?: string | null;
   onCancel?: () => void;
@@ -208,7 +208,10 @@ export function JobWizard({
   }, [serverFieldErrors]);
   useEffect(() => {
     const first = [0, 1, 2, 3, 4].find(i => Object.keys(server[i]).length);
-    if (first !== undefined) setStep(first);
+    if (first !== undefined) {
+      setStep(first);
+      focusFirstInvalid();
+    }
   }, [server]);
 
   const stepOk = (i: number) => Object.keys(problems[i] ?? {}).length === 0;
@@ -217,6 +220,7 @@ export function JobWizard({
   const next = () => {
     setTouched(t => ({ ...t, [step]: true }));
     if (stepOk(step)) setStep(s => Math.min(s + 1, STEPS.length - 1));
+    else focusFirstInvalid();
   };
 
   const payload = () => ({
@@ -267,9 +271,16 @@ export function JobWizard({
     // rejected by the server anyway.
     setTouched({ 0: true, 1: true, 2: true, 3: true, 4: true });
     const firstBad = [0, 1, 2, 3, 4].find(i => !stepOk(i));
-    if (firstBad !== undefined) { setStep(firstBad); return; }
-    onSubmit(payload(), { publish });
+    if (firstBad !== undefined) {
+      setStep(firstBad);
+      focusFirstInvalid();
+      return;
+    }
+    setPressed(publish ? 'publish' : 'draft');
+    return onSubmit(payload(), { publish });
   };
+  // Which final button was pressed, so only that one says "Saving…".
+  const [pressed, setPressed] = useState<'draft' | 'publish' | null>(null);
 
   const org = organizations.find(o => o.id === draft.org_id);
   const preview = usePreviewJob(draft, org, posterName);
@@ -278,17 +289,15 @@ export function JobWizard({
     <View style={styles.flex}>
       <Progress step={step} />
 
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <FormScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <View style={styles.stepHead}>
           <Text style={styles.stepTitle} accessibilityRole="header">{STEPS[step].title}</Text>
           <Text style={styles.stepHint}>{STEPS[step].hint}</Text>
         </View>
 
-        <ErrorBanner message={error} />
-
         {step === 0 ? (
           <>
-            {organizations.length || onCreateOrganization ? (
+            {organizations.length ? (
               <Field label="Posting as">
                 <ChipRow>
                   {allowSelf ? (
@@ -313,16 +322,6 @@ export function JobWizard({
                   <OrgVerifiedBadge status={org.verification_status} />
                 ) : allowSelf ? (
                   <Text style={styles.hint}>This role will show your own name as the employer.</Text>
-                ) : null}
-                {onCreateOrganization ? (
-                  <Pressable
-                    onPress={onCreateOrganization}
-                    accessibilityRole="button"
-                    accessibilityLabel="Create an organisation"
-                    style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.link}>+ Create an organisation</Text>
-                  </Pressable>
                 ) : null}
               </Field>
             ) : null}
@@ -614,7 +613,10 @@ export function JobWizard({
             </View>
           </>
         ) : null}
-      </ScrollView>
+        {/* Beside the buttons: only what belongs to no field (a refusal, the
+            network). Field problems are shown under their fields. */}
+        <ErrorBanner message={error} />
+      </FormScrollView>
 
       <View style={styles.footer}>
         {step > 0 ? (
@@ -636,17 +638,21 @@ export function JobWizard({
             {mode === 'create' ? (
               <Button
                 label="Save draft"
+                loadingLabel="Saving…"
                 variant="outline"
                 onPress={() => finish(false)}
-                loading={submitting}
+                loading={submitting && pressed === 'draft'}
+                disabled={submitting}
                 style={styles.footerBtn}
                 testID="wizard-draft"
               />
             ) : null}
             <Button
               label={mode === 'edit' ? 'Save changes' : 'Publish'}
+              loadingLabel={mode === 'edit' ? 'Saving…' : 'Publishing…'}
               onPress={() => finish(true)}
-              loading={submitting}
+              loading={submitting && pressed === 'publish'}
+              disabled={submitting}
               style={styles.footerBtn}
               testID="wizard-publish"
             />
@@ -854,7 +860,7 @@ const styles = StyleSheet.create({
     minHeight: 36,
     justifyContent: 'center',
   },
-  chipOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipOn: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   chipText: { ...typography.caption, color: colors.textSecondary },
   chipTextOn: { color: colors.white, fontFamily: fonts.body.semibold },
 
@@ -877,8 +883,6 @@ const styles = StyleSheet.create({
     maxHeight: 460,
   },
 
-  linkRow: { alignSelf: 'flex-start', minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
-  link: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.navy },
 
   footer: {
     flexDirection: 'row',

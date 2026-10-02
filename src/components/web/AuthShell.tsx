@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView } from 'react-native';
+import { AuthCardContext } from './authCardContext';
 import { colors, spacing, radius, typography, useBreakpoint } from '../../theme';
 
 /**
@@ -43,17 +44,14 @@ export function AuthShell({
     <View style={styles.root} testID={testID}>
       <View style={styles.brandPanel}>
         <View style={styles.brandInner}>
-          {/* The logo is a transparent PNG whose lettering is brand navy — the
-              same colour as this panel — so it must sit on a light chip. Placed
-              directly on navy it renders as an invisible rectangle. */}
-          <View style={styles.logoChip}>
-            <Image
-              source={require('../../../assets/images/formeds-logo.png')}
-              style={styles.logo}
-              resizeMode="contain"
-              accessibilityLabel="ForMeds"
-            />
-          </View>
+          {/* The reversed logo -- white lettering, teal mark, transparent
+              background -- made for dark surfaces like this panel. */}
+          <Image
+            source={require('../../../assets/images/formeds-logo-white.png')}
+            style={styles.logo}
+            resizeMode="contain"
+            accessibilityLabel="ForMeds"
+          />
           <Text style={styles.tagline} accessibilityRole="header">
             India&apos;s first integrated healthcare platform
           </Text>
@@ -69,15 +67,39 @@ export function AuthShell({
         </View>
       </View>
 
-      {/* No ScrollView here: every auth screen already owns one, and nesting
-          two scroll containers on web produces a card that scrolls its own
-          scrollbar. The card is height-capped instead and the child scrolls
-          inside it. */}
-      <View style={styles.formPanel}>
-        <View style={[styles.card, { maxWidth }, fill && styles.cardFill]}>{children}</View>
-      </View>
+      {/* The card grows with its form and never scrolls on its own -- a
+          scrollbar inside a card reads as broken. If the window is too short
+          for the form, this panel scrolls instead, like any web page. The
+          screen's own ScrollView renders as a plain view in here (see
+          AuthCardContext), and +html.tsx keeps its wrapper from collapsing. */}
+      <ScrollView style={styles.formScroll} contentContainerStyle={styles.formPanel}>
+        <AuthCardContext.Provider value>
+          <View style={[styles.card, { maxWidth }]} nativeID="auth-card">{children}</View>
+        </AuthCardContext.Provider>
+      </ScrollView>
     </View>
   );
+}
+
+/**
+ * Two fields side by side on desktop, stacked on a phone. Lets the longer
+ * sign-up forms fit the card without a scrollbar inside it.
+ */
+export function AuthRow({ children }: { children: React.ReactNode }) {
+  const { isMobile } = useBreakpoint();
+  if (isMobile) return <>{children}</>;
+  return (
+    <View style={styles.row}>
+      {React.Children.toArray(children).map((child, i) => (
+        <View key={i} style={styles.rowItem}>{child}</View>
+      ))}
+    </View>
+  );
+}
+
+/** Back button and the account-type badge on one line, on every width. */
+export function AuthTopRow({ children }: { children: React.ReactNode }) {
+  return <View style={styles.topRow}>{children}</View>;
 }
 
 function Point({ text }: { text: string }) {
@@ -102,15 +124,8 @@ const styles = StyleSheet.create({
     maxWidth: 520,
   },
   brandInner: { gap: spacing.md },
-  logoChip: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  logo: { width: 168, height: 48 },
+  // The image's own 3.34:1 shape, so it sits flush with the text below.
+  logo: { width: 167, height: 50, marginBottom: spacing.lg },
   tagline: { ...typography.h2, color: colors.white, lineHeight: 30 },
   mission: { ...typography.body, color: '#B6C6D8', lineHeight: 22 },
   points: { marginTop: spacing.xl, gap: spacing.md },
@@ -118,8 +133,13 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.tealLight, marginTop: 8 },
   pointText: { ...typography.caption, color: '#B6C6D8', flex: 1, lineHeight: 20 },
 
+  row: { flexDirection: 'row', gap: spacing.md },
+  rowItem: { flex: 1, minWidth: 0 },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg },
+
+  formScroll: { flex: 1 },
   formPanel: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xxxl,
@@ -140,7 +160,4 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 4,
   },
-  // Fills the panel but stops growing on tall monitors, where a 1300px-tall
-  // card holding a six-field form reads as a rendering mistake.
-  cardFill: { height: '100%', maxHeight: 720 },
 });

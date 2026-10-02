@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSubmit } from '../../../../../src/hooks/useSubmit';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -18,7 +19,7 @@ export default function EditLocumScreen() {
   const router = useRouter();
   const [locum, setLocum] = useState<Locum | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, run } = useSubmit();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -35,22 +36,20 @@ export default function EditLocumScreen() {
   useEffect(() => { load(); }, [load]);
   const initial = useMemo(() => (locum ? formFromLocum(locum) : undefined), [locum]);
 
-  const submit = useCallback(async (patch: Record<string, unknown>) => {
+  const submit = useCallback((patch: Record<string, unknown>) => run(async () => {
     if (!token || !id) return;
     if (!Object.keys(patch).length) { router.back(); return; }
-    setSubmitting(true);
     setError(null);
     try {
       await updateLocum(token, id, patch);
       if (router.canGoBack()) router.back();
       else router.replace(`/jobs/locum/manage/${id}` as any);
     } catch (e: any) {
-      setError(e?.message || 'Could not save your changes.');
-      setFieldErrors(errorFields(e, LOCUM_ERROR_FIELDS));
-    } finally {
-      setSubmitting(false);
+      const fields = errorFields(e, LOCUM_ERROR_FIELDS);
+      setFieldErrors(fields);
+      setError(Object.keys(fields).length ? null : e?.message || 'Could not save your changes. Please try again.');
     }
-  }, [token, id, router]);
+  }, patch), [token, id, router, run]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

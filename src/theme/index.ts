@@ -1,7 +1,10 @@
 export { colors } from './colors';
 export type { ColorToken } from './colors';
-export { spacing, radius, typography, shadow, fonts, MIN_TOUCH_TARGET, compactAction } from './tokens';
+export { spacing, radius, typography, shadow, elevation, fonts, motion, MIN_TOUCH_TARGET, compactAction } from './tokens';
+export { materials, gloss } from './materials';
 export { ROLE_META, getRoleMeta } from './roles';
 export type { Role, RoleMeta } from './roles';
 export { breakpoints, layout, useBreakpoint } from './breakpoints';
 export type { Breakpoint } from './breakpoints';
+export { activeTheme, applyTheme, THEMES, isPremium, isMaterial, isTerracotta, isRefined } from './activeTheme';
+export type { ThemeId } from './activeTheme';

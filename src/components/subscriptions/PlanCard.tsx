@@ -85,7 +85,7 @@ export function PlanCard({
       </View>
 
       {action === 'upgrade' ? (
-        <Button label={`Upgrade to ${plan.name}`} onPress={onAction ?? (() => {})} loading={busy}
+        <Button label={`Upgrade to ${plan.name}`} loadingLabel="Starting checkout…" onPress={onAction ?? (() => {})} loading={busy}
           testID={`${testID}-upgrade`} />
       ) : action === 'downgrade' ? (
         <Button label={`Switch to ${plan.name}`} variant="outline" onPress={onAction ?? (() => {})}

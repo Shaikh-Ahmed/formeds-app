@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity, TextInput, Pressable,
-  ActivityIndicator, KeyboardAvoidingView, Platform, RefreshControl, Share, Image, Modal,
-} from 'react-native';
+import { shareCase } from '../../src/utils/share';
+import { CopiedToast, useCopiedToast } from '../../src/components/CopiedToast';
+import { useSubmit } from '../../src/hooks/useSubmit';
+import { View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity, TextInput, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform, RefreshControl, Image, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,12 +13,13 @@ import {
   Avatar, RoleBadge, VoteControl, TagChip, KycNotice,
   LoadingState, ErrorState, ErrorBanner, Button,
 } from '../../src/components';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../src/theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../../src/theme';
 import {
   ANSWER_SORTS, REPORT_REASONS,
   type AnswerSort, type CaseAnswer, type CaseThread, type VoteValue,
 } from '../../src/types/cases';
 import { PageColumn } from '../../src/components/web';
+import { mediaUri } from '../../src/utils/media';
 
 type ReplyTarget = { id: string; author: string } | null;
 
@@ -45,7 +46,7 @@ export default function CaseDetailScreen() {
   const [draft, setDraft] = useState('');
   const [anonymous, setAnonymous] = useState(false);
   const [replyTo, setReplyTo] = useState<ReplyTarget>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, run: runAnswer } = useSubmit();
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState<{ type: 'case' | 'answer'; id: string } | null>(null);
 
@@ -98,27 +99,27 @@ export default function CaseDetailScreen() {
 
   // ── Writing ───────────────────────────────────────────────────────────────
 
-  const submit = async () => {
+  const submit = () => {
     if (!draft.trim()) return;
-    setSubmitting(true);
-    setActionError(null);
-    try {
-      await apiFetch(`/api/cases/${id}/answers`, token, {
-        method: 'POST',
-        body: JSON.stringify({
-          body: draft.trim(),
-          is_anonymous: anonymous,
-          ...(replyTo ? { parent_id: replyTo.id } : {}),
-        }),
-      });
-      setDraft('');
-      setReplyTo(null);
-      await load();
-    } catch (e: any) {
-      setActionError(e?.message || 'Could not post that.');
-    } finally {
-      setSubmitting(false);
-    }
+    const answer = {
+      body: draft.trim(),
+      is_anonymous: anonymous,
+      ...(replyTo ? { parent_id: replyTo.id } : {}),
+    };
+    return runAnswer(async key => {
+      setActionError(null);
+      try {
+        // Keyed: a double tap or a retry posts this answer once.
+        await apiFetch(`/api/cases/${id}/answers`, token, {
+          method: 'POST', body: JSON.stringify(answer), idempotencyKey: key,
+        });
+        setDraft('');
+        setReplyTo(null);
+        await load();
+      } catch (e: any) {
+        setActionError(e?.message || 'Could not post that. Please try again.');
+      }
+    }, { id, answer });
   };
 
   const accept = async (answerId: string) => {
@@ -172,12 +173,8 @@ export default function CaseDetailScreen() {
     } catch (e: any) { setActionError(e?.message || 'Could not send that report.'); }
   };
 
-  const share = async () => {
-    if (!thread) return;
-    try {
-      await Share.share({ message: `${thread.title}\n\n${thread.body}\n\n— via ForMeds Cases` });
-    } catch { /* user dismissed the sheet */ }
-  };
+  const copiedToast = useCopiedToast();
+  const share = async () => { if (thread) copiedToast.report(await shareCase(thread)); };
 
   const locked = thread?.status === 'closed';
   const answerLabel = useMemo(() => {
@@ -271,7 +268,7 @@ export default function CaseDetailScreen() {
 
       <AuthorRow post={item} />
       <Text style={[styles.body, item.is_deleted && styles.removed]}>{item.body}</Text>
-      {item.image_url ? <Image source={{ uri: item.image_url }} style={styles.image} resizeMode="cover" /> : null}
+      {item.image_url ? <Image source={{ uri: mediaUri(item.image_url) }} style={styles.image} resizeMode="cover" /> : null}
       <PostActions post={item} isAnswer />
 
       {item.replies?.length ? (
@@ -323,7 +320,7 @@ export default function CaseDetailScreen() {
             <View style={styles.caseText}>
               <Text style={styles.body}>{thread.body}</Text>
               {thread.image_url ? (
-                <Image source={{ uri: thread.image_url }} style={styles.image} resizeMode="cover" />
+                <Image source={{ uri: mediaUri(thread.image_url) }} style={styles.image} resizeMode="cover" />
               ) : null}
             </View>
           </View>
@@ -542,6 +539,7 @@ export default function CaseDetailScreen() {
         </View>
       </Modal>
       </PageColumn>
+      <CopiedToast visible={copiedToast.visible} />
     </SafeAreaView>
   );
 }
@@ -593,7 +591,7 @@ const styles = StyleSheet.create({
   answersTitle: { ...typography.h3, color: colors.text },
   sortRow: { flexDirection: 'row', gap: spacing.sm },
   sortChip: { backgroundColor: colors.bgMuted, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs + 2 },
-  sortChipActive: { backgroundColor: colors.navy },
+  sortChipActive: { backgroundColor: colors.action, ...gloss.fill },
   sortText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   sortTextActive: { color: colors.white },
 
@@ -636,7 +634,7 @@ const styles = StyleSheet.create({
   },
   sendBtn: {
     width: MIN_TOUCH_TARGET, height: MIN_TOUCH_TARGET, borderRadius: MIN_TOUCH_TARGET / 2,
-    backgroundColor: colors.navy, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.action, ...gloss.fill, alignItems: 'center', justifyContent: 'center',
   },
   sendBtnDisabled: { opacity: 0.5 },
   anonRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm, minHeight: 30 },

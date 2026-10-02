@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { colors, radius, spacing } from '../theme';
+import { colors, radius, spacing, gloss } from '../theme';
 
 interface Props {
   label: string;
@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
   },
-  chipSelected: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipSelected: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   text: { fontSize: 12, fontWeight: '600', color: colors.navy },
   textSelected: { color: colors.white },
   count: { color: colors.textMuted, fontWeight: '500' },

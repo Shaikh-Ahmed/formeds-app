@@ -10,8 +10,8 @@ import { usePaginatedList } from '../hooks/usePaginatedList';
 import { LoadingState, EmptyState, ErrorState } from './States';
 import { PageColumn } from './web';
 import { JobBadge } from './jobs/JobMeta';
-import { isLocumNotification, locumNotificationMeta } from '../types/locum';
-import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET } from '../theme';
+import { isLocumNotification, isLocumShiftNotification, locumNotificationMeta } from '../types/locum';
+import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../theme';
 
 /**
  * The notifications screen, rendered by two routes.
@@ -102,6 +102,10 @@ export function NotificationsView({ withBack = false }: { withBack?: boolean }) 
       router.push('/recruiter/invitations' as any);
     } else if (item.type === 'recruiter_status') {
       router.push('/recruiter' as any);
+    } else if (isLocumShiftNotification(item.type)) {
+      // After selection -- arrival, attendance, no-shows, strikes, requests,
+      // reviews -- the place to act is Shifts, not the locum's public page.
+      router.push('/jobs/locum/shifts' as any);
     } else if (isLocumNotification(item.type) && item.ref_id) {
       // Every Locum notification points at its locum; the page shows the
       // applicant their status and the hospital its Manage button.
@@ -279,7 +283,7 @@ const styles = StyleSheet.create({
     minHeight: 34,
     justifyContent: 'center',
   },
-  chipActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   chipText: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   chipTextActive: { color: colors.white },
 

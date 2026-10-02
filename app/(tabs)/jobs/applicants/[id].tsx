@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useSubmit } from '../../../../src/hooks/useSubmit';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -71,6 +72,7 @@ export default function ApplicantWorkspace() {
   const [sheet, setSheet] = useState<null | 'filters' | 'sort' | 'status' | 'bulk' | 'more' | 'interview'>(null);
   const [confirmReject, setConfirmReject] = useState<null | { ids: string[] }>(null);
   const [busy, setBusy] = useState(false);
+  const guard = useSubmit();
   const [actionError, setActionError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [draftFilters, setDraftFilters] = useState<Filters>({});
@@ -172,11 +174,15 @@ export default function ApplicantWorkspace() {
     } finally { setBusy(false); }
   };
 
-  const saveInterview = async (v: Parameters<typeof scheduleInterview>[2]) => {
+  const saveInterview = (v: Parameters<typeof scheduleInterview>[2]) =>
+    guard.run(key => scheduleOnce(key, v), { app: detail?.application.id, v });
+
+  const scheduleOnce = async (key: string, v: Parameters<typeof scheduleInterview>[2]) => {
     if (!token || !detail) return;
     setBusy(true); setActionError(null);
     try {
-      await scheduleInterview(token, detail.application.id, v);
+      // Keyed: a double click schedules (and notifies) once.
+      await scheduleInterview(token, detail.application.id, v, key);
       setSheet(null); setToast('Interview scheduled. The applicant has been told.');
       await refresh();
     } catch (e: any) {

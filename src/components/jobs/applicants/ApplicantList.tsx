@@ -1,7 +1,8 @@
 import React from 'react';
+import { TrustMark } from '../../TrustMark';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, radius, spacing, typography, MIN_TOUCH_TARGET } from '../../../theme';
+import { colors, fonts, radius, spacing, typography, MIN_TOUCH_TARGET, gloss } from '../../../theme';
 import { Avatar } from '../../Avatar';
 import { Skeleton } from '../../Skeleton';
 import { JobBadge } from '../JobMeta';
@@ -187,7 +188,7 @@ function Row({ card, selected, checked, onPress, onToggle }: {
         <Text style={styles.name} numberOfLines={1}>{a?.name ?? 'Applicant'}</Text>
         {verified ? (
           <View style={styles.verified}>
-            <Ionicons name="checkmark-circle" size={13} color={colors.teal} />
+            <TrustMark size={13} classicIcon="checkmark-circle" />
             <Text style={styles.verifiedText}>{verified}</Text>
           </View>
         ) : null}
@@ -223,7 +224,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: MIN_TOUCH_TARGET, minHeight: 44, justifyContent: 'center',
     paddingHorizontal: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
   },
-  iconBtnOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  iconBtnOn: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   iconBtnCount: { ...typography.small, fontFamily: fonts.body.bold, color: colors.white },
   tabsScroll: { flexGrow: 0, flexShrink: 0 },
   tabs: { paddingHorizontal: spacing.md, gap: spacing.xs, paddingBottom: spacing.sm },
@@ -231,7 +232,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 34, paddingHorizontal: spacing.md,
     borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border,
   },
-  tabOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  tabOn: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   tabText: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   tabCount: { ...typography.small, color: colors.textMuted },
   tabTextOn: { color: colors.white },

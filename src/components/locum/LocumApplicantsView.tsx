@@ -1,9 +1,11 @@
 import React, { useCallback, useState } from 'react';
+import { TrustMark } from '../TrustMark';
+import { useSubmit } from '../../hooks/useSubmit';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, radius, spacing, typography, fonts } from '../../theme';
+import { colors, radius, spacing, typography, fonts, gloss } from '../../theme';
 import { postedAgo } from '../../utils/time';
 import { Avatar } from '../Avatar';
 import { Button } from '../Button';
@@ -20,6 +22,7 @@ import {
   LOCUM_APPLICATION_META, LOCUM_ROLE_LABELS,
   type Locum, type LocumApplicationStatus, type LocumHistoryEvent, type ManagedLocumApplication,
 } from '../../types/locum';
+import { ReliabilityLine } from './shifts/ShiftBits';
 
 type Move = 'under_review' | 'contacted' | 'selected' | 'not_selected';
 
@@ -33,6 +36,13 @@ interface Action {
 
 /** Stages from which "Contact" also records that the hospital got in touch. */
 const MARK_CONTACTED_FROM: LocumApplicationStatus[] = ['applied', 'under_review'];
+
+const ATTENDANCE_LABELS: Record<string, string> = {
+  arrival_reported: 'Arrived',
+  attendance_approved: 'Attendance approved',
+  completed: 'Shift completed',
+  no_show: 'No-show',
+};
 
 /**
  * The hospital's applicant list, shared by one locum's page and the
@@ -78,6 +88,7 @@ export function LocumApplicantsView({
   const { token } = useAuth();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const guard = useSubmit();
   const [actionError, setActionError] = useState<string | null>(null);
   const [interviewFor, setInterviewFor] = useState<{ app: ManagedLocumApplication; result: InterviewResult } | null>(null);
   const [confirm, setConfirm] = useState<{ app: ManagedLocumApplication; move: Move } | null>(null);
@@ -113,12 +124,15 @@ export function LocumApplicantsView({
     }
   }, [token, replace, onLocumUpdate]);
 
-  const saveInterview = useCallback(async (data: { result: InterviewResult; interview_at?: string; notes?: string }) => {
+  const saveInterview = useCallback((data: { result: InterviewResult; interview_at?: string; notes?: string }) =>
+    guard.run(key => recordOnce(key, data), { app: interviewFor?.app.id, data }), [guard, interviewFor]);
+
+  const recordOnce = useCallback(async (key: string, data: { result: InterviewResult; interview_at?: string; notes?: string }) => {
     if (!token || !interviewFor) return;
     setBusy(interviewFor.app.id);
     setActionError(null);
     try {
-      const res = await recordLocumInterview(token, interviewFor.app.id, data);
+      const res = await recordLocumInterview(token, interviewFor.app.id, data, key);
       replace(res.application);
       setInterviewFor(null);
     } catch (e: any) {
@@ -298,8 +312,7 @@ function ApplicantRow({
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>{name}</Text>
             {card?.account_verified ? (
-              <Ionicons name="checkmark-circle" size={14} color={colors.teal}
-                accessibilityLabel="Verified healthcare professional" />
+              <TrustMark size={14} classicIcon="checkmark-circle" label="Verified healthcare professional" />
             ) : null}
           </View>
           {line ? <Text style={styles.meta} numberOfLines={1}>{line}</Text> : null}
@@ -307,6 +320,7 @@ function ApplicantRow({
             {[card?.account_verified ? 'Verified' : 'Not yet verified', card?.city || card?.location]
               .filter(Boolean).join(' · ')}
           </Text>
+          <ReliabilityLine summary={app.reliability} />
         </View>
       </Pressable>
 
@@ -314,6 +328,10 @@ function ApplicantRow({
         <JobBadge label={meta.label} icon={meta.icon as any} tone={BADGE_TONE[meta.tone]} />
         {app.interview_cleared && app.status !== 'interview_passed' && app.status !== 'selected' ? (
           <JobBadge label="Interview cleared" icon="shield-checkmark-outline" tone="teal" />
+        ) : null}
+        {app.status === 'selected' && app.attendance_status && app.attendance_status !== 'not_started' ? (
+          <JobBadge label={ATTENDANCE_LABELS[app.attendance_status]} icon="time-outline"
+            tone={app.attendance_status === 'no_show' ? 'danger' : 'teal'} />
         ) : null}
         <Text style={styles.applied}>{postedAgo(app.created_at).replace('Posted', 'Applied')}</Text>
       </View>
@@ -431,7 +449,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, minHeight: 36, borderRadius: radius.md,
     borderWidth: 1, borderColor: colors.navy, backgroundColor: colors.white, justifyContent: 'center',
   },
-  actionPrimary: { backgroundColor: colors.navy },
+  actionPrimary: { backgroundColor: colors.action, ...gloss.fill },
   actionQuiet: { borderColor: colors.border },
   actionText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.navy },
   actionTextPrimary: { color: colors.white },

@@ -22,10 +22,23 @@ jest.mock('../context/AuthContext', () => ({
 
 const mockFetchCheckout = jest.fn();
 const mockPayDemo = jest.fn();
+const mockCreateOrder = jest.fn();
+const mockVerify = jest.fn();
+const mockReportFailure = jest.fn();
 jest.mock('../api/subscriptions', () => ({
   fetchCheckout: (...a: any[]) => mockFetchCheckout(...a),
   payDemo: (...a: any[]) => mockPayDemo(...a),
   startCheckout: jest.fn(),
+  fetchPlans: () => Promise.resolve({ plans: [], features: [], token_costs: [] }),
+  fetchMySubscription: () => Promise.resolve(null),
+  createPaymentOrder: (...a: any[]) => mockCreateOrder(...a),
+  verifyPayment: (...a: any[]) => mockVerify(...a),
+  reportPaymentFailure: (...a: any[]) => mockReportFailure(...a),
+}));
+const mockOpenRazorpay = jest.fn();
+jest.mock('../utils/razorpay', () => ({
+  razorpaySupported: true,
+  openRazorpay: (...a: any[]) => mockOpenRazorpay(...a),
 }));
 
 // eslint-disable-next-line import/first
@@ -112,8 +125,9 @@ describe('Demo checkout', () => {
     await waitFor(() => screen.getByTestId('pay-success'));
     await act(async () => { fireEvent.press(screen.getByTestId('pay-success')); });
     await waitFor(() => expect(screen.getByTestId('checkout-success')).toBeTruthy());
-    expect(mockPayDemo).toHaveBeenCalledWith('t', 'pay-1', 'success', 'card');
-    expect(screen.getByText('1,000 AED tokens allocated for this month.')).toBeTruthy();
+    // The trailing idempotency key makes a retried payment return the first result.
+    expect(mockPayDemo).toHaveBeenCalledWith('t', 'pay-1', 'success', 'card', expect.any(String));
+    expect(screen.getByText('1,000 AED tokens are ready for this month.')).toBeTruthy();
   });
 
   it('leaves the plan alone when the demo payment fails', async () => {
@@ -124,5 +138,93 @@ describe('Demo checkout', () => {
     await act(async () => { fireEvent.press(screen.getByTestId('pay-failure')); });
     await waitFor(() => expect(screen.getByTestId('checkout-failed')).toBeTruthy());
     expect(screen.getByText('Demo payment failed. Your subscription has not been changed.')).toBeTruthy();
+  });
+});
+
+describe('Razorpay checkout', () => {
+  const CHECKOUT = {
+    payment_id: 'pay-1', status: 'pending', plan: { code: 'procare', name: 'ProCare', tagline: 'Professional' },
+    billing_cycle: 'monthly', purpose: 'new', amount: 299, currency: 'INR', provider: 'razorpay', demo: false,
+    test_mode: true, failure_reason: '',
+  };
+  const ORDER = {
+    key_id: 'rzp_test_x', test_mode: true, payment_id: 'pay-1', order_id: 'order_1', amount: 29900,
+    currency: 'INR', name: 'ForMeds', description: 'ProCare · Monthly', prefill: {},
+  };
+  const PAID = { razorpay_order_id: 'order_1', razorpay_payment_id: 'pay_9', razorpay_signature: 'sig' };
+
+  beforeEach(() => {
+    [mockFetchCheckout, mockCreateOrder, mockVerify, mockReportFailure, mockOpenRazorpay, mockPayDemo]
+      .forEach(m => m.mockReset());
+    mockFetchCheckout.mockResolvedValue(CHECKOUT);
+    mockCreateOrder.mockResolvedValue(ORDER);
+    mockReportFailure.mockResolvedValue(CHECKOUT);
+  });
+
+  const pay = async () => {
+    render(<CheckoutScreen />);
+    await waitFor(() => screen.getByTestId('pay-razorpay'));
+    await act(async () => { fireEvent.press(screen.getByTestId('pay-razorpay')); });
+  };
+
+  it('offers one real payment, not the demo, and says it is test mode', async () => {
+    render(<CheckoutScreen />);
+    await waitFor(() => expect(screen.getByText('Pay ₹299')).toBeTruthy());
+    expect(screen.getByTestId('test-mode-banner')).toBeTruthy();
+    expect(screen.queryByTestId('pay-success')).toBeNull();
+    expect(screen.queryByTestId('demo-banner')).toBeNull();
+  });
+
+  it('shows success only after the server verifies the payment', async () => {
+    mockOpenRazorpay.mockResolvedValue({ kind: 'paid', response: PAID });
+    mockVerify.mockResolvedValue({
+      status: 'succeeded', already_processed: false, checkout: { ...CHECKOUT, status: 'succeeded' },
+      subscription: { aed_tokens: wallet({ remaining: 1000, used: 0 }),
+        subscription: { current_period_end: '2026-11-02T00:00:00+00:00' } },
+    });
+    await pay();
+    await waitFor(() => expect(screen.getByTestId('checkout-success')).toBeTruthy());
+    expect(mockCreateOrder).toHaveBeenCalledWith('t', 'pay-1', expect.any(String));
+    expect(mockVerify).toHaveBeenCalledWith('t', 'pay-1', PAID);
+    expect(screen.getByText('ProCare is now active.')).toBeTruthy();
+  });
+
+  it('a closed Razorpay window changes nothing', async () => {
+    mockOpenRazorpay.mockResolvedValue({ kind: 'dismissed' });
+    await pay();
+    await waitFor(() => expect(screen.getByTestId('checkout-cancelled')).toBeTruthy());
+    expect(screen.getByText('Payment cancelled. Your subscription has not been changed.')).toBeTruthy();
+    expect(mockVerify).not.toHaveBeenCalled();
+  });
+
+  it('a failed payment is reported, never verified, and can be retried', async () => {
+    mockOpenRazorpay.mockResolvedValue({ kind: 'failed', reason: 'Card declined.' });
+    await pay();
+    await waitFor(() => expect(screen.getByTestId('checkout-failed')).toBeTruthy());
+    expect(mockReportFailure).toHaveBeenCalledWith('t', 'pay-1', 'Card declined.');
+    expect(mockVerify).not.toHaveBeenCalled();
+    expect(screen.getByTestId('checkout-retry')).toBeTruthy();
+  });
+
+  it('a rejected verification is a failure, not a success', async () => {
+    mockOpenRazorpay.mockResolvedValue({ kind: 'paid', response: PAID });
+    mockVerify.mockRejectedValue({ status: 400, code: 'invalid_signature' });
+    await pay();
+    await waitFor(() => expect(screen.getByTestId('checkout-failed')).toBeTruthy());
+    expect(screen.queryByTestId('checkout-success')).toBeNull();
+  });
+
+  it('a lost connection while verifying keeps the payment and re-checks it', async () => {
+    mockOpenRazorpay.mockResolvedValue({ kind: 'paid', response: PAID });
+    mockVerify.mockRejectedValueOnce({ status: 0, message: 'Network error' });
+    await pay();
+    await waitFor(() => expect(screen.getByTestId('checkout-unconfirmed')).toBeTruthy());
+    mockVerify.mockResolvedValue({
+      status: 'succeeded', already_processed: true, checkout: { ...CHECKOUT, status: 'succeeded' },
+      subscription: { aed_tokens: wallet({ remaining: 1000, used: 0 }), subscription: null },
+    });
+    await act(async () => { fireEvent.press(screen.getByTestId('checkout-recheck')); });
+    await waitFor(() => expect(screen.getByTestId('checkout-success')).toBeTruthy());
+    expect(mockVerify).toHaveBeenLastCalledWith('t', 'pay-1', PAID);
   });
 });

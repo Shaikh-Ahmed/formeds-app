@@ -1,4 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { FormScrollView } from '../../src/components/FormScrollView';
+import { useSubmit } from '../../src/hooks/useSubmit';
+import { useFormErrors } from '../../src/hooks/useFormErrors';
+import { FieldError, useFieldError } from '../../src/components/FieldError';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
   ActivityIndicator, KeyboardAvoidingView, Platform, Image,
@@ -15,6 +19,7 @@ import {
 import { SPECIALTY_OPTIONS, OTHER_SPECIALTY, isCustomSpecialty } from '../../src/data/specialties';
 import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../src/theme';
 import { PageColumn } from '../../src/components/web';
+import { mediaUri } from '../../src/utils/media';
 
 // Mirrors the server's validators (models/schemas.py). Enforced here too so the
 // writer sees the limit while typing rather than as a 422 on submit.
@@ -49,7 +54,10 @@ export default function CaseComposerScreen() {
 
   const [loading, setLoading] = useState(editing);
   const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const { submitting: saving, run } = useSubmit();
+  const errs = useFormErrors<'title' | 'body'>({ known: ['title', 'body'] });
+  const titleErr = useFieldError(errs.fields.title);
+  const bodyErr = useFieldError(errs.fields.body);
   const [error, setError] = useState<string | null>(null);
 
   const loadExisting = useCallback(async () => {
@@ -124,32 +132,43 @@ export default function CaseComposerScreen() {
 
   const titleShort = title.trim().length > 0 && title.trim().length < TITLE_MIN;
   const bodyShort = body.trim().length > 0 && body.trim().length < BODY_MIN;
-  const ready = title.trim().length >= TITLE_MIN && body.trim().length >= BODY_MIN && isKycApproved;
+  const ready = isKycApproved;
 
-  const submit = async () => {
+  const submit = () => {
     if (!ready) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const payload = {
-        title: title.trim(),
-        body: body.trim(),
-        specialty: specialtyValue.trim(),
-        tags,
-        image_url: imageUrl,
-        ...(editing ? {} : { is_anonymous: anonymous }),
-      };
-      const saved = editing
-        ? await apiFetch(`/api/cases/${id}`, token, { method: 'PATCH', body: JSON.stringify(payload) })
-        : await apiFetch('/api/cases/', token, { method: 'POST', body: JSON.stringify(payload) });
+    // Checked here first, so nothing is sent while a field still needs work;
+    // each message sits under its own field.
+    const t = title.trim();
+    const b = body.trim();
+    const valid = errs.check({
+      title: !t ? 'Write your question.' : t.length < TITLE_MIN ? `The question needs at least ${TITLE_MIN} characters.` : undefined,
+      body: !b ? 'Add the case details.' : b.length < BODY_MIN ? `The details need at least ${BODY_MIN} characters.` : undefined,
+    });
+    if (!valid) return;
+    const payload = {
+      title: t,
+      body: b,
+      specialty: specialtyValue.trim(),
+      tags,
+      image_url: imageUrl,
+      ...(editing ? {} : { is_anonymous: anonymous }),
+    };
+    return run(async key => {
+      setError(null);
+      try {
+        // A new case is keyed: a double click or a retry posts it once.
+        const saved = editing
+          ? await apiFetch(`/api/cases/${id}`, token, { method: 'PATCH', body: JSON.stringify(payload) })
+          : await apiFetch('/api/cases/', token, { method: 'POST', body: JSON.stringify(payload), idempotencyKey: key });
 
-      // replace(), not push(): backing out of a freshly posted case should land
-      // on the list, not on the composer that created it.
-      router.replace({ pathname: '/case/[id]', params: { id: saved.id } } as any);
-    } catch (e: any) {
-      setError(e?.message || 'Could not save this case.');
-      setSaving(false);
-    }
+        // replace(), not push(): backing out of a freshly posted case should land
+        // on the list, not on the composer that created it.
+        router.replace({ pathname: '/case/[id]', params: { id: saved.id } } as any);
+      } catch (e: any) {
+        // The server's word on a field goes under that field; anything else here.
+        errs.fromError(e, 'Could not save this case. Please try again.');
+      }
+    }, payload);
   };
 
   if (loading) {
@@ -167,9 +186,8 @@ export default function CaseComposerScreen() {
       <ScreenHeader title={editing ? 'Edit case' : 'Post a case'} />
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <FormScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <KycNotice action="post a case" />
-          <ErrorBanner message={error} />
 
           <View style={styles.privacyNote}>
             <Ionicons name="shield-checkmark-outline" size={18} color={colors.teal} />
@@ -185,12 +203,14 @@ export default function CaseComposerScreen() {
             placeholder="Summarise it in one line, as you would ask a colleague"
             placeholderTextColor={colors.textMuted}
             value={title}
-            onChangeText={setTitle}
+            onChangeText={v => { setTitle(v); errs.clear('title'); }}
             editable={isKycApproved}
             maxLength={TITLE_MAX}
             multiline
             accessibilityLabel="Case question"
+            {...titleErr.inputProps}
           />
+          <FieldError message={errs.fields.title} id={titleErr.id} />
           <Text style={[styles.hint, titleShort && styles.hintWarn]}>
             {titleShort ? `At least ${TITLE_MIN} characters` : `${title.trim().length}/${TITLE_MAX}`}
           </Text>
@@ -202,13 +222,15 @@ export default function CaseComposerScreen() {
             placeholder={BODY_PROMPT}
             placeholderTextColor={colors.textMuted}
             value={body}
-            onChangeText={setBody}
+            onChangeText={v => { setBody(v); errs.clear('body'); }}
             editable={isKycApproved}
             multiline
             textAlignVertical="top"
             accessibilityLabel="Case details"
+            {...bodyErr.inputProps}
           />
-          {bodyShort ? <Text style={[styles.hint, styles.hintWarn]}>At least {BODY_MIN} characters</Text> : null}
+          <FieldError message={errs.fields.body} id={bodyErr.id} />
+          {bodyShort && !errs.fields.body ? <Text style={[styles.hint, styles.hintWarn]}>At least {BODY_MIN} characters</Text> : null}
 
           <View style={styles.selectBlock}>
             <SelectField
@@ -269,7 +291,7 @@ export default function CaseComposerScreen() {
           <Text style={styles.label}>Attachment</Text>
           {imageUrl ? (
             <View style={styles.imageWrap}>
-              <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
+              <Image source={{ uri: mediaUri(imageUrl) }} style={styles.image} resizeMode="cover" />
               <TouchableOpacity
                 style={styles.removeImage}
                 onPress={() => setImageUrl('')}
@@ -320,15 +342,17 @@ export default function CaseComposerScreen() {
             </TouchableOpacity>
           ) : null}
 
+          <ErrorBanner message={error ?? errs.formError} />
           <Button
             testID="submit-case-btn"
             label={editing ? 'Save changes' : 'Post case'}
+            loadingLabel={editing ? 'Saving…' : 'Posting…'}
             onPress={submit}
             loading={saving}
             disabled={!ready}
             style={styles.submit}
           />
-        </ScrollView>
+        </FormScrollView>
       </KeyboardAvoidingView>
       </PageColumn>
     </SafeAreaView>

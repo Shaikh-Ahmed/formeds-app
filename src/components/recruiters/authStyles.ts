@@ -5,7 +5,7 @@ import { colors, radius, spacing, typography } from '../../theme';
 export const authStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.white },
   flex: { flex: 1 },
-  scroll: { paddingHorizontal: spacing.xxl, paddingTop: spacing.lg, paddingBottom: spacing.xxxl + spacing.xxl },
+  scroll: { paddingHorizontal: spacing.xxl, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
   backBtn: {
     width: 44, height: 44, borderRadius: radius.lg, backgroundColor: colors.bgMuted,
     alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xl,

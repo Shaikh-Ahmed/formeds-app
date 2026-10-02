@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { FieldError } from '../FieldError';
+import { FormScrollView } from '../FormScrollView';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -11,6 +13,7 @@ import {
   isRealDate, nowMinuteString, todayString, validateAmount, validateInteger, validateTimeRange,
 } from '../../utils/validation';
 import { ErrorBanner } from '../States';
+import { focusFirstInvalid } from '../../hooks/useFormErrors';
 import { ChoiceChips } from './ChoiceChips';
 import { toDayString } from './LocumMeta';
 import { OTHER_SPECIALTY, SPECIALTY_OPTIONS, SPECIALTIES } from '../../data/specialties';
@@ -297,7 +300,7 @@ export function LocumForm({
   error?: string | null;
   /** Per-field refusals from the last submit (see utils/api errorFields). */
   serverFieldErrors?: Record<string, string>;
-  onSubmit: (payload: Record<string, unknown>) => void;
+  onSubmit: (payload: Record<string, unknown>) => void | Promise<unknown>;
 }) {
   const { token, user } = useAuth();
   const start = useMemo(() => initial ?? emptyLocumForm(user), [initial, user]);
@@ -306,7 +309,6 @@ export function LocumForm({
   const [moreOpen, setMoreOpen] = useState(
     !!(start.qualifications || start.requirements || start.notes || start.experience_min),
   );
-  const [localError, setLocalError] = useState<string | null>(null);
   // Shown under each field once the poster has tried to submit, then live as
   // they correct it -- never while they are still filling the form in.
   const [attempted, setAttempted] = useState(false);
@@ -317,6 +319,10 @@ export function LocumForm({
     const mapped: Partial<Record<LocumField, string>> = {};
     Object.entries(serverFieldErrors ?? {}).forEach(([k, v]) => { const f = SERVER_FIELD[k] ?? (k as LocumField); mapped[f] = v; });
     setServerErrors(mapped);
+    if (Object.keys(mapped).length) {
+      if (mapped.experience_min) setMoreOpen(true);
+      focusFirstInvalid();
+    }
   }, [serverFieldErrors]);
   const fieldErrors = { ...serverErrors, ...(attempted ? locumFieldErrors(form, new Date(), editing ? start : undefined) : {}) };
   const [cityOther, setCityOther] = useState(false);
@@ -330,7 +336,12 @@ export function LocumForm({
   const isRecruiter = user?.role === 'recruiter';
   useEffect(() => {
     if (!token || editing) return;
-    fetchMyOrganizations(token).then(list => {
+    fetchMyOrganizations(token).then(all => {
+      // A hospital/clinic account's own organisation is the account itself.
+      // Posting "as" it would also split its interview-clearance history
+      // (scoped per posting identity), so it keeps posting as itself; those
+      // locums still appear on its organisation profile.
+      const list = all.filter(o => o.account_user_id !== user?.id);
       setOrgs(list);
       if (isRecruiter && list.length) {
         const agency = list.find(o => o.org_type === 'staffing') ?? list[0];
@@ -339,7 +350,7 @@ export function LocumForm({
         }));
       }
     }).catch(() => setOrgs([]));
-  }, [token, editing, isRecruiter]);
+  }, [token, editing, isRecruiter, user?.id]);
 
   const set = <K extends keyof LocumFormState>(key: K, value: LocumFormState[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -384,11 +395,14 @@ export function LocumForm({
   const submit = () => {
     setAttempted(true);
     const errors = locumFieldErrors(form, new Date(), editing ? start : undefined);
-    const count = Object.keys(errors).length;
-    setLocalError(count ? (count === 1 ? Object.values(errors)[0]!
-      : `Please fix: ${(Object.keys(errors) as LocumField[]).map(k => FIELD_NAMES[k]).join(', ')}.`) : null);
-    if (count) return;
-    onSubmit(editing ? diffLocumPayload(start, form) : buildLocumPayload(form));
+    if (Object.keys(errors).length) {
+      // Each message sits under its own field; nothing is sent. A field
+      // inside the closed "More details" panel opens it so it can be seen.
+      if (errors.experience_min) setMoreOpen(true);
+      focusFirstInvalid();
+      return;
+    }
+    return onSubmit(editing ? diffLocumPayload(start, form) : buildLocumPayload(form));
   };
 
   const orgChoices = [
@@ -397,7 +411,7 @@ export function LocumForm({
   ];
 
   return (
-    <ScrollView
+    <FormScrollView
       contentContainerStyle={styles.body}
       keyboardShouldPersistTaps="handled"
       testID="locum-form"
@@ -425,7 +439,7 @@ export function LocumForm({
           testID="locum-specialty"
         />
         {fieldErrors.specialty && form.specialty !== OTHER_SPECIALTY ? (
-          <Text style={styles.fieldError} accessibilityRole="alert">{fieldErrors.specialty}</Text>
+          <FieldError message={fieldErrors.specialty} />
         ) : null}
         {form.specialty === OTHER_SPECIALTY ? (
           <FormInput label="Specialty (type it)" value={form.customSpecialty}
@@ -460,7 +474,7 @@ export function LocumForm({
           <DateField label="Shift date" value={form.shift_date} onChange={v => set('shift_date', v)}
             min={todayString()} error={fieldErrors.shift_date} testID="locum-date" />
         ) : fieldErrors.shift_date ? (
-          <Text style={styles.fieldError} accessibilityRole="alert">{fieldErrors.shift_date}</Text>
+          <FieldError message={fieldErrors.shift_date} />
         ) : null}
         <ChoiceChips label="Shift" choices={SHIFT_CHOICES} value={form.shift_type}
           onChange={chooseShift} testID="locum-shift" />
@@ -499,7 +513,7 @@ export function LocumForm({
                   options={[...cityOptions, OTHER_CITY]} searchPlaceholder="Search cities"
                   onChange={v => { if (v === OTHER_CITY) { setCityOther(true); set('city', ''); } else set('city', v); }}
                   testID="locum-city-select" />
-                {fieldErrors.city ? <Text style={styles.fieldError} accessibilityRole="alert">{fieldErrors.city}</Text> : null}
+                <FieldError message={fieldErrors.city} />
               </>
             )}
           </View>
@@ -557,14 +571,16 @@ export function LocumForm({
         </View>
       ) : null}
 
-      <ErrorBanner message={localError || error} />
+      {/* Only what belongs to no field: a conflict, a permission, the network. */}
+      <ErrorBanner message={error} />
       <Button
         label={editing ? 'Save changes' : 'Post locum'}
+        loadingLabel={editing ? 'Saving…' : 'Posting…'}
         onPress={submit}
         loading={submitting}
         testID="locum-submit"
       />
-    </ScrollView>
+    </FormScrollView>
   );
 }
 

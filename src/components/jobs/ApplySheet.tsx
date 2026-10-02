@@ -106,6 +106,7 @@ export function ApplySheet({
             <Button
               label="Submit application"
               onPress={submit}
+              loadingLabel="Applying…"
               loading={submitting}
               disabled={!isKycApproved}
               style={styles.footerBtn}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { FormScrollView } from '../src/components/FormScrollView';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,8 @@ export default function VerifyScreen() {
     phone?: string;
     phoneRequired?: string;
     delivered?: string;
+    /** 'phone' when the email is already verified (a Google signup). */
+    start?: string;
   }>();
   const router = useRouter();
   const { completeSignup } = useAuth();
@@ -34,9 +37,10 @@ export default function VerifyScreen() {
   const phone = params.phone ?? '';
   const phoneRequired = params.phoneRequired === '1';
 
-  const [step, setStep] = useState<Step>('email');
+  const [step, setStep] = useState<Step>(params.start === 'phone' ? 'phone' : 'email');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [codeError, setCodeError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Delivery genuinely failed (provider rejected it) — distinct from a wrong
@@ -72,11 +76,15 @@ export default function VerifyScreen() {
 
   const submit = async () => {
     if (!/^\d{6}$/.test(code)) {
-      setError('Enter the 6-digit code');
+      setCodeError('Enter the 6-digit code.');
       return;
     }
+    // Enter and the button can both fire: one attempt at a time, since each
+    // wrong attempt counts against the limit.
+    if (submitting) return;
     setSubmitting(true);
     setError(null);
+    setCodeError(null);
     setNotice(null);
     try {
       const result: VerificationResult = await apiFetch(
@@ -86,7 +94,9 @@ export default function VerifyScreen() {
       );
       await finish(result);
     } catch (e: any) {
-      setError(e?.message || 'That code could not be verified.');
+      // A wrong or expired code is about the code: say so under it.
+      if (e?.code && String(e.code).startsWith('otp_')) setCodeError(e.message);
+      else setError(e?.message || 'That code could not be verified.');
       setCode('');
     } finally {
       setSubmitting(false);
@@ -131,7 +141,7 @@ export default function VerifyScreen() {
     <SafeAreaView style={styles.safe}>
       <AuthShell maxWidth={480}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <FormScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.iconWrap}>
             <Ionicons
               name={isEmailStep ? 'mail-open-outline' : 'chatbox-ellipses-outline'}
@@ -181,7 +191,8 @@ export default function VerifyScreen() {
             label="Verification code"
             icon="key-outline"
             value={code}
-            onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+            onChangeText={(v) => { setCode(v.replace(/\D/g, '').slice(0, 6)); setCodeError(null); }}
+            error={codeError ?? undefined}
             placeholder="123456"
             keyboardType="number-pad"
             maxLength={6}
@@ -194,6 +205,7 @@ export default function VerifyScreen() {
           <Button
             testID="verify-submit-btn"
             label="Verify"
+            loadingLabel="Verifying…"
             onPress={submit}
             loading={submitting}
             disabled={code.length !== 6}
@@ -222,7 +234,7 @@ export default function VerifyScreen() {
               Wrong {isEmailStep ? 'email' : 'number'}? <Text style={styles.linkBold}>Start over</Text>
             </Text>
           </TouchableOpacity>
-        </ScrollView>
+        </FormScrollView>
       </KeyboardAvoidingView>
       </AuthShell>
     </SafeAreaView>

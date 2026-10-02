@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, TextInputProps } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing, typography, MIN_TOUCH_TARGET } from '../theme';
+import { FieldError, useFieldError } from './FieldError';
 
 interface Props extends Omit<TextInputProps, 'style'> {
   label: string;
@@ -25,6 +26,8 @@ export function FormInput({ label, icon, error, secure, rows, testID, ...inputPr
   const multiline = !!inputProps.multiline;
   const minHeight = multiline ? ROW_HEIGHT * (rows ?? 4) : undefined;
   const [hidden, setHidden] = useState(true);
+  const err = useFieldError(error);
+  const inputRef = useRef<TextInput>(null);
   return (
     <View style={styles.group}>
       <Text style={styles.label}>{label}</Text>
@@ -37,6 +40,7 @@ export function FormInput({ label, icon, error, secure, rows, testID, ...inputPr
       >
         {icon ? <Ionicons name={icon} size={20} color={colors.textMuted} style={styles.icon} /> : null}
         <TextInput
+          ref={inputRef}
           testID={testID}
           style={[styles.input, multiline ? { minHeight } : null]}
           // Without this the cursor starts vertically centred on Android,
@@ -45,6 +49,7 @@ export function FormInput({ label, icon, error, secure, rows, testID, ...inputPr
           placeholderTextColor={colors.textMuted}
           secureTextEntry={secure && hidden}
           accessibilityLabel={label}
+          {...err.inputProps}
           {...inputProps}
         />
         {secure ? (
@@ -58,7 +63,7 @@ export function FormInput({ label, icon, error, secure, rows, testID, ...inputPr
           </TouchableOpacity>
         ) : null}
       </View>
-      {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
+      <FieldError message={error} id={err.id} onFocusField={() => inputRef.current?.focus()} />
       {/* A counter for long text, once it is worth knowing: from 70% of the
           limit, so a short answer is not cluttered by "12 / 20000". */}
       {multiline && inputProps.maxLength && String(inputProps.value ?? '').length >= inputProps.maxLength * 0.7 ? (
@@ -72,7 +77,7 @@ export function FormInput({ label, icon, error, secure, rows, testID, ...inputPr
 
 const styles = StyleSheet.create({
   group: { marginBottom: spacing.lg + 2 },
-  label: { ...typography.label, color: '#334155', marginBottom: 6 },
+  label: { ...typography.label, color: colors.textBody, marginBottom: 6 },
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',

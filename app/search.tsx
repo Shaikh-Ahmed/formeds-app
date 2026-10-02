@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { TrustMark } from '../src/components/TrustMark';
 import {
   View,
   Text,
@@ -11,13 +12,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
 import { apiFetch } from '../src/utils/api';
 import { Avatar, RoleBadge, CaseCard } from '../src/components';
 import { PageColumn } from '../src/components/web';
-import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET, getRoleMeta } from '../src/theme';
+import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET, getRoleMeta, gloss } from '../src/theme';
 import type { CaseThread } from '../src/types/cases';
+import { ConnectActions, type ConnectionStatus } from '../src/components/network/ConnectActions';
 
 type Scope = 'all' | 'people' | 'cases' | 'jobs';
 
@@ -43,6 +45,9 @@ interface PersonResult {
   location?: string;
   avatar?: string;
   verified?: boolean;
+  /** Where the viewer stands with them -- drives Connect / Message. */
+  connection_status?: ConnectionStatus;
+  connection_id?: string | null;
 }
 
 /**
@@ -62,8 +67,13 @@ export default function SearchScreen() {
   const { token } = useAuth();
   const router = useRouter();
   const inputRef = useRef<TextInput>(null);
+  // The desktop top bar's search box opens this page with ?q=.
+  const { q: initialQ } = useLocalSearchParams<{ q?: string }>();
 
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(typeof initialQ === 'string' ? initialQ : '');
+  useEffect(() => {
+    if (typeof initialQ === 'string') setQuery(initialQ);
+  }, [initialQ]);
   const [scope, setScope] = useState<Scope>('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -334,27 +344,34 @@ function PersonRow({ person, onPress }: { person: PersonResult; onPress: () => v
     person.professional_role || person.specialty || person.specialty_focus || meta.longLabel;
   const place = person.location || [person.city, person.state].filter(Boolean).join(', ');
 
+  // The row opens the profile; Connect / Message sits beside it, not inside
+  // it -- a button inside a link is invalid on the web.
   return (
-    <Pressable
-      testID={`search-person-${person.id}`}
-      onPress={onPress}
-      accessibilityRole="link"
-      accessibilityLabel={`${person.name}, ${sub}${place ? `, ${place}` : ''}`}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-    >
-      <Avatar name={person.name} role={person.role} uri={person.avatar} size={44} />
-      <View style={styles.cardBody}>
-        <View style={styles.nameRow}>
-          <Text style={styles.cardTitle} numberOfLines={1}>{person.name}</Text>
-          {person.verified ? (
-            <Ionicons name="shield-checkmark" size={14} color={colors.teal} />
-          ) : null}
+    <View style={styles.card}>
+      <Pressable
+        testID={`search-person-${person.id}`}
+        onPress={onPress}
+        accessibilityRole="link"
+        accessibilityLabel={`${person.name}, ${sub}${place ? `, ${place}` : ''}`}
+        style={({ pressed }) => [styles.personLink, pressed && styles.pressed]}
+      >
+        <Avatar name={person.name} role={person.role} uri={person.avatar} size={44} />
+        <View style={styles.cardBody}>
+          <View style={styles.nameRow}>
+            <Text style={styles.cardTitle} numberOfLines={1}>{person.name}</Text>
+            {person.verified ? (
+              <TrustMark size={14} classicIcon="shield-checkmark" label="Verified" />
+            ) : null}
+          </View>
+          <Text style={styles.cardSub} numberOfLines={1}>{sub}</Text>
+          {place ? <Text style={styles.cardMeta} numberOfLines={1}>{place}</Text> : null}
+          <View style={styles.badgeRow}><RoleBadge role={person.role} /></View>
         </View>
-        <Text style={styles.cardSub} numberOfLines={1}>{sub}</Text>
-        {place ? <Text style={styles.cardMeta} numberOfLines={1}>{place}</Text> : null}
-      </View>
-      <RoleBadge role={person.role} />
-    </Pressable>
+      </Pressable>
+      <ConnectActions compact userId={person.id} name={person.name}
+        initialStatus={person.connection_status ?? 'none'} connectionId={person.connection_id}
+        testID={`search-connect-${person.id}`} />
+    </View>
   );
 }
 
@@ -440,7 +457,7 @@ const styles = StyleSheet.create({
     minHeight: 34,
     justifyContent: 'center',
   },
-  chipActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   chipText: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   chipTextActive: { color: colors.white },
 
@@ -465,6 +482,8 @@ const styles = StyleSheet.create({
     minHeight: MIN_TOUCH_TARGET + 16,
   },
   cardPressed: { backgroundColor: colors.bgMuted },
+  personLink: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  badgeRow: { flexDirection: 'row', marginTop: spacing.xs },
   cardBody: { flex: 1, minWidth: 0 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   cardTitle: { ...typography.bodyStrong, color: colors.text, flexShrink: 1 },

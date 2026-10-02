@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ComingSoon } from '../../src/components';
 import { PageGrid, ProfileRail } from '../../src/components/web';
-import { colors, spacing, radius, typography, useBreakpoint } from '../../src/theme';
+import { colors, spacing, radius, typography, useBreakpoint, gloss } from '../../src/theme';
 
 /**
  * Learning Hub — Books, CME and Research all ship in a later phase.
@@ -76,7 +76,7 @@ export default function LearningScreen() {
             accessibilityState={{ selected: activeTab === t.key }}
             accessibilityLabel={`${t.label} — coming soon`}
           >
-            <Ionicons name={t.icon} size={16} color={activeTab === t.key ? colors.textOnDark : '#64748B'} />
+            <Ionicons name={t.icon} size={16} color={activeTab === t.key ? colors.textOnDark : colors.textSubtle} />
             <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
@@ -128,9 +128,10 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md - 2,
     borderRadius: radius.md,
     backgroundColor: colors.bgMuted,
+    ...gloss.glass,
   },
-  tabActive: { backgroundColor: colors.navy },
-  tabText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
+  tabActive: { backgroundColor: colors.action, ...gloss.fill },
+  tabText: { fontSize: 13, fontWeight: '600', color: colors.textSubtle },
   tabTextActive: { color: colors.textOnDark },
   body: { padding: spacing.lg, paddingBottom: 100 },
   footnote: {

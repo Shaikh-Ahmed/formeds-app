@@ -52,7 +52,7 @@ export interface CollapsibleHeader {
    */
   headerHeight: number;
   /** Spread onto the `Animated.View` wrapping the collapsing content. */
-  headerStyle: { transform: { translateY: Animated.Value }[] };
+  headerStyle: { transform: { translateY: Animated.Value | Animated.AnimatedAddition<number> }[] };
   onHeaderLayout: (event: LayoutChangeEvent) => void;
   /** Spread onto whichever scrollable should drive the header. */
   scrollProps: CollapsibleScrollProps;
@@ -72,11 +72,26 @@ export interface CollapsibleHeader {
  * header that moves in response to scrolling is exactly the scroll-driven
  * motion that setting asks us to drop.
  */
-export function useCollapsibleHeader({ enabled = true }: { enabled?: boolean } = {}): CollapsibleHeader {
+export function useCollapsibleHeader({ enabled = true, leadHeight = 0 }: {
+  enabled?: boolean;
+  /**
+   * Height of a lead section at the top of the header (e.g. a greeting hero)
+   * that scrolls away with the content, pixel for pixel, as soon as the reader
+   * scrolls, and only returns at the top of the list. The rest of the header
+   * keeps the usual hide-on-scroll-down / show-on-scroll-up behaviour.
+   */
+  leadHeight?: number;
+} = {}): CollapsibleHeader {
   const [headerHeight, setHeaderHeight] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
 
   const translateY = useRef(new Animated.Value(0)).current;
+  // The list's scroll offset, for the lead section. Fed from the JS scroll
+  // handler, so animations that combine with it must stay on the JS driver.
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const lead = useRef(leadHeight);
+  lead.current = leadHeight;
+  const useNative = leadHeight <= 0;
   const hidden = useRef(false);
   const lastOffset = useRef(0);
   const height = useRef(0);
@@ -103,24 +118,27 @@ export function useCollapsibleHeader({ enabled = true }: { enabled?: boolean } =
     if (immediate) {
       translateY.stopAnimation();
       translateY.setValue(0);
+      // Content was swapped (a tab change) and starts at the top again.
+      scrollY.setValue(0);
       return;
     }
     Animated.timing(translateY, {
       toValue: 0,
       duration: REVEAL_MS,
-      useNativeDriver: true,
+      useNativeDriver: useNative,
     }).start();
-  }, [translateY]);
+  }, [translateY, scrollY, useNative]);
 
   const hide = useCallback(() => {
     if (hidden.current || height.current <= 0) return;
     hidden.current = true;
     Animated.timing(translateY, {
-      toValue: -height.current,
+      // The lead section has already scrolled away by the time this runs.
+      toValue: -(height.current - lead.current),
       duration: HIDE_MS,
-      useNativeDriver: true,
+      useNativeDriver: useNative,
     }).start();
-  }, [translateY]);
+  }, [translateY, useNative]);
 
   const collapsible = enabled && !reduceMotion;
 
@@ -140,7 +158,7 @@ export function useCollapsibleHeader({ enabled = true }: { enabled?: boolean } =
     setHeaderHeight(next);
     // Re-pin a header that changed size while hidden, or the old offset leaves
     // a strip of it on screen.
-    if (hidden.current) translateY.setValue(-next);
+    if (hidden.current) translateY.setValue(-(next - lead.current));
   }, [translateY]);
 
   const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -148,8 +166,9 @@ export function useCollapsibleHeader({ enabled = true }: { enabled?: boolean } =
     const offset = contentOffset.y;
     const previous = lastOffset.current;
     lastOffset.current = offset;
-
+    // Pinned (composer open, reduce motion): the lead section stays too.
     if (!active.current || height.current <= 0) return;
+    if (lead.current > 0) scrollY.setValue(Math.max(0, offset));
 
     // A list that barely overflows can't be scrolled far enough to bring a
     // hidden header back, so never take it away in the first place.
@@ -173,9 +192,16 @@ export function useCollapsibleHeader({ enabled = true }: { enabled?: boolean } =
     } else {
       reveal();
     }
-  }, [hide, reveal]);
+  }, [hide, reveal, scrollY]);
 
-  const headerStyle = useMemo(() => ({ transform: [{ translateY }] }), [translateY]);
+  const headerStyle = useMemo(() => {
+    if (leadHeight <= 0) return { transform: [{ translateY }] };
+    // Lead section: follows the scroll exactly, up to its own height.
+    const leadShift = scrollY.interpolate({
+      inputRange: [0, leadHeight], outputRange: [0, -leadHeight], extrapolate: 'clamp',
+    });
+    return { transform: [{ translateY: Animated.add(leadShift, translateY) }] };
+  }, [translateY, scrollY, leadHeight]);
   const scrollProps = useMemo(() => ({ onScroll, scrollEventThrottle: 16 }), [onScroll]);
 
   return { headerHeight, headerStyle, onHeaderLayout, scrollProps, reveal };

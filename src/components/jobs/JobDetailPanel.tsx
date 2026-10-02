@@ -1,4 +1,5 @@
 import React from 'react';
+import { TrustMark } from '../TrustMark';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing, typography, MIN_TOUCH_TARGET } from '../../theme';
@@ -94,12 +95,7 @@ export function JobDetailPanel({
             <View style={styles.employerNameRow}>
               <Text style={styles.employerName} numberOfLines={1}>{job.employer_name}</Text>
               {job.employer_verified ? (
-                <Ionicons
-                  name="checkmark-circle"
-                  size={15}
-                  color={colors.teal}
-                  accessibilityLabel="Verified organisation"
-                />
+                <TrustMark size={15} classicIcon="checkmark-circle" label="Verified organisation" />
               ) : null}
             </View>
             {job.posted_by_recruiter ? (
