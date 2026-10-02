@@ -5,7 +5,7 @@ import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-nat
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, layout, radius, spacing, typography, useBreakpoint, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, layout, radius, spacing, typography, useBreakpoint, MIN_TOUCH_TARGET, isPremium } from '../../theme';
 import { shareJob } from '../../utils/share';
 import { PageGrid } from '../web';
 import { Button } from '../Button';
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   copiedText: { ...typography.label, color: colors.white },
   flex: { flex: 1 },
 
-  header: { paddingTop: spacing.xl, paddingHorizontal: spacing.lg, gap: spacing.xs },
+  header: { paddingTop: isPremium ? spacing.lg : spacing.xl, paddingHorizontal: spacing.lg, gap: isPremium ? 2 : spacing.xs },
   h1: { ...typography.h2, color: colors.text },
   sub: { ...typography.caption, color: colors.textSecondary, lineHeight: 20 },
 

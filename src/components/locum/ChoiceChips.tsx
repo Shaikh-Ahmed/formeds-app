@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts, gloss } from '../../theme';
+import { colors, radius, spacing, typography, fonts, gloss, isPremium } from '../../theme';
 
 export interface Choice<T extends string> {
   value: T;
@@ -42,6 +42,7 @@ export function ChoiceChips<T extends string>({
               accessibilityRole="radio"
               accessibilityState={{ selected }}
               accessibilityLabel={choice.label}
+              hitSlop={isPremium ? { top: 7, bottom: 7, left: 3, right: 3 } : undefined}
               style={({ pressed }) => [styles.chip, selected && styles.chipOn, pressed && styles.pressed]}
             >
               {choice.icon ? (
@@ -59,13 +60,13 @@ export function ChoiceChips<T extends string>({
 const styles = StyleSheet.create({
   group: { gap: spacing.sm },
   label: { ...typography.label, color: colors.text },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: isPremium ? 6 : spacing.sm },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     paddingHorizontal: spacing.md,
-    minHeight: 38,
+    minHeight: isPremium ? 30 : 38,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
@@ -73,7 +74,8 @@ const styles = StyleSheet.create({
     ...gloss.glass,
   },
   chipOn: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
-  text: { ...typography.caption, color: colors.textSecondary },
+  text: isPremium ? { fontSize: 12, lineHeight: 16, fontFamily: fonts.body.regular, color: colors.textSecondary }
+    : { ...typography.caption, color: colors.textSecondary },
   textOn: { color: colors.white, fontFamily: fonts.body.semibold },
   pressed: { opacity: 0.7 },
 });

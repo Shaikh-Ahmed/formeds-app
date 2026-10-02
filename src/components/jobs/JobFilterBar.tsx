@@ -76,18 +76,20 @@ export function JobFilterBar({
           accessibilityLabel={
             activeCount ? `Filters, ${activeCount} applied` : 'Filters'
           }
+          hitSlop={isPremium ? { top: 4, bottom: 4 } : undefined}
           style={({ pressed }) => [
             styles.filterBtn,
+            isPremium && styles.cFilterBtn,
             activeCount > 0 && styles.filterBtnActive,
             pressed && styles.pressed,
           ]}
         >
           <Ionicons
             name="options-outline"
-            size={18}
+            size={isPremium ? 15 : 18}
             color={activeCount ? colors.white : colors.text}
           />
-          <Text style={[styles.filterText, activeCount > 0 && styles.filterTextActive]}>
+          <Text style={[styles.filterText, isPremium && styles.cFilterText, activeCount > 0 && styles.filterTextActive]}>
             {activeCount ? `Filters (${activeCount})` : 'Filters'}
           </Text>
         </Pressable>
@@ -105,13 +107,15 @@ export function JobFilterBar({
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={`Sort by ${label}`}
+              hitSlop={isPremium ? { top: 7, bottom: 7, left: 3, right: 3 } : undefined}
               style={({ pressed }) => [
                 styles.sortChip,
+                isPremium && styles.cSortChip,
                 active && styles.sortChipActive,
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={[styles.sortText, active && styles.sortTextActive]}>{label}</Text>
+              <Text style={[styles.sortText, isPremium && styles.cSortText, active && styles.sortTextActive]}>{label}</Text>
             </Pressable>
           );
         })}
@@ -134,7 +138,7 @@ export function JobFilterBar({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: spacing.md, paddingBottom: spacing.md },
+  wrap: { gap: isPremium ? spacing.sm : spacing.md, paddingBottom: isPremium ? spacing.sm : spacing.md },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   searchBar: {
     flex: 1,
@@ -147,13 +151,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     minHeight: MIN_TOUCH_TARGET,
-    // Premium: search is a recessed pill, as in the header.
+    // Premium: search is a compact recessed pill, as in the header.
     ...(isPremium ? {
-      backgroundColor: colors.bgMuted, borderColor: 'transparent', borderRadius: radius.pill, paddingHorizontal: spacing.lg,
+      backgroundColor: colors.bgMuted, borderColor: 'transparent', borderRadius: radius.pill, paddingHorizontal: spacing.md + 2,
+      minHeight: 38,
       ...(Platform.OS === 'web' ? ({ boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)' } as object) : {}),
     } : {}),
   },
-  searchInput: { flex: 1, ...typography.body, color: colors.text, paddingVertical: spacing.sm },
+  searchInput: isPremium
+    ? { flex: 1, fontSize: 13, fontFamily: fonts.body.medium, color: colors.text, paddingVertical: 6 }
+    : { flex: 1, ...typography.body, color: colors.text, paddingVertical: spacing.sm },
 
   filterBtn: {
     flexDirection: 'row',
@@ -173,7 +180,7 @@ const styles = StyleSheet.create({
 
   // flexWrap, not a horizontal scroller: options must never be clipped out of
   // sight, and this row grows with the user's text size.
-  sortRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  sortRow: { flexDirection: 'row', flexWrap: 'wrap', gap: isPremium ? 6 : spacing.sm },
   sortChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -190,5 +197,10 @@ const styles = StyleSheet.create({
   sortTextActive: { color: colors.white, fontFamily: fonts.body.semibold },
 
   resultCount: { ...typography.caption, color: colors.textSecondary },
+  // -- Premium: compact controls (touch area restored by hit slop) -----------
+  cFilterBtn: { minHeight: 38, paddingHorizontal: spacing.md, gap: 5 },
+  cFilterText: { fontSize: 13, lineHeight: 17 },
+  cSortChip: { minHeight: 30, paddingVertical: 4, paddingHorizontal: spacing.md },
+  cSortText: { fontSize: 12, lineHeight: 16 },
   pressed: { opacity: 0.7 },
 });

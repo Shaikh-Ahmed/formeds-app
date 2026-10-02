@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET, gloss } from '../../theme';
+import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET, gloss, isPremium } from '../../theme';
 import { JobsModuleTabs } from './JobsModuleTabs';
 
 export type JobsSegment = 'discover' | 'saved' | 'applications' | 'posted';
@@ -63,16 +63,17 @@ export function JobsSegmentedNav({ active }: { active: JobsSegment }) {
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={segment.label}
+            hitSlop={isPremium ? { top: 7, bottom: 7, left: 3, right: 3 } : undefined}
             style={({ pressed }) => [
-              styles.segment, selected && styles.segmentActive, pressed && styles.pressed,
+              styles.segment, isPremium && styles.cSegment, selected && styles.segmentActive, pressed && styles.pressed,
             ]}
           >
             <Ionicons
               name={segment.icon}
-              size={16}
+              size={isPremium ? 14 : 16}
               color={selected ? colors.white : colors.textSecondary}
             />
-            <Text style={[styles.label, selected && styles.labelActive]}>{segment.label}</Text>
+            <Text style={[styles.label, isPremium && styles.cLabel, selected && styles.labelActive]}>{segment.label}</Text>
           </Pressable>
         );
       })}
@@ -105,9 +106,9 @@ export function JobsSegmentedNav({ active }: { active: JobsSegment }) {
 }
 
 const styles = StyleSheet.create({
-  scroller: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  wide: { paddingVertical: spacing.lg },
-  row: { flexDirection: 'row', gap: spacing.sm },
+  scroller: { paddingHorizontal: spacing.lg, paddingVertical: isPremium ? spacing.sm : spacing.md },
+  wide: { paddingVertical: isPremium ? spacing.md : spacing.lg },
+  row: { flexDirection: 'row', gap: isPremium ? 6 : spacing.sm },
   segment: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -125,4 +126,7 @@ const styles = StyleSheet.create({
   label: { ...typography.caption, color: colors.textSecondary },
   labelActive: { color: colors.white, fontFamily: fonts.body.semibold },
   pressed: { opacity: 0.7 },
+  // Premium: compact segments (touch area restored by hit slop).
+  cSegment: { minHeight: 32, paddingHorizontal: spacing.md, gap: 5 },
+  cLabel: { fontSize: 12.5, lineHeight: 17 },
 });

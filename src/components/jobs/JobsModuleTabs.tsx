@@ -95,8 +95,8 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.8 },
   // Premium: a Material 3 segmented control -- a quiet slate track, the
   // chosen segment lifted onto a white thumb in teal.
-  cBar: { backgroundColor: colors.bgMuted, borderColor: colors.bgMuted, padding: 4, gap: 4, borderRadius: radius.pill },
-  cTab: { backgroundColor: 'transparent', borderRadius: radius.pill, paddingVertical: 9 },
+  cBar: { backgroundColor: colors.bgMuted, borderColor: colors.bgMuted, padding: 3, gap: 3, borderRadius: radius.pill, marginTop: spacing.md },
+  cTab: { backgroundColor: 'transparent', borderRadius: radius.pill, paddingVertical: 7 },
   cTabActive: {
     backgroundColor: colors.white,
     ...(Platform.OS === 'web' ? ({ boxShadow: '0 1px 3px rgba(15,23,42,0.10), 0 1px 2px rgba(15,23,42,0.06)' } as object) : elevation.subtle),

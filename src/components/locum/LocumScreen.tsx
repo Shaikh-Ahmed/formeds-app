@@ -255,20 +255,20 @@ export function LocumScreen({ selectedId = null }: { selectedId?: string | null 
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: { paddingTop: spacing.xl, paddingHorizontal: spacing.lg, gap: spacing.xs, paddingBottom: spacing.sm },
+  header: { paddingTop: isPremium ? spacing.lg : spacing.xl, paddingHorizontal: spacing.lg, gap: isPremium ? 2 : spacing.xs, paddingBottom: isPremium ? 0 : spacing.sm },
   h1: { ...typography.h2, color: colors.text },
   sub: { ...typography.caption, color: colors.textSecondary, lineHeight: 20 },
   notice: { paddingHorizontal: spacing.lg },
   postRow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, alignItems: 'flex-start' },
 
-  filterBar: { gap: spacing.md, paddingBottom: spacing.md },
+  filterBar: { gap: isPremium ? spacing.sm : spacing.md, paddingBottom: isPremium ? spacing.sm : spacing.md },
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.md,
-    minHeight: 36,
+    minHeight: isPremium ? 32 : 36,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: isPremium ? colors.border : colors.navy,
