@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { colors, radius, spacing, gloss } from '../theme';
+import { colors, radius, spacing, gloss, isTerracotta } from '../theme';
 
 interface Props {
   label: string;
@@ -35,9 +35,10 @@ export function TagChip({ label, count, selected, onPress, onRemove, testID }: P
 
 const styles = StyleSheet.create({
   chip: {
-    backgroundColor: '#EFF6FF',
+    // A pale brand tint: blue everywhere but Terracotta, which is warm.
+    backgroundColor: isTerracotta ? colors.tealBg : '#EFF6FF',
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: isTerracotta ? colors.border : '#DBEAFE',
     borderRadius: radius.sm,
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 4,
