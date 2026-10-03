@@ -183,14 +183,9 @@ export function JobsScreen({
       <PageGrid fluid testID="jobs-grid">
         {split ? (
           <>
-            <View style={styles.header}>
-              <Text style={styles.h1} accessibilityRole="header">
-                Find your next healthcare opportunity
-              </Text>
-              <Text style={styles.sub}>
-                Roles, locum shifts, fellowships and training posts, matched to your expertise.
-              </Text>
-            </View>
+            {/* No visible page title -- the tabs below say where you are. The
+                heading stays for screen readers, which navigate by headings. */}
+            <Text style={styles.srOnly} accessibilityRole="header">Jobs</Text>
             <JobsSegmentedNav active={segment} />
           </>
         ) : null}
@@ -219,14 +214,9 @@ export function JobsScreen({
               style={[styles.floatingHeader, headerStyle]}
               onLayout={onHeaderLayout}
             >
-              <View style={styles.header}>
-                <Text style={styles.h1} accessibilityRole="header">
-                  Find your next healthcare opportunity
-                </Text>
-                <Text style={styles.sub}>
-                  Roles, locum shifts, fellowships and training posts, matched to your expertise.
-                </Text>
-              </View>
+              {/* No visible page title -- the tabs below say where you are. The
+                  heading stays for screen readers, which navigate by headings. */}
+              <Text style={styles.srOnly} accessibilityRole="header">Jobs</Text>
               <JobsSegmentedNav active={segment} />
             </Animated.View>
             <JobsList
@@ -319,9 +309,7 @@ const styles = StyleSheet.create({
   copiedText: { ...typography.label, color: colors.white },
   flex: { flex: 1 },
 
-  header: { paddingTop: isPremium ? spacing.lg : spacing.xl, paddingHorizontal: spacing.lg, gap: isPremium ? 2 : spacing.xs },
-  h1: { ...typography.h2, color: colors.text },
-  sub: { ...typography.caption, color: colors.textSecondary, lineHeight: 20 },
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
 
   // overflow hidden is what lets the header slide out of view rather than
   // over the tab bar; the list scrolls underneath it.
