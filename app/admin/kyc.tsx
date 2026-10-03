@@ -17,8 +17,14 @@ interface KycRequest {
   applicant_name?: string;
   applicant_email?: string;
   applicant_role?: string;
+  applicant_education?: {
+    student_course?: string | null; student_institution?: string | null; student_university?: string | null;
+    student_year?: number | null; graduation_year?: number | null;
+  };
   created_at: string;
 }
+
+const TYPE_LABELS: Record<string, string> = { student_id: 'Student ID', nmc: 'NMC', rohini: 'ROHINI' };
 
 export default function AdminKycScreen() {
   const { user, token } = useAuth();
@@ -108,7 +114,17 @@ export default function AdminKycScreen() {
             <View style={styles.card}>
               <Text style={styles.name}>{item.applicant_name || 'Unknown'} <Text style={styles.role}>· {item.applicant_role}</Text></Text>
               <Text style={styles.meta}>{item.applicant_email}</Text>
-              <Text style={styles.meta}>{item.registration_type.toUpperCase()}: {item.registration_number}{item.state_council ? ` · ${item.state_council}` : ''}</Text>
+              <Text style={styles.meta}>{TYPE_LABELS[item.registration_type] ?? item.registration_type.toUpperCase()}: {item.registration_number}{item.state_council ? ` · ${item.state_council}` : ''}</Text>
+              {item.applicant_education?.student_course ? (
+                <Text style={styles.meta} testID={`kyc-education-${item.id}`}>
+                  {[item.applicant_education.student_course,
+                    item.applicant_education.student_year ? `Year ${item.applicant_education.student_year}` : '',
+                    item.applicant_education.student_institution,
+                    item.applicant_education.student_university,
+                    item.applicant_education.graduation_year ? `Graduating ${item.applicant_education.graduation_year}` : '',
+                  ].filter(Boolean).join(' · ')}
+                </Text>
+              ) : null}
               {/* The old "Auto-check: verified" line came from a mock provider that
                   derived that verdict from a string prefix. Showing a fabricated
                   pass to a human reviewer invites rubber-stamping — approval must

@@ -43,8 +43,8 @@ export function ApplySheet({
 }) {
   const { user, isKycApproved } = useAuth();
   const router = useRouter();
-  // A professional applies on an approved verification; a student on a
-  // verified email (which any signed-in account has). The server checks both.
+  // Applying needs an approved verification -- a professional's registration,
+  // a student's college ID. The server checks it too.
   const ready = canApplyNow(user, isKycApproved);
   const student = isStudent(user);
   const [note, setNote] = useState('');
@@ -158,7 +158,7 @@ export function ApplySheet({
 
         {/* Verification is the gate, so it is stated before the form rather
             than sprung as an error on submit. */}
-        {student ? null : <KycNotice action="apply for jobs" />}
+        <KycNotice action={student ? 'apply for internships and jobs' : 'apply for jobs'} />
         <ErrorBanner message={error} />
 
         {step === 'profile' ? (

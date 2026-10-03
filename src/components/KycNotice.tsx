@@ -17,29 +17,17 @@ export function KycNotice({ action }: { action: string }) {
   const { isKycApproved, user } = useAuth();
   const router = useRouter();
   const student = user?.role === 'student';
-  const { state } = useKycStatus({ enabled: !!user && !isKycApproved && !student });
+  const { state } = useKycStatus({ enabled: !!user && !isKycApproved });
 
   if (isKycApproved || !user) return null;
-  // A student has no professional registration to verify, so there is no
-  // "verify to unlock" here -- only an honest statement of who it is for.
-  if (student) {
-    return (
-      <View style={[styles.banner, styles.info]} accessibilityRole="text" testID="kyc-notice-student">
-        <Ionicons name="information-circle-outline" size={20} color={colors.info} />
-        <View style={styles.body}>
-          <Text style={[styles.title, styles.infoTitle]}>For verified healthcare professionals</Text>
-          <Text style={styles.hint}>Student accounts can&apos;t {action}.</Text>
-        </View>
-      </View>
-    );
-  }
   // Already submitted: say so, rather than asking them to do it again.
   const reviewing = state?.status === 'pending';
   const rejected = state?.status === 'rejected';
   const title = reviewing ? 'Verification under review' : rejected ? 'Verification not approved' : 'Verification required';
   const hint = reviewing
     ? `You can ${action} once your documents are approved. We will notify you.`
-    : rejected ? `Resubmit your documents to ${action}.` : `Complete verification to ${action}.`;
+    : rejected ? `Resubmit your documents to ${action}.`
+      : student ? `Verify your student status to ${action}.` : `Complete verification to ${action}.`;
 
   return (
     <TouchableOpacity
@@ -73,8 +61,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   body: { flex: 1 },
-  info: { backgroundColor: colors.infoBg, borderColor: colors.border },
-  infoTitle: { color: colors.info },
   title: { ...typography.bodyStrong, color: colors.warning },
   hint: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
 });

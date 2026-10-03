@@ -94,7 +94,7 @@ export function useKycStatus({ enabled = true }: { enabled?: boolean } = {}) {
  * How to describe verification to someone who is not yet approved. "Under
  * review" must never read as "complete verification": they already did.
  */
-export function kycCopy(status: KycStatus | undefined): {
+export function kycCopy(status: KycStatus | undefined, role?: string | null): {
   title: string; hint: string; cta: string; tone: 'warning' | 'navy' | 'danger';
 } {
   if (status === 'pending') {
@@ -111,6 +111,14 @@ export function kycCopy(status: KycStatus | undefined): {
       hint: 'Your documents could not be verified. See why and submit them again.',
       cta: 'Resubmit documents',
       tone: 'danger',
+    };
+  }
+  if (role === 'student') {
+    return {
+      title: 'Verify your student status',
+      hint: 'Add your course and college ID. Verified students can apply to internships, post and comment.',
+      cta: 'Verify now',
+      tone: 'warning',
     };
   }
   return {

@@ -75,7 +75,7 @@ export function ProfessionalIdentity({
       {profile.account_verified ? (
         <View style={styles.verifiedRow}>
           <TrustMark size={15} classicIcon="shield-checkmark" />
-          <Text style={styles.verifiedText}>Verified healthcare professional</Text>
+          <Text style={styles.verifiedText}>{student ? 'Verified student' : 'Verified healthcare professional'}</Text>
         </View>
       ) : null}
 

@@ -47,7 +47,7 @@ function recruiterMayOpen(segments: string[]): boolean {
 // student anyway; this keeps a student from landing on a screen that can only
 // say no. Everything else -- feed, jobs, internships, applications, learning,
 // AED, profile, messages -- is theirs.
-const STUDENT_BLOCKED_AREAS = new Set(['recruiter', 'admin', 'kyc']);
+const STUDENT_BLOCKED_AREAS = new Set(['recruiter', 'admin']);
 const STUDENT_BLOCKED_JOB_SCREENS = new Set(['new', 'edit', 'applicants', 'posted', 'locum']);
 
 function studentMayOpen(segments: string[]): boolean {
@@ -131,7 +131,7 @@ function RootNavigator() {
       // owns the admin exemption so this screen and every KYC-gated control
       // agree on who is approved.
       // Students have no council registration to verify, so never land there.
-      const needsKyc = user.role !== 'student' && !isKycApproved && !kycPrompted.current;
+      const needsKyc = !isKycApproved && !kycPrompted.current;
       kycPrompted.current = true;
       router.replace(needsKyc ? '/kyc' : '/(tabs)/community');
     }

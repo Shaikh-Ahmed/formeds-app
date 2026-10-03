@@ -55,13 +55,12 @@ export default function SettingsScreen() {
             value={user?.email_verified ? 'Yes' : 'Not yet'}
           />
           <Row icon="call-outline" label="Phone" value={user?.phone} />
-          {/* Previously a dead read-only row — there was no way to act on it.
-              A student has no council registration to verify. */}
-          {user?.role === 'student' ? null : <TouchableOpacity
+          {/* Previously a dead read-only row — there was no way to act on it. */}
+          <TouchableOpacity
             style={styles.row}
             onPress={() => router.push((user?.role === 'recruiter' ? '/recruiter/account' : '/kyc') as any)}
             accessibilityRole="button"
-            accessibilityLabel={`Professional verification: ${user?.verified ? 'verified' : 'not verified'}. Tap to view.`}
+            accessibilityLabel={`${user?.role === 'student' ? 'Student' : 'Professional'} verification: ${user?.verified ? 'verified' : 'not verified'}. Tap to view.`}
             testID="settings-kyc"
           >
             <Ionicons
@@ -69,10 +68,10 @@ export default function SettingsScreen() {
               size={18}
               color={user?.verified ? colors.teal : colors.warning}
             />
-            <Text style={styles.rowLabel}>Professional verification</Text>
+            <Text style={styles.rowLabel}>{user?.role === 'student' ? 'Student verification' : 'Professional verification'}</Text>
             <Text style={styles.rowValue}>{user?.verified ? 'Verified' : 'Not verified'}</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </TouchableOpacity>}
+          </TouchableOpacity>
         </View>
 
         {/* Google is for normal members only; recruiters and admins never see it. */}

@@ -17,6 +17,9 @@ import { colors, radius, spacing, typography } from '../src/theme';
 import { validateRequired, firstError } from '../src/utils/validation';
 import { appendFile } from '../src/utils/upload';
 import { PageColumn } from '../src/components/web';
+import {
+  StudentEducationFields, validateEducation, type EducationField, type StudentEducation,
+} from '../src/components/students/StudentEducationFields';
 
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024; // mirrors services/files.py
 
@@ -28,8 +31,12 @@ interface PickedDocument {
 }
 
 /**
- * Professional verification (KYC). Shown right after first sign-in and reachable
- * from Settings. Approval is always manual — nothing here can self-approve.
+ * Verification (KYC). Shown right after first sign-in and reachable from
+ * Settings. Approval is always manual — nothing here can self-approve.
+ *
+ * A professional sends a registration certificate; an organisation its
+ * facility registration; a student their college ID with their education,
+ * which is where a student's course and college are first captured.
  */
 export default function KycScreen() {
   const { user, token } = useAuth();
@@ -37,27 +44,36 @@ export default function KycScreen() {
   const router = useRouter();
 
   const isProfessional = user?.role === 'healthcare_professional';
+  const isStudent = user?.role === 'student';
+  const [education, setEducation] = useState<StudentEducation>({
+    course: user?.student_course ?? '',
+    institution: user?.student_institution ?? '',
+    university: user?.student_university ?? '',
+    current_year: user?.student_year ? String(user.student_year) : '',
+    graduation_year: user?.graduation_year ? String(user.graduation_year) : '',
+  });
   const [registrationNumber, setRegistrationNumber] = useState('');
   const [stateCouncil, setStateCouncil] = useState('');
   const [document, setDocument] = useState<PickedDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { submitting, run } = useSubmit();
-  const errs = useFormErrors<'number' | 'council' | 'document'>({
-    known: ['number', 'council', 'document'],
+  const errs = useFormErrors<'number' | 'council' | 'document' | EducationField>({
+    known: ['number', 'council', 'document', 'course', 'institution', 'current_year', 'graduation_year'],
     serverFields: { registration_number: 'number', state_council: 'council', document: 'document' },
   });
 
-  const docLabel = isProfessional
-    ? 'Medical registration certificate'
-    : 'Facility registration certificate';
-  const numberLabel = isProfessional ? 'Medical registration number' : 'Registration / ROHINI ID';
+  const docLabel = isStudent ? 'College ID card or bonafide certificate'
+    : isProfessional ? 'Medical registration certificate'
+      : 'Facility registration certificate';
+  const numberLabel = isStudent ? 'Enrolment / roll number'
+    : isProfessional ? 'Medical registration number' : 'Registration / ROHINI ID';
 
   const pickDocument = async () => {
     setError(null);
     errs.clear('document');
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setError('Photo access is needed to attach your certificate. Enable it in Settings.');
+      setError(`Photo access is needed to attach your ${isStudent ? 'college ID' : 'certificate'}. Enable it in Settings.`);
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -84,11 +100,12 @@ export default function KycScreen() {
     const valid = errs.check({
       number: validateRequired(registrationNumber, numberLabel),
       council: isProfessional ? validateRequired(stateCouncil, 'State medical council') : null,
-      document: document ? null : 'Attach your registration certificate.',
+      document: document ? null : isStudent ? 'Attach your college ID card or bonafide certificate.' : 'Attach your registration certificate.',
+      ...(isStudent ? validateEducation(education) : {}),
     });
     if (!valid) return;
     // One submission per press; a retry of the same documents reuses its key.
-    return run(key => send(key), { registrationNumber, stateCouncil, doc: document?.uri });
+    return run(key => send(key), { registrationNumber, stateCouncil, doc: document?.uri, education });
   };
 
   const send = async (key: string) => {
@@ -97,6 +114,13 @@ export default function KycScreen() {
       const form = new FormData();
       form.append('registration_number', registrationNumber.trim());
       if (isProfessional) form.append('state_council', stateCouncil.trim());
+      if (isStudent) {
+        form.append('course', education.course);
+        form.append('institution', education.institution.trim());
+        if (education.university.trim()) form.append('university', education.university.trim());
+        form.append('current_year', education.current_year);
+        form.append('graduation_year', education.graduation_year);
+      }
       // Platform-correct: a browser's FormData stringifies the React Native
       // { uri, name, type } descriptor into "[object Object]", which the API
       // rejects as `Expected UploadFile, received: <class 'str'>`.
@@ -137,7 +161,9 @@ export default function KycScreen() {
         icon="shield-checkmark"
         tone={colors.teal}
         title="You're verified"
-        body="Your registration has been approved. You have full access to ForMeds."
+        body={isStudent
+          ? 'Your student status has been confirmed. You can apply to internships and roles open to students.'
+          : 'Your registration has been approved. You have full access to ForMeds.'}
         actionLabel="Continue"
         onAction={() => router.replace('/(tabs)/community')}
       />
@@ -150,7 +176,9 @@ export default function KycScreen() {
         icon="hourglass-outline"
         tone={colors.warning}
         title="Under review"
-        body="Our team is checking your certificate. This usually takes 1–2 working days. You can keep exploring ForMeds while you wait — posting and job applications unlock once you're approved."
+        body={isStudent
+          ? "Our team is checking your college ID. This usually takes 1–2 working days. You can keep exploring ForMeds while you wait — applying to internships unlocks once you're approved."
+          : "Our team is checking your certificate. This usually takes 1–2 working days. You can keep exploring ForMeds while you wait — posting and job applications unlock once you're approved."}
         actionLabel="Explore ForMeds"
         onAction={() => router.replace('/(tabs)/community')}
       />
@@ -174,12 +202,23 @@ export default function KycScreen() {
           ) : null}
 
           <Text style={styles.lead}>
-            {isProfessional
-              ? 'Upload the medical registration certificate that authorises you to practise in India. A reviewer checks every document by hand.'
-              : 'Upload the registration certificate for your facility. A reviewer checks every document by hand.'}
+            {isStudent
+              ? 'Confirm you are a student: add your course and college, then upload your college ID card or bonafide certificate. A reviewer checks every document by hand.'
+              : isProfessional
+                ? 'Upload the medical registration certificate that authorises you to practise in India. A reviewer checks every document by hand.'
+                : 'Upload the registration certificate for your facility. A reviewer checks every document by hand.'}
           </Text>
 
           <ErrorBanner message={error} />
+
+          {isStudent ? (
+            <StudentEducationFields
+              value={education}
+              onChange={(field, v) => { setEducation(e => ({ ...e, [field]: v })); errs.clear(field as EducationField); }}
+              errors={errs.fields}
+              testIDPrefix="kyc-student"
+            />
+          ) : null}
 
           <FormInput
             testID="kyc-number-input"
@@ -188,7 +227,7 @@ export default function KycScreen() {
             value={registrationNumber}
             onChangeText={v => { setRegistrationNumber(v); errs.clear('number'); }}
             error={errs.fields.number}
-            placeholder={isProfessional ? 'e.g. MH-12345' : 'e.g. 1234567890123'}
+            placeholder={isStudent ? 'e.g. 21MBBS0042' : isProfessional ? 'e.g. MH-12345' : 'e.g. 1234567890123'}
             autoCapitalize="characters"
             maxLength={80}
           />
@@ -213,7 +252,7 @@ export default function KycScreen() {
             style={styles.picker}
             onPress={pickDocument}
             accessibilityRole="button"
-            accessibilityLabel={document ? 'Change attached certificate' : 'Attach your certificate'}
+            accessibilityLabel={document ? `Change attached ${isStudent ? 'document' : 'certificate'}` : `Attach your ${isStudent ? 'college ID' : 'certificate'}`}
           >
             {document ? (
               <>
@@ -228,7 +267,7 @@ export default function KycScreen() {
               <>
                 <Ionicons name="cloud-upload-outline" size={24} color={colors.textMuted} />
                 <View style={styles.flex}>
-                  <Text style={styles.fileName}>Attach certificate</Text>
+                  <Text style={styles.fileName}>{isStudent ? 'Attach college ID' : 'Attach certificate'}</Text>
                   <Text style={styles.fileHint}>Photo or scan, up to 10MB</Text>
                 </View>
               </>

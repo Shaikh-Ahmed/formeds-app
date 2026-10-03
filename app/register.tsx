@@ -13,10 +13,6 @@ import { validateEmail, validatePassword, validatePhone, validateRequired, first
 import { AuthShell, AuthRow, AuthTopRow } from '../src/components/web';
 import { GoogleSignInButton } from '../src/components/auth/GoogleSignInButton';
 import { useGoogleSignIn } from '../src/components/auth/useGoogleSignIn';
-import {
-  EMPTY_EDUCATION, StudentEducationFields, educationPayload, validateEducation,
-  type EducationField, type StudentEducation,
-} from '../src/components/students/StudentEducationFields';
 
 /**
  * Step 2 of signup. Deliberately minimal: name, email, password, phone.
@@ -32,10 +28,8 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const isStudent = role === 'student';
-  const [education, setEducation] = useState<StudentEducation>(EMPTY_EDUCATION);
-  const errs = useFormErrors<'name' | 'email' | 'phone' | 'password' | EducationField>({
-    known: ['name', 'email', 'phone', 'password', 'course', 'institution', 'current_year', 'graduation_year'],
+  const errs = useFormErrors<'name' | 'email' | 'phone' | 'password'>({
+    known: ['name', 'email', 'phone', 'password'],
     codes: { email_taken: 'email', phone_taken: 'phone' },
   });
   const [loading, setLoading] = useState(false);
@@ -60,7 +54,6 @@ export default function RegisterScreen() {
       email: validateEmail(email),
       phone: validatePhone(phone),
       password: validatePassword(password),
-      ...(isStudent ? validateEducation(education) : {}),
     });
     if (!valid || loading) return;
 
@@ -69,7 +62,6 @@ export default function RegisterScreen() {
     try {
       const pending = await register({
         email, password, name: name.trim(), role, phone,
-        ...(isStudent ? educationPayload(education) : {}),
       });
       router.replace({
         pathname: '/verify',
@@ -113,7 +105,7 @@ export default function RegisterScreen() {
 
           <Text style={styles.title} accessibilityRole="header">Create account</Text>
           <Text style={styles.subtitle}>
-            {isStudent ? 'Your details and where you study — the rest can wait.' : 'Just four details — you can add the rest later.'}
+            Just four details — you can add the rest later.
           </Text>
 
           <ErrorBanner message={error || google.error} />
@@ -177,18 +169,6 @@ export default function RegisterScreen() {
           />
           </AuthRow>
 
-          {isStudent ? (
-            <View testID="register-student-education">
-              <Text style={styles.sectionLabel}>Your studies</Text>
-              <StudentEducationFields
-                value={education}
-                onChange={(field, v) => { setEducation(e => ({ ...e, [field]: v })); errs.clear(field); }}
-                errors={errs.fields}
-                testIDPrefix="register-student"
-              />
-            </View>
-          ) : null}
-
           <Text style={styles.legal}>
             We&apos;ll send a code to your email to confirm it&apos;s you.
           </Text>
@@ -232,7 +212,6 @@ const styles = StyleSheet.create({
   title: { ...typography.h1, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xxl },
   legal: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.lg },
-  sectionLabel: { ...typography.overline, color: colors.teal, marginTop: spacing.xs, marginBottom: spacing.md },
   linkBtn: { alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.lg },
   linkText: { ...typography.body, color: colors.textSecondary },
   linkBold: { fontWeight: '700', color: colors.navy },

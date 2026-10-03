@@ -14,12 +14,11 @@ export const isProfessional = (u: RoleUser) => u?.role === 'healthcare_professio
 export const appliesForWork = (u: RoleUser) => isProfessional(u) || isStudent(u);
 
 /**
- * Ready to apply now. A professional needs an approved verification; a
- * student has no council registration to verify -- a verified email (which
- * any signed-in account has) is enough.
+ * Ready to apply now: an approved verification -- a professional's
+ * registration certificate, a student's college ID.
  */
 export const canApplyNow = (u: RoleUser, isKycApproved: boolean) =>
-  isStudent(u) || (isProfessional(u) && isKycApproved);
+  appliesForWork(u) && isKycApproved;
 
 /** Learning: professionals and students. */
 export const hasLearning = (u: RoleUser) => appliesForWork(u);

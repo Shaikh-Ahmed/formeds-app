@@ -42,7 +42,7 @@ export function FeedRail() {
   const { isKycApproved, user } = useAuth();
   const router = useRouter();
   const { state } = useKycStatus({ enabled: !!user && !isKycApproved });
-  const copy = kycCopy(state?.status);
+  const copy = kycCopy(state?.status, user?.role);
   const tone = copy.tone === 'navy' ? colors.navy : copy.tone === 'danger' ? colors.redText : colors.warning;
 
   return (
@@ -50,8 +50,7 @@ export function FeedRail() {
       {/* Verification is the gate on posting, applying and messaging, so on
           desktop it gets persistent rail space instead of only appearing
           inside the composer. */}
-      {/* Students have no professional verification to complete. */}
-      {!isKycApproved && user && user.role !== 'student' ? (
+      {!isKycApproved && user ? (
         <View style={[styles.kycCard, copy.tone === 'navy' && styles.kycCardReview,
           copy.tone === 'danger' && styles.kycCardRejected]} testID="rail-kyc">
           <View style={styles.kycHead}>

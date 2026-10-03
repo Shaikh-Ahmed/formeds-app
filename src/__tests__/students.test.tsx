@@ -6,6 +6,7 @@ import {
 import { EMPTY_EDUCATION, educationPayload, ordinalYear, validateEducation } from '../components/students/StudentEducationFields';
 import { scalarFormFor, SCALAR_FORMS } from '../components/profile/entryForms';
 import { OPEN_TO_LABELS } from '../types/profile';
+import { kycCopy } from '../hooks/useKycStatus';
 import { ROLE_META, getRoleMeta } from '../theme/roles';
 import { JobCard } from '../components/jobs/JobCard';
 import { JobWizard } from '../components/jobs/wizard/JobWizard';
@@ -38,8 +39,9 @@ describe('role helpers', () => {
     expect(isStudent(STUDENT)).toBe(true);
   });
 
-  it('needs no KYC for a student but does for a professional', () => {
-    expect(canApplyNow(STUDENT, false)).toBe(true);
+  it('needs an approved verification to apply, student or professional', () => {
+    expect(canApplyNow(STUDENT, false)).toBe(false);
+    expect(canApplyNow(STUDENT, true)).toBe(true);
     expect(canApplyNow(PRO, false)).toBe(false);
     expect(canApplyNow(PRO, true)).toBe(true);
     expect(canApplyNow(HOSPITAL, true)).toBe(false);
@@ -65,6 +67,15 @@ describe('role helpers', () => {
     expect(studentLine({ student_course: 'BDS', student_year: 1 })).toBe('BDS · 1st year');
     expect(studentLine({})).toBe('');
     expect(ordinalYear(5)).toBe('5th year');
+  });
+});
+
+describe('student verification copy', () => {
+  it('asks a student for their college ID, not a medical registration', () => {
+    expect(kycCopy('not_submitted', 'student').title).toBe('Verify your student status');
+    expect(kycCopy('not_submitted', 'student').hint).toMatch(/college ID/);
+    expect(kycCopy('pending', 'student').title).toBe('Verification under review');
+    expect(kycCopy('not_submitted', 'healthcare_professional').title).toBe('Verification pending');
   });
 });
 

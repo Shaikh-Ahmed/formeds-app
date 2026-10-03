@@ -71,7 +71,8 @@ export default function EditProfileScreen() {
   const save = async () => {
     const nameProblem = name.trim() ? null : 'Name is required.';
     const expError = isProfessional ? validateInteger(experience, 'Years of experience', { max: 80 }) : null;
-    const eduProblems = isStudent ? validateEducation(education) : {};
+    const eduStarted = isStudent && Object.values(education).some(v => String(v).trim());
+    const eduProblems = eduStarted ? validateEducation(education) : {};
     setNameError(nameProblem);
     setExperienceError(expError);
     setEducationErrors(eduProblems);
@@ -99,7 +100,7 @@ export default function EditProfileScreen() {
       }
       // Passing `null` here sent no Authorization header, so every save 401'd.
       await apiFetch('/api/profile/update', token, { method: 'PUT', body: JSON.stringify(payload) });
-      if (isStudent) {
+      if (eduStarted) {
         // Education is validated as a whole record by PATCH /profile/me.
         await apiFetch('/api/profile/me', token, { method: 'PATCH', body: JSON.stringify({
           student_course: education.course,

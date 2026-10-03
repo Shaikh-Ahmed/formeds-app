@@ -16,10 +16,6 @@ import { firstError, validatePhone, validateRequired } from '../src/utils/valida
 import {
   clearPendingGoogleSignup, completeGoogleSignup, pendingGoogleSignup, useGoogleResultRouter,
 } from '../src/components/auth/useGoogleSignIn';
-import {
-  EMPTY_EDUCATION, StudentEducationFields, educationPayload, validateEducation,
-  type EducationField, type StudentEducation,
-} from '../src/components/students/StudentEducationFields';
 
 // The same roles email signup offers. Recruiters have their own signup with
 // its own verification; the server refuses any other role anyway.
@@ -46,9 +42,8 @@ export default function GoogleOnboardingScreen() {
   const [phone, setPhone] = useState('');
   const [usePhoto, setUsePhoto] = useState(!!pending?.photo_available);
   const [error, setError] = useState<string | null>(null);
-  const [education, setEducation] = useState<StudentEducation>(EMPTY_EDUCATION);
-  const errs = useFormErrors<'role' | 'name' | 'phone' | EducationField>({
-    known: ['role', 'name', 'phone', 'course', 'institution', 'current_year', 'graduation_year'],
+  const errs = useFormErrors<'role' | 'name' | 'phone'>({
+    known: ['role', 'name', 'phone'],
     codes: { phone_taken: 'phone' },
   });
   const [loading, setLoading] = useState(false);
@@ -75,7 +70,6 @@ export default function GoogleOnboardingScreen() {
       role: role ? null : 'Choose what best describes you.',
       name: validateRequired(name, nameLabel),
       phone: validatePhone(phone),
-      ...(role === 'student' ? validateEducation(education) : {}),
     });
     if (!valid || loading) return;
     setLoading(true);
@@ -88,7 +82,6 @@ export default function GoogleOnboardingScreen() {
         phone,
         professional_role: role === 'healthcare_professional' ? professionalRole ?? undefined : undefined,
         use_google_photo: usePhoto,
-        ...(role === 'student' ? educationPayload(education) : {}),
       });
       await route(result);
     } catch (e: any) {
@@ -140,15 +133,6 @@ export default function GoogleOnboardingScreen() {
                 choices={PROFESSIONAL_ROLES.map(p => ({ value: p, label: p }))} />
             ) : null}
 
-            {role === 'student' ? (
-              <StudentEducationFields
-                value={education}
-                onChange={(field, v) => { setEducation(e => ({ ...e, [field]: v })); errs.clear(field); }}
-                errors={errs.fields}
-                testIDPrefix="google-student"
-              />
-            ) : null}
-
             <FieldError message={errs.fields.role} />
             <FormInput maxLength={120} testID="google-name-input" label={nameLabel} icon="person-outline"
               value={name} onChangeText={v => { setName(v); errs.clear('name'); }}
@@ -170,7 +154,7 @@ export default function GoogleOnboardingScreen() {
               {role === 'healthcare_professional'
                 ? 'Next, verify your medical or nursing registration. Signing in with Google does not verify your professional credentials.'
                 : role === 'student'
-                  ? 'You can browse and apply for jobs and internships open to students straight away.'
+                  ? 'Next, verify your student status with your college ID and add your course. You can browse ForMeds straight away.'
                   : 'Next, verify your organisation. Signing in with Google does not verify it.'}
               {pending.phone_required ? ' We will also text a code to confirm your phone.' : ''}
             </Text>
