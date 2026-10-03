@@ -55,8 +55,9 @@ export default function SettingsScreen() {
             value={user?.email_verified ? 'Yes' : 'Not yet'}
           />
           <Row icon="call-outline" label="Phone" value={user?.phone} />
-          {/* Previously a dead read-only row — there was no way to act on it. */}
-          <TouchableOpacity
+          {/* Previously a dead read-only row — there was no way to act on it.
+              A student has no council registration to verify. */}
+          {user?.role === 'student' ? null : <TouchableOpacity
             style={styles.row}
             onPress={() => router.push((user?.role === 'recruiter' ? '/recruiter/account' : '/kyc') as any)}
             accessibilityRole="button"
@@ -71,11 +72,29 @@ export default function SettingsScreen() {
             <Text style={styles.rowLabel}>Professional verification</Text>
             <Text style={styles.rowValue}>{user?.verified ? 'Verified' : 'Not verified'}</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-          </TouchableOpacity>
+          </TouchableOpacity>}
         </View>
 
         {/* Google is for normal members only; recruiters and admins never see it. */}
         {user?.role !== 'recruiter' && !user?.is_admin ? <SignInMethods /> : null}
+
+        {user?.role === 'student' ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Career</Text>
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => router.push('/opportunities' as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Career preferences and recruiter visibility. Tap to manage."
+              testID="settings-opportunities"
+            >
+              <Ionicons name="compass-outline" size={18} color={colors.navy} />
+              <Text style={styles.rowLabel}>Career preferences & visibility</Text>
+              <Text style={styles.rowValue}>Manage</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {user?.role === 'healthcare_professional' ? (
           <View style={styles.section}>

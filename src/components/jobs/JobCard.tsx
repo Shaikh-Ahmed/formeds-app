@@ -12,6 +12,7 @@ import {
   JobBadge, MetaItem, formatExperience, formatPay, formatShiftDates, formatTypeLine,
 } from './JobMeta';
 import { EMPLOYMENT_TYPE_LABELS, isShiftRole, type Job } from '../../types/jobs';
+import { eligibilityOf } from '../../utils/roles';
 
 interface Props {
   item: Job;
@@ -53,6 +54,8 @@ export const JobCard = React.memo(function JobCard({
   item, onPress, onToggleSave, onShare, onQuickApply, selected = false, compact = false,
 }: Props) {
   const pay = formatPay(item);
+  const eligibility = eligibilityOf(item);
+  const studentsWelcome = eligibility !== 'professionals';
   const experience = formatExperience(item);
   const shiftDates = formatShiftDates(item);
   const skills = item.skills?.slice(0, MAX_SKILL_CHIPS) ?? [];
@@ -153,16 +156,25 @@ export const JobCard = React.memo(function JobCard({
           <Text style={styles.payHidden}>Pay not disclosed</Text>
         )}
 
-        {(item.is_urgent || isShiftRole(item.employment_type)) && !compact ? (
+        {/* Who may apply is shown even on a compact card: it decides whether
+            the posting is worth opening at all. */}
+        {((item.is_urgent || isShiftRole(item.employment_type)) && !compact) || studentsWelcome ? (
           <View style={styles.badgeRow}>
-            {item.is_urgent ? (
+            {item.is_urgent && !compact ? (
               <JobBadge label="Urgent" icon="alert-circle" tone="danger" />
             ) : null}
-            {isShiftRole(item.employment_type) ? (
+            {isShiftRole(item.employment_type) && !compact ? (
               <JobBadge
                 label={EMPLOYMENT_TYPE_LABELS[item.employment_type]}
                 icon="flash-outline"
                 tone="teal"
+              />
+            ) : null}
+            {studentsWelcome ? (
+              <JobBadge
+                label={eligibility === 'students' ? 'Students only' : 'Open to students'}
+                icon="school-outline"
+                tone="navy"
               />
             ) : null}
           </View>

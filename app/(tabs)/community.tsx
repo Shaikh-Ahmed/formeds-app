@@ -17,6 +17,7 @@ import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer, E
 import type { ArticleFeedPost } from '../../src/types/feed';
 import { PostActions } from '../../src/components/PostActions';
 import { PageGrid, ProfileRail, FeedRail, Hoverable } from '../../src/components/web';
+import { StudentDashboard } from '../../src/components/students/StudentDashboard';
 import { colors, fonts, spacing, radius, typography, shadow, elevation, useBreakpoint, activeTheme, isRefined, isMaterial, isPremium, isTerracotta, gloss } from '../../src/theme';
 import { useCollapsibleHeader, focusScrollInset } from '../../src/hooks/useCollapsibleHeader';
 import { mediaUri } from '../../src/utils/media';
@@ -322,6 +323,7 @@ export default function FeedScreen() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={colors.navy} progressViewOffset={headerHeight} />}
             onEndReached={loadMorePosts}
             onEndReachedThreshold={0.5}
+            ListHeaderComponent={user?.role === 'student' && !savedOnly ? <StudentDashboard /> : null}
             ListFooterComponent={loadingMore ? <ActivityIndicator style={{ paddingVertical: 20 }} color={colors.navy} /> : null}
             ListEmptyComponent={isRefined ? (
               // Premium: a designed state with a next step -- into the
@@ -451,7 +453,7 @@ export default function FeedScreen() {
             an invitation, where a bare pencil glyph in a header did not. On the
             Cases tab it routes to the full composer, which needs a title and
             tags and so can't expand inline. */}
-        {!showCompose && (
+        {!showCompose && user?.role !== 'student' && (
           <Hoverable
             testID="compose-trigger"
             onPress={() =>

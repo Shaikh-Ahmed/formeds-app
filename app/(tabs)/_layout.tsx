@@ -188,12 +188,12 @@ export default function TabLayout() {
         <Tabs.Screen name="learning" options={{
           title: 'Learning',
           tabBarIcon: tabIcon('book'),
-          href: role === 'healthcare_professional' ? '/(tabs)/learning' : null,
+          href: role === 'healthcare_professional' || role === 'student' ? '/(tabs)/learning' : null,
         }} />
         <Tabs.Screen name="specialists" options={{
           title: role === 'clinic' ? 'Listings' : 'Specialists',
           tabBarIcon: tabIcon('people'),
-          href: role === 'hospital' || role === 'recruiter' ? null : '/(tabs)/specialists',
+          href: role === 'hospital' || role === 'recruiter' || role === 'student' ? null : '/(tabs)/specialists',
         }} />
         <Tabs.Screen name="alerts" options={{
           title: 'Alerts',

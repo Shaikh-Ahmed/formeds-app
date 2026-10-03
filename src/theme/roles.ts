@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from './colors';
 import { isMaterial } from './activeTheme';
 
-export type Role = 'healthcare_professional' | 'hospital' | 'clinic' | 'recruiter' | 'official';
+export type Role = 'healthcare_professional' | 'student' | 'hospital' | 'clinic' | 'recruiter' | 'official';
 
 export interface RoleMeta {
   /** Short label for badges (feed, people cards). */
@@ -32,6 +32,16 @@ export const ROLE_META: Record<Role, RoleMeta> = {
     bg: isMaterial ? colors.tealBg : colors.successBg,
     icon: 'medkit',
     description: 'Doctor, Nurse, or Allied Health Worker',
+  },
+  student: {
+    label: 'Student',
+    longLabel: 'Healthcare Student',
+    // The info hue: learning and early career, distinct from the trust teal a
+    // verified professional carries.
+    color: colors.info,
+    bg: colors.infoBg,
+    icon: 'school',
+    description: 'MBBS, Nursing, Pharmacy or Allied Health student',
   },
   hospital: {
     label: 'Hospital',

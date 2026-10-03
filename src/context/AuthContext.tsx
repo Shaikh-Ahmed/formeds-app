@@ -26,6 +26,12 @@ interface User {
   is_admin?: boolean;
   /** KYC approval — distinct from email_verified. Legacy column name. */
   verified?: boolean;
+  /** Student accounts: course, college and year (see services/students.py). */
+  student_course?: string;
+  student_institution?: string;
+  student_university?: string;
+  student_year?: number;
+  graduation_year?: number;
   [key: string]: any;
 }
 
@@ -73,6 +79,12 @@ export interface RegisterInput {
   name: string;
   role: string;
   phone: string;
+  /** Students only: the education that defines a student account. */
+  course?: string;
+  institution?: string;
+  university?: string;
+  current_year?: number;
+  graduation_year?: number;
 }
 
 const AuthContext = createContext<AuthContextType>({

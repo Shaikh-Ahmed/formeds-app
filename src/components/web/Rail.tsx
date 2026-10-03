@@ -12,6 +12,7 @@ import { fetchMyProfile } from '../../api/profile';
 import { fetchAccountOrganization } from '../../api/organizations';
 import { completionItems } from '../organizations/profile/completion';
 import { Avatar } from '../Avatar';
+import { studentLine } from '../../utils/roles';
 import { Hoverable } from './Hoverable';
 
 /** Generic sidebar card. The single container shape used by both rails. */
@@ -129,6 +130,7 @@ export function ProfileRail() {
   const role = user?.role;
   const isOrg = role === 'hospital' || role === 'clinic';
   const isPro = role === 'healthcare_professional';
+  const isStudentAccount = role === 'student';
 
   const shortcuts: Shortcut[] = [
     { label: 'My network', icon: 'people-outline', href: '/people' },
@@ -137,16 +139,18 @@ export function ProfileRail() {
     isOrg
       ? { label: 'My job postings', icon: 'briefcase-outline', href: '/(tabs)/jobs/posted' }
       : { label: 'My jobs & applications', icon: 'briefcase-outline', href: '/(tabs)/jobs/applications' },
-    isOrg
-      ? { label: 'My locum postings', icon: 'medkit-outline', href: '/(tabs)/jobs/locum/mine' }
-      : { label: 'My locum assignments', icon: 'medkit-outline', href: '/(tabs)/jobs/locum/shifts' },
-    ...(isPro ? [{ label: 'My learning', icon: 'school-outline' as const, href: '/(tabs)/learning' }] : []),
+    // Locum is clinical cover: no shortcut for a student.
+    ...(isStudentAccount ? [] : [isOrg
+      ? { label: 'My locum postings', icon: 'medkit-outline' as const, href: '/(tabs)/jobs/locum/mine' }
+      : { label: 'My locum assignments', icon: 'medkit-outline' as const, href: '/(tabs)/jobs/locum/shifts' }]),
+    ...(isPro || isStudentAccount ? [{ label: 'My learning', icon: 'school-outline' as const, href: '/(tabs)/learning' }] : []),
     // The admin queue's only other entry point is AppDrawer, which never
     // renders above 768px, so an admin on desktop needs these rows.
     ...(user?.is_admin
       ? [{ label: 'KYC review queue', icon: 'shield-checkmark-outline' as const, href: '/admin/kyc' },
         { label: 'Recruiter review', icon: 'briefcase-outline' as const, href: '/admin/recruiters' },
-        { label: 'Locum reliability', icon: 'calendar-outline' as const, href: '/admin/locum' }]
+        { label: 'Locum reliability', icon: 'calendar-outline' as const, href: '/admin/locum' },
+        { label: 'Student accounts', icon: 'school-outline' as const, href: '/admin/students' }]
       : []),
     { label: 'Settings', icon: 'settings-outline', href: '/settings' },
   ];
@@ -186,7 +190,14 @@ export function ProfileRail() {
           <Text style={[styles.identityRole, { color: meta.color }]} numberOfLines={1}>
             {meta.longLabel}
           </Text>
-          {user?.specialty ? (
+          {isStudentAccount && user?.student_course ? (
+            <>
+              <Text style={styles.identityMeta} numberOfLines={1}>{studentLine(user)}</Text>
+              {user.student_institution ? (
+                <Text style={styles.identityMeta} numberOfLines={1}>{user.student_institution}</Text>
+              ) : null}
+            </>
+          ) : user?.specialty ? (
             <Text style={styles.identityMeta} numberOfLines={1}>{user.specialty}</Text>
           ) : null}
           {summary.location ? (

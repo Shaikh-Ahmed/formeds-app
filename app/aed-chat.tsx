@@ -80,6 +80,15 @@ export const QUICK_ACTIONS: QuickAction[] = [
   { action: 'guideline', label: 'Clinical guidelines', hint: 'What current guidance says', icon: 'document-text-outline', prefill: 'What do current guidelines recommend for ' },
 ];
 
+// A student's AED leads with study: concepts first, case analysis last. Same
+// actions, same server rules -- only the order and the welcome change.
+const STUDENT_ORDER: AedAction[] = [
+  'explain_concept', 'medication', 'lab_report', 'differential', 'research', 'guideline', 'compare_drugs', 'analyze_case',
+];
+export const quickActionsFor = (role?: string | null): QuickAction[] => role === 'student'
+  ? STUDENT_ORDER.map(a => QUICK_ACTIONS.find(q => q.action === a)).filter((q): q is QuickAction => !!q)
+  : QUICK_ACTIONS;
+
 // The conversation survives closing and reopening AED within one app session.
 // It is never written to device storage: it can hold patient details, and the
 // server already forgets it after 24 hours. Keyed by user, so whoever signs in
@@ -428,10 +437,12 @@ export default function AEDChatScreen() {
                   {shortWindow ? 'How can I help?' : 'How can I help with your healthcare question?'}
                 </Text>
                 {shortWindow ? null : <Text style={[styles.welcomeSub, isMaterial && styles.mWelcomeSub]}>
-                  Cases, lab reports, medications, research and guidelines — structured for clinical work.
+                  {user?.role === 'student'
+                    ? 'Concepts, drugs, lab values, research and guidelines — explained for your studies.'
+                    : 'Cases, lab reports, medications, research and guidelines — structured for clinical work.'}
                 </Text>}
                 <View style={[styles.actions, isMaterial && styles.mActions]}>
-                  {QUICK_ACTIONS.map(qa => (
+                  {quickActionsFor(user?.role).map(qa => (
                     <Pressable key={qa.action} testID={`aed-action-${qa.action}`}
                       onPress={() => pickQuickAction(qa)} accessibilityRole="button"
                       accessibilityLabel={`${qa.label}. ${qa.hint}`}

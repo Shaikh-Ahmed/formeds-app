@@ -48,6 +48,7 @@ export function buildJobsQuery(filters: JobFilters = {}): string {
   push('urgent_only', filters.urgent_only);
   push('posted_within_days', filters.posted_within_days);
   push('org_id', filters.org_id);
+  push('audience', filters.audience);
   push('sort', filters.sort);
 
   return params.toString();
@@ -55,7 +56,8 @@ export function buildJobsQuery(filters: JobFilters = {}): string {
 
 /** How many filters the user has actually set, for the "Filters (3)" badge. */
 export function activeFilterCount(filters: JobFilters): number {
-  const { sort: _sort, q: _q, ...rest } = filters;
+  // The audience is set by the page a student is on, not chosen as a filter.
+  const { sort: _sort, q: _q, audience: _audience, ...rest } = filters;
   return Object.values(rest).filter(v => {
     if (Array.isArray(v)) return v.length > 0;
     return v !== undefined && v !== null && v !== '' && v !== false;

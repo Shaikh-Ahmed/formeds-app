@@ -77,10 +77,12 @@ export function TopBar({
     { key: 'community', label: 'Home', href: '/(tabs)/community',
       icon: isRefined ? 'home-outline' : 'chatbubbles-outline', iconActive: isRefined ? 'home' : 'chatbubbles' },
     { key: 'jobs', label: 'Jobs', href: '/(tabs)/jobs', icon: 'briefcase-outline', iconActive: 'briefcase' },
-    ...(role === 'healthcare_professional'
+    // Learning: professionals and students. Specialists is a professional
+    // listing, so students do not get it.
+    ...(role === 'healthcare_professional' || role === 'student'
       ? [{ key: 'learning', label: 'Learning', href: '/(tabs)/learning', icon: 'book-outline', iconActive: 'book' } as NavItem]
       : []),
-    ...(role !== 'hospital'
+    ...(role !== 'hospital' && role !== 'student'
       ? [{ key: 'specialists', label: role === 'clinic' ? 'Listings' : 'Specialists', href: '/(tabs)/specialists', icon: 'people-outline', iconActive: 'people' } as NavItem]
       : []),
     { key: 'messages', label: 'Messages', href: '/messages', icon: 'mail-outline', iconActive: 'mail', badge: unreadMessages },

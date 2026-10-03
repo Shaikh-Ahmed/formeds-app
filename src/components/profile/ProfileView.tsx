@@ -25,7 +25,7 @@ import { SpecializationSection, SkillsSection, InterestsSection } from './Taxono
 import { AvailabilitySection, MentorshipSection, ProfessionalLinksSection } from './EngagementSections';
 import { ProfileCompletion } from './ProfileCompletion';
 import { EntrySheet } from './EntrySheet';
-import { SCALAR_FORMS, ScalarFormKey } from './entryForms';
+import { ScalarFormKey, scalarFormFor } from './entryForms';
 import { AccountOrganizationProfile, ORG_ACCOUNT_ROLES } from '../organizations/profile/AccountOrganizationProfile';
 import { ConnectActions } from '../network/ConnectActions';
 
@@ -331,14 +331,15 @@ export function ProfileView({ userId }: Props) {
   // Credentials — what a hospital or recruiter verifies.
   const credentials = (
     <>
-      <RegistrationSection
+      {/* A student has no council registration yet. */}
+      {profile.role === 'student' ? null : <RegistrationSection
         entries={at('registration')}
         editable={editable}
         visibility={vis('registration')}
         onAdd={() => setEntrySheet({ kind: 'registration' })}
         onEdit={(id) => setEntrySheet({ kind: 'registration', entry: findEntry(at('registration'), id) })}
         onChangeVisibility={openPrivacy?.('registration')}
-      />
+      />}
       <EntryListSection
         title="Certifications"
         rows={at('certification').map(rowBuilders.certification)}
@@ -431,7 +432,7 @@ export function ProfileView({ userId }: Props) {
       <EntrySheet
         visible={!!scalarSheet}
         kind={null}
-        form={scalarSheet ? SCALAR_FORMS[scalarSheet] : undefined}
+        form={scalarSheet ? scalarFormFor(scalarSheet, profile.role) : undefined}
         initial={scalarSheet ? fromProfile(scalarSheet, profile!) : undefined}
         saving={saving}
         error={sheetError}

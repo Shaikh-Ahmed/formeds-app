@@ -50,7 +50,8 @@ export function FeedRail() {
       {/* Verification is the gate on posting, applying and messaging, so on
           desktop it gets persistent rail space instead of only appearing
           inside the composer. */}
-      {!isKycApproved && user ? (
+      {/* Students have no professional verification to complete. */}
+      {!isKycApproved && user && user.role !== 'student' ? (
         <View style={[styles.kycCard, copy.tone === 'navy' && styles.kycCardReview,
           copy.tone === 'danger' && styles.kycCardRejected]} testID="rail-kyc">
           <View style={styles.kycHead}>

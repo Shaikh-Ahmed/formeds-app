@@ -161,6 +161,10 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
                 <DrawerRow icon="grid-outline" label="Recruiter portal" iconColor={colors.recruiter}
                   onPress={() => go('/recruiter')} testID="drawer-recruiter" />
               ) : null}
+              {user?.role === 'student' ? (
+                <DrawerRow icon="compass-outline" label="Career preferences & visibility"
+                  onPress={() => go('/opportunities')} testID="drawer-opportunities" />
+              ) : null}
               {user?.role === 'healthcare_professional' ? (
                 <DrawerRow icon="compass-outline" label="Opportunities & availability"
                   onPress={() => go('/opportunities')} testID="drawer-opportunities" />
@@ -192,6 +196,13 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
                     iconColor={colors.teal}
                     onPress={() => go('/admin/locum')}
                     testID="drawer-admin-locum"
+                  />
+                  <DrawerRow
+                    icon="school-outline"
+                    label="Student accounts"
+                    iconColor={colors.teal}
+                    onPress={() => go('/admin/students')}
+                    testID="drawer-admin-students"
                   />
                 </>
               ) : null}

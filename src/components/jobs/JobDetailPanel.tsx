@@ -13,6 +13,8 @@ import {
   JobBadge, MetaItem, formatExperience, formatPay, formatShiftDates, formatTypeLine,
 } from './JobMeta';
 import { EMPLOYMENT_TYPE_LABELS, type Job } from '../../types/jobs';
+import { useAuth } from '../../context/AuthContext';
+import { acceptsRole, appliesForWork, eligibilityOf, isStudent } from '../../utils/roles';
 
 /**
  * The whole job page body, minus navigation.
@@ -47,6 +49,7 @@ export function JobDetailPanel({
   onViewOrganization?: (orgId: string) => void;
   embedded?: boolean;
 }) {
+  const { user } = useAuth();
   if (loading) return <JobDetailSkeleton />;
 
   if (!job) {
@@ -67,6 +70,9 @@ export function JobDetailPanel({
   const experience = formatExperience(job);
   const shiftDates = formatShiftDates(job);
   const closed = job.status !== 'active';
+  const eligibility = eligibilityOf(job);
+  // An applicant sees, before tapping, whether this posting takes them.
+  const notEligible = !!user && appliesForWork(user) && !acceptsRole(job, user.role);
 
   return (
     <ScrollView
@@ -114,6 +120,12 @@ export function JobDetailPanel({
             icon="briefcase-outline"
             tone="navy"
           />
+          {eligibility !== 'professionals' ? (
+            <JobBadge label={eligibility === 'students' ? 'Students only' : 'Open to students'} icon="school-outline"
+              tone="teal" />
+          ) : isStudent(user) ? (
+            <JobBadge label="Professionals only" icon="medkit-outline" tone="neutral" />
+          ) : null}
           {job.is_urgent ? <JobBadge label="Urgent" icon="alert-circle" tone="danger" /> : null}
           {closed ? <JobBadge label="Closed" icon="lock-closed-outline" tone="neutral" /> : null}
           {job.has_applied ? (
@@ -129,9 +141,10 @@ export function JobDetailPanel({
       {embedded ? (
         <View style={styles.actionRow}>
           <Button
-            label={job.has_applied ? 'Applied' : 'Apply now'}
+            label={job.has_applied ? 'Applied'
+              : notEligible ? (isStudent(user) ? 'Not open to students' : 'Students only') : 'Apply now'}
             onPress={onApply}
-            disabled={job.has_applied || closed}
+            disabled={job.has_applied || closed || notEligible}
             loading={applying}
             style={styles.applyBtn}
             testID="job-apply"

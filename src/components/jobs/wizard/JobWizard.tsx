@@ -15,6 +15,7 @@ import {
   todayString, validateAmount, validateDate, validateDateOrder, validateInteger,
 } from '../../../utils/validation';
 import { SPECIALTY_OPTIONS } from '../../../data/specialties';
+import { ELIGIBILITY_LABELS, type Eligibility } from '../../../utils/roles';
 import { STATE_NAMES, citiesForState } from '../../../data/indiaLocations';
 import { JobCard } from '../JobCard';
 import { JobDetailPanel } from '../JobDetailPanel';
@@ -57,6 +58,8 @@ export interface JobDraft {
   description: string;
   responsibilities: string;
   is_urgent: boolean;
+  /** Who may apply. Shift cover (locum/temporary) is professionals only. */
+  eligibility: Eligibility;
 }
 
 const EMPTY: JobDraft = {
@@ -67,6 +70,7 @@ const EMPTY: JobDraft = {
   pay_period: 'month', pay_min: '', pay_max: '', pay_disclosed: true,
   experience_min: '', skills: '', requirements: '',
   description: '', responsibilities: '', is_urgent: false,
+  eligibility: 'professionals',
 };
 
 const STEPS = [
@@ -136,6 +140,16 @@ export function JobWizard({
 
   const set = <K extends keyof JobDraft>(key: K, value: JobDraft[K]) =>
     setDraft(prev => ({ ...prev, [key]: value }));
+
+  // Changing the type keeps "who may apply" sensible: an internship opens to
+  // students by default, and shift cover is never open to them.
+  const setType = (t: EmploymentType) => setDraft(prev => ({
+    ...prev,
+    employment_type: t,
+    eligibility: isShiftRole(t)
+      ? 'professionals'
+      : t === 'internship' && prev.eligibility === 'professionals' ? 'both' : prev.eligibility,
+  }));
 
   const shift = isShiftRole(draft.employment_type);
   const needsCity = draft.work_mode !== 'remote';
@@ -226,6 +240,7 @@ export function JobWizard({
   const payload = () => ({
     title: draft.title.trim(),
     employment_type: draft.employment_type,
+    eligibility: shift ? 'professionals' : draft.eligibility,
     specialty: draft.specialty,
     department: draft.department.trim(),
     description: draft.description.trim(),
@@ -347,12 +362,28 @@ export function JobWizard({
                     key={t}
                     label={EMPLOYMENT_TYPE_LABELS[t]}
                     selected={draft.employment_type === t}
-                    onPress={() => set('employment_type', t)}
+                    onPress={() => setType(t)}
                     testID={`wizard-type-${t}`}
                   />
                 ))}
               </ChipRow>
             </Field>
+
+            {shift ? null : (
+              <Field label="Who can apply">
+                <ChipRow>
+                  {(Object.keys(ELIGIBILITY_LABELS) as Eligibility[]).map(e => (
+                    <Choice
+                      key={e}
+                      label={ELIGIBILITY_LABELS[e]}
+                      selected={draft.eligibility === e}
+                      onPress={() => set('eligibility', e)}
+                      testID={`wizard-eligibility-${e}`}
+                    />
+                  ))}
+                </ChipRow>
+              </Field>
+            )}
 
             <SelectField
               label="Specialty"
@@ -677,6 +708,7 @@ function usePreviewJob(draft: JobDraft, org: Organization | undefined, posterNam
     org_id: org?.id ?? null,
     posted_as: org ? 'organization' : 'individual',
     employment_type: draft.employment_type,
+    eligibility: draft.eligibility,
     title: draft.title.trim() || 'Untitled role',
     specialty: draft.specialty,
     department: draft.department,

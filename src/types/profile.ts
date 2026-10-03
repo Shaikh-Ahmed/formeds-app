@@ -187,7 +187,9 @@ export type OpenToOption =
   | 'consulting'
   | 'teaching'
   | 'research'
-  | 'mentorship';
+  | 'mentorship'
+  | 'internship'
+  | 'fellowship';
 
 export const OPEN_TO_LABELS: Record<OpenToOption, string> = {
   full_time: 'Full-time roles',
@@ -198,6 +200,8 @@ export const OPEN_TO_LABELS: Record<OpenToOption, string> = {
   teaching: 'Teaching',
   research: 'Research',
   mentorship: 'Mentorship',
+  internship: 'Internships',
+  fellowship: 'Fellowships',
 };
 
 export interface Availability {
@@ -247,6 +251,12 @@ export interface ProfileScalars {
   cover_photo?: string;
   role?: string;
   professional_role?: string;
+  /** Student accounts: education (see services/students.py). */
+  student_course?: string | null;
+  student_institution?: string | null;
+  student_university?: string | null;
+  student_year?: number | null;
+  graduation_year?: number | null;
   /** Legacy free-text specialty, still returned by the server. */
   specialty?: string;
   specialty_focus?: string;

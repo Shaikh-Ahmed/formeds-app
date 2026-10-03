@@ -6,7 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET, gloss, isPremium } from '../../theme';
 import { JobsModuleTabs } from './JobsModuleTabs';
 
-export type JobsSegment = 'discover' | 'saved' | 'applications' | 'posted';
+export type JobsSegment = 'discover' | 'internships' | 'saved' | 'applications' | 'posted';
 
 interface Segment {
   key: JobsSegment;
@@ -19,6 +19,15 @@ const SEEKER_SEGMENTS: Segment[] = [
   { key: 'discover', label: 'Discover', icon: 'compass-outline', href: '/jobs' },
   { key: 'saved', label: 'Saved', icon: 'bookmark-outline', href: '/jobs/saved' },
   { key: 'applications', label: 'Applications', icon: 'document-text-outline', href: '/jobs/applications' },
+];
+
+// Students: internships get their own place beside Discover. A student never
+// posts, so never sees Posted.
+const STUDENT_SEGMENTS: Segment[] = [
+  SEEKER_SEGMENTS[0],
+  { key: 'internships', label: 'Internships', icon: 'school-outline', href: '/jobs/internships' },
+  SEEKER_SEGMENTS[1],
+  SEEKER_SEGMENTS[2],
 ];
 
 const POSTED_SEGMENT: Segment = {
@@ -43,8 +52,9 @@ export function JobsSegmentedNav({ active }: { active: JobsSegment }) {
   const { isMobile } = useBreakpoint();
   const router = useRouter();
 
-  const canPost = !!user?.role;
-  const segments = canPost ? [...SEEKER_SEGMENTS, POSTED_SEGMENT] : SEEKER_SEGMENTS;
+  const student = user?.role === 'student';
+  const canPost = !!user?.role && !student;
+  const segments = student ? STUDENT_SEGMENTS : canPost ? [...SEEKER_SEGMENTS, POSTED_SEGMENT] : SEEKER_SEGMENTS;
 
   const content = (
     <View style={styles.row} accessibilityRole="tablist">
@@ -89,7 +99,8 @@ export function JobsSegmentedNav({ active }: { active: JobsSegment }) {
   // component gained when Locum arrived; the segments themselves are unchanged.
   return (
     <View>
-      <JobsModuleTabs active="jobs" />
+      {/* Locum is clinical cover; a student has no Jobs | Locum switch. */}
+      {student ? null : <JobsModuleTabs active="jobs" />}
       {isMobile ? (
         <ScrollView
           horizontal

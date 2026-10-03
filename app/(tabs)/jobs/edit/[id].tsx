@@ -14,6 +14,7 @@ import { fetchJob, setJobStatus, updateJob } from '../../../../src/api/jobs';
 import { fetchMyOrganizations } from '../../../../src/api/organizations';
 import type { Job } from '../../../../src/types/jobs';
 import type { Organization } from '../../../../src/types/organizations';
+import { eligibilityOf } from '../../../../src/utils/roles';
 
 /**
  * Editing an existing posting.
@@ -171,6 +172,7 @@ function toDraft(job: Job): Partial<JobDraft> {
     description: job.description ?? '',
     responsibilities: job.responsibilities ?? '',
     is_urgent: job.is_urgent,
+    eligibility: eligibilityOf(job),
   };
 }
 

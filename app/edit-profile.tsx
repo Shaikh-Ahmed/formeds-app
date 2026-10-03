@@ -13,6 +13,9 @@ import { STATE_NAMES, citiesForState, isCustomCity, OTHER_CITY } from '../src/da
 import { OTHER_SPECIALTY, PROFESSIONAL_ROLES, SPECIALTY_OPTIONS, SPECIALTIES } from '../src/data/specialties';
 import { colors, spacing, typography } from '../src/theme';
 import { PageColumn } from '../src/components/web';
+import {
+  StudentEducationFields, validateEducation, type StudentEducation, type EducationField,
+} from '../src/components/students/StudentEducationFields';
 
 export default function EditProfileScreen() {
   const { user, token, refreshUser } = useAuth();
@@ -55,14 +58,25 @@ export default function EditProfileScreen() {
   const isProfessional = user?.role === 'healthcare_professional';
   const isHospital = user?.role === 'hospital';
   const isClinic = user?.role === 'clinic';
+  const isStudent = user?.role === 'student';
+  const [education, setEducation] = useState<StudentEducation>({
+    course: user?.student_course ?? '',
+    institution: user?.student_institution ?? '',
+    university: user?.student_university ?? '',
+    current_year: user?.student_year ? String(user.student_year) : '',
+    graduation_year: user?.graduation_year ? String(user.graduation_year) : '',
+  });
+  const [educationErrors, setEducationErrors] = useState<Partial<Record<EducationField, string>>>({});
 
   const save = async () => {
     const nameProblem = name.trim() ? null : 'Name is required.';
     const expError = isProfessional ? validateInteger(experience, 'Years of experience', { max: 80 }) : null;
+    const eduProblems = isStudent ? validateEducation(education) : {};
     setNameError(nameProblem);
     setExperienceError(expError);
+    setEducationErrors(eduProblems);
     // Each problem is shown under its own field; nothing is sent.
-    if (nameProblem || expError) { setError(null); focusFirstInvalid(); return; }
+    if (nameProblem || expError || Object.keys(eduProblems).length) { setError(null); focusFirstInvalid(); return; }
     if (saving) return;
     setSaving(true); setError(null);
     try {
@@ -73,6 +87,9 @@ export default function EditProfileScreen() {
         payload.city = cityValue.trim();
         payload.state = state.trim();
         if (experience) payload.years_experience = Number(experience);
+      } else if (isStudent) {
+        payload.city = cityValue.trim();
+        payload.state = state.trim();
       } else if (isHospital) {
         payload.location = location.trim();
         payload.contact_person = contactPerson.trim();
@@ -82,6 +99,16 @@ export default function EditProfileScreen() {
       }
       // Passing `null` here sent no Authorization header, so every save 401'd.
       await apiFetch('/api/profile/update', token, { method: 'PUT', body: JSON.stringify(payload) });
+      if (isStudent) {
+        // Education is validated as a whole record by PATCH /profile/me.
+        await apiFetch('/api/profile/me', token, { method: 'PATCH', body: JSON.stringify({
+          student_course: education.course,
+          student_institution: education.institution.trim(),
+          student_university: education.university.trim(),
+          student_year: Number(education.current_year),
+          graduation_year: Number(education.graduation_year),
+        }) });
+      }
       await refreshUser();
       router.back();
     } catch (e: any) {
@@ -102,6 +129,21 @@ export default function EditProfileScreen() {
           <FormInput label="Full name" icon="person-outline" value={name} onChangeText={v => { setName(v); setNameError(null); }} placeholder="Your name" maxLength={120}
             error={nameError ?? undefined} testID="edit-name" />
 
+          {isStudent && (
+            <>
+              <Text style={styles.sectionLabel}>Education</Text>
+              <StudentEducationFields
+                value={education}
+                onChange={(field, v) => {
+                  setEducation(e => ({ ...e, [field]: v }));
+                  setEducationErrors(e => ({ ...e, [field]: undefined }));
+                }}
+                errors={educationErrors}
+                testIDPrefix="edit-student"
+              />
+            </>
+          )}
+
           {isProfessional && (
             <>
               <Text style={styles.sectionLabel}>Resume</Text>
@@ -110,6 +152,11 @@ export default function EditProfileScreen() {
                 onChange={setProfessionalRole} known={PROFESSIONAL_ROLES} maxLength={80} testID="edit-role" />
               <ListOrOther label="Specialty" icon="medical-outline" value={specialty}
                 onChange={setSpecialty} known={SPECIALTIES} options={SPECIALTY_OPTIONS} maxLength={120} testID="edit-specialty" />
+            </>
+          )}
+
+          {(isProfessional || isStudent) && (
+            <>
               {/* State first: it is what narrows the city list, and a city
                   picker with nothing in it reads as broken. */}
               <SelectField
@@ -146,10 +193,13 @@ export default function EditProfileScreen() {
                   maxLength={80}
                 />
               ) : null}
-              <NumberField label="Years of experience" suffix="years" value={experience} maxDigits={2}
-                onChangeText={v => { setExperience(v); setExperienceError(null); }} placeholder="e.g. 8"
-                error={experienceError} testID="edit-experience" />
             </>
+          )}
+
+          {isProfessional && (
+            <NumberField label="Years of experience" suffix="years" value={experience} maxDigits={2}
+              onChangeText={v => { setExperience(v); setExperienceError(null); }} placeholder="e.g. 8"
+              error={experienceError} testID="edit-experience" />
           )}
 
           {isHospital && (

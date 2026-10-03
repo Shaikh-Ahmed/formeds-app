@@ -42,6 +42,24 @@ function recruiterMayOpen(segments: string[]): boolean {
   return RECRUITER_JOB_SCREENS.has(third ?? '');
 }
 
+// Where a student may NOT go: employer and recruiter tools, locum shifts,
+// specialist listings and admin. The server refuses every one of these for a
+// student anyway; this keeps a student from landing on a screen that can only
+// say no. Everything else -- feed, jobs, internships, applications, learning,
+// AED, profile, messages -- is theirs.
+const STUDENT_BLOCKED_AREAS = new Set(['recruiter', 'admin', 'kyc']);
+const STUDENT_BLOCKED_JOB_SCREENS = new Set(['new', 'edit', 'applicants', 'posted', 'locum']);
+
+function studentMayOpen(segments: string[]): boolean {
+  const [first, second, third] = segments;
+  if (STUDENT_BLOCKED_AREAS.has(first ?? '')) return false;
+  if (first === 'org' && (second === 'new' || second === 'manage')) return false;
+  if (first !== '(tabs)') return true;
+  if (second === 'specialists') return false;
+  if (second === 'jobs') return !STUDENT_BLOCKED_JOB_SCREENS.has(third ?? '');
+  return true;
+}
+
 function RootNavigator() {
   const { user, loading, token, isKycApproved } = useAuth();
   const segments = useSegments();
@@ -99,6 +117,10 @@ function RootNavigator() {
       router.replace('/recruiter' as any);
       return;
     }
+    if (user?.role === 'student' && !inPublicArea && !studentMayOpen(segments as string[])) {
+      router.replace('/(tabs)/community');
+      return;
+    }
     if (user && inPublicArea) {
       // Recruiters have their own home and their own verification flow.
       if (user.role === 'recruiter') {
@@ -108,7 +130,8 @@ function RootNavigator() {
       // A signed-in user who still needs KYC lands there first. `isKycApproved`
       // owns the admin exemption so this screen and every KYC-gated control
       // agree on who is approved.
-      const needsKyc = !isKycApproved && !kycPrompted.current;
+      // Students have no council registration to verify, so never land there.
+      const needsKyc = user.role !== 'student' && !isKycApproved && !kycPrompted.current;
       kycPrompted.current = true;
       router.replace(needsKyc ? '/kyc' : '/(tabs)/community');
     }
@@ -144,6 +167,7 @@ function RootNavigator() {
       <Stack.Screen name="admin/kyc" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="admin/recruiters" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="admin/locum" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="admin/students" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="recruiter-register" />
       <Stack.Screen name="recruiter-login" />
       <Stack.Screen name="opportunities" options={{ animation: 'slide_from_right' }} />

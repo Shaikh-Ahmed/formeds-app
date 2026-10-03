@@ -14,6 +14,7 @@ import { JobListSkeleton } from './JobCardSkeleton';
 import { JobFilterBar } from './JobFilterBar';
 import { JobFiltersSheet } from './JobFiltersSheet';
 import { activeFilterCount, jobsPath, toggleSaveJob } from '../../api/jobs';
+import { acceptsRole, appliesForWork } from '../../utils/roles';
 import type { Job, JobFilters, JobSort } from '../../types/jobs';
 
 const SEARCH_DEBOUNCE_MS = 350;
@@ -41,6 +42,7 @@ export function JobsList({
   onSaveSearch,
   onQuickApply,
   appliedIds,
+  preset,
 }: {
   scrollProps?: CollapsibleScrollProps;
   contentInsetTop?: number;
@@ -55,10 +57,13 @@ export function JobsList({
   onQuickApply?: (job: Job) => void;
   /** Jobs applied to since the list loaded, so their cards say so at once. */
   appliedIds?: string[];
+  /** Filters the page fixes (e.g. a student's "open to students" / internships). */
+  preset?: JobFilters;
 }) {
   const { token, user } = useAuth();
-  // Only professionals apply; everyone else never sees the button.
-  const canApply = user?.role === 'healthcare_professional';
+  // Professionals and students apply -- each only where the posting takes
+  // them; employer and recruiter accounts never see the button.
+  const canApply = appliesForWork(user);
   const [copied, setCopied] = useState(false);
   useEffect(() => { if (copied) { const t = setTimeout(() => setCopied(false), 2200); return () => clearTimeout(t); } }, [copied]);
   const onShare = useCallback(async (job: Job) => {
@@ -71,8 +76,8 @@ export function JobsList({
 
   const debouncedSearch = useDebounced(search, SEARCH_DEBOUNCE_MS);
   const effective = useMemo<JobFilters>(
-    () => ({ ...filters, q: debouncedSearch.trim() || undefined }),
-    [filters, debouncedSearch],
+    () => ({ ...filters, ...preset, q: debouncedSearch.trim() || undefined }),
+    [filters, preset, debouncedSearch],
   );
 
   const path = useMemo(() => jobsPath(effective), [effective]);
@@ -138,7 +143,7 @@ export function JobsList({
           <JobCard
             item={appliedIds?.includes(item.id) ? { ...item, has_applied: true } : item}
             onShare={onShare}
-            onQuickApply={canApply ? onQuickApply : undefined}
+            onQuickApply={canApply && acceptsRole(item, user?.role) ? onQuickApply : undefined}
             selected={item.id === selectedId}
             compact={compact}
             onPress={() => onSelect(item)}

@@ -37,6 +37,11 @@ export interface GoogleCompleteInput {
   phone: string;
   professional_role?: string;
   use_google_photo?: boolean;
+  course?: string;
+  institution?: string;
+  university?: string;
+  current_year?: number;
+  graduation_year?: number;
 }
 
 export const completeGoogleSignup = (input: GoogleCompleteInput): Promise<GoogleSignInResult> =>

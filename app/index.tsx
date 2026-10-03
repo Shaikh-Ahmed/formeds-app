@@ -33,7 +33,9 @@ export default function WelcomeScreen() {
     );
   }
 
-  const roleCards = (['healthcare_professional', 'hospital', 'clinic'] as Role[]).map(role => {
+  // Student sits beside Healthcare Professional: both are people building a
+  // healthcare career; hospitals and clinics follow as employers.
+  const roleCards = (['healthcare_professional', 'student', 'hospital', 'clinic'] as Role[]).map(role => {
     const meta = ROLE_META[role];
     return (
       <Hoverable

@@ -337,6 +337,8 @@ export const SCALAR_FORMS: Record<ScalarFormKey, EntryForm> = {
           { value: 'teaching', label: 'Teaching' },
           { value: 'research', label: 'Research' },
           { value: 'mentorship', label: 'Mentorship' },
+          { value: 'internship', label: 'Internships' },
+          { value: 'fellowship', label: 'Fellowships' },
         ],
         helper: 'Visible to hospitals and clinics by default, not to other professionals.',
       },
@@ -424,4 +426,19 @@ export function normalizeEntryValues(form: EntryForm, values: Record<string, any
     if (f.type === 'number' && typeof v === 'string' && v !== '') out[f.key] = Number(v);
   }
   return out;
+}
+
+/**
+ * A scalar form as this account type sees it. A student is never offered
+ * locum (the server refuses it too).
+ */
+export function scalarFormFor(key: ScalarFormKey, role?: string | null): EntryForm {
+  const form = SCALAR_FORMS[key];
+  if (key !== 'availability' || role !== 'student') return form;
+  return {
+    ...form,
+    fields: form.fields.map(f => f.key === 'open_to' && f.options
+      ? { ...f, options: f.options.filter(o => o.value !== 'locum') }
+      : f),
+  };
 }

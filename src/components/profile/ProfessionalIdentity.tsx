@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../../theme';
 import { Profile, OPEN_TO_LABELS } from '../../types/profile';
 import { joinMeta } from './format';
+import { studentLine } from '../../utils/roles';
 
 interface Props {
   profile: Profile;
@@ -31,14 +32,19 @@ export function ProfessionalIdentity({
   // Comma, not the meta separator: 'Hyderabad, Telangana' is one location,
   // whereas 'Hyderabad · Telangana' reads as two unrelated facts.
   const location = [profile.city, profile.state].filter(Boolean).join(', ');
-  const primary = joinMeta(
-    profile.primary_specialization || profile.specialty || profile.professional_role,
-    profile.current_organization,
-    location,
-  );
-  const experience = profile.years_experience
+  const student = profile.role === 'student';
+  // A student is identified by what and where they study.
+  const primary = student
+    ? joinMeta(studentLine(profile), profile.student_institution, location)
+    : joinMeta(
+      profile.primary_specialization || profile.specialty || profile.professional_role,
+      profile.current_organization,
+      location,
+    );
+  const experience = !student && profile.years_experience
     ? `${profile.years_experience}+ years experience`
     : '';
+  const graduating = student && profile.graduation_year ? `Expected graduation ${profile.graduation_year}` : '';
   const openTo = (profile.availability?.open_to || []).slice(0, 2);
 
   return (
@@ -64,6 +70,7 @@ export function ProfessionalIdentity({
 
       {primary ? <Text style={styles.meta}>{primary}</Text> : null}
       {experience ? <Text style={styles.metaMuted}>{experience}</Text> : null}
+      {graduating ? <Text style={styles.metaMuted} testID="profile-graduation">{graduating}</Text> : null}
 
       {profile.account_verified ? (
         <View style={styles.verifiedRow}>

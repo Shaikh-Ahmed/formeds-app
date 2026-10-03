@@ -33,7 +33,7 @@ type Confirm = { kind: 'cancel' } | { kind: 'downgrade'; plan: Plan };
  * scheduled for the end of the period, and the page says exactly when.
  */
 export default function SubscriptionScreen() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const router = useRouter();
   const [view, setView] = useState<SubscriptionView | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -168,8 +168,9 @@ export default function SubscriptionScreen() {
                 <Text style={styles.renewal}>{renewalLine}</Text>
                 {!view.can_subscribe ? (
                   <Text style={styles.hint}>
-                    ProCare and MedElite are plans for healthcare professionals. Your organisation
-                    account includes AED on the Core allowance.
+                    {user?.role === 'student'
+                      ? 'ProCare and MedElite are plans for registered healthcare professionals. Your student account includes AED on the Core allowance.'
+                      : 'ProCare and MedElite are plans for healthcare professionals. Your organisation account includes AED on the Core allowance.'}
                   </Text>
                 ) : null}
                 {view.can_subscribe && sub ? (

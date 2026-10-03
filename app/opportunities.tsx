@@ -49,7 +49,8 @@ export default function OpportunitiesScreen() {
   const [tab, setTab] = useState<Tab>((['preferences', 'availability', 'invitations'].includes(params.tab || '')
     ? params.tab : 'preferences') as Tab);
 
-  if (user && user.role !== 'healthcare_professional') {
+  const student = user?.role === 'student';
+  if (user && user.role !== 'healthcare_professional' && !student) {
     return (
       <RecruiterScreen title="Opportunities">
         <Notice tone="neutral" title="For healthcare professionals"
@@ -58,21 +59,24 @@ export default function OpportunitiesScreen() {
     );
   }
 
+  // A student's career preferences: visibility and invitations to jobs and
+  // internships. Locum availability is for registered professionals.
+  const shown: Tab = student && tab === 'availability' ? 'preferences' : tab;
   return (
-    <RecruiterScreen title="Opportunities" testID="opportunities-screen">
-      <ChoiceChips value={tab} onChange={v => v && setTab(v)} testID="opportunities-tabs" choices={[
+    <RecruiterScreen title={student ? 'Career preferences' : 'Opportunities'} testID="opportunities-screen">
+      <ChoiceChips value={shown} onChange={v => v && setTab(v)} testID="opportunities-tabs" choices={[
         { value: 'preferences', label: 'Preferences', icon: 'options-outline' },
-        { value: 'availability', label: 'Availability', icon: 'calendar-outline' },
+        ...(student ? [] : [{ value: 'availability' as const, label: 'Availability', icon: 'calendar-outline' as const }]),
         { value: 'invitations', label: 'Invitations', icon: 'mail-outline' },
       ]} />
-      {tab === 'preferences' ? <Preferences /> : tab === 'availability' ? <Availability /> : <Invitations />}
+      {shown === 'preferences' ? <Preferences student={student} /> : shown === 'availability' ? <Availability /> : <Invitations />}
     </RecruiterScreen>
   );
 }
 
 // ── Preferences ─────────────────────────────────────────────────────────────
 
-function Preferences() {
+function Preferences({ student = false }: { student?: boolean }) {
   const { token } = useAuth();
   const [s, setS] = useState<DiscoverySettings | null>(null);
   const [cities, setCities] = useState<string[]>([]);
@@ -93,8 +97,10 @@ function Preferences() {
     if (!token) return;
     setSaving(true); setError(null);
     try {
-      const { city_known: _k, state: _s, ...body } = s;
-      setS(await saveDiscovery(token, body));
+      const { city_known: _k, state: _s, ...all } = s;
+      // A student never sends locum settings: the server refuses them.
+      const { available_for_locum: _l, locum_alerts: _a, locum_roles: _r, ...studentBody } = all;
+      setS(await saveDiscovery(token, (student ? studentBody : all) as typeof all));
       setSaved(true);
     } catch (e: any) {
       setError(e?.message || 'Could not save your preferences.');
@@ -106,11 +112,15 @@ function Preferences() {
   return (
     <>
       <Card title="Visibility" subtitle="All of these are off until you turn them on.">
-        <ToggleRow label="Open to job opportunities" value={s.open_to_jobs} onChange={v => update({ open_to_jobs: v })}
-          hint="Signals you'd consider new permanent or contract roles." testID="toggle-open-to-jobs" />
-        <ToggleRow label="Available for locum shifts" value={s.available_for_locum}
-          onChange={v => update({ available_for_locum: v })}
-          hint="Lets us alert you to shifts that fit your availability." testID="toggle-locum" />
+        <ToggleRow label={student ? 'Open to internships and jobs' : 'Open to job opportunities'} value={s.open_to_jobs}
+          onChange={v => update({ open_to_jobs: v })}
+          hint={student ? "Signals you'd consider internships and roles open to students." : "Signals you'd consider new permanent or contract roles."}
+          testID="toggle-open-to-jobs" />
+        {student ? null : (
+          <ToggleRow label="Available for locum shifts" value={s.available_for_locum}
+            onChange={v => update({ available_for_locum: v })}
+            hint="Lets us alert you to shifts that fit your availability." testID="toggle-locum" />
+        )}
         <ToggleRow label="Discoverable by verified recruiters" value={s.recruiter_discovery}
           onChange={v => update({ recruiter_discovery: v })}
           hint="Verified recruiters can find your public profile and invite you to apply. They never see your email, phone or exact location."
@@ -118,23 +128,27 @@ function Preferences() {
       </Card>
 
       <Card title="Location" subtitle="We only ever show your city and an approximate distance.">
-        <SelectField label="City you work from" value={s.city} onChange={city => update({ city })} options={cities}
+        <SelectField label={student ? 'City you study in' : 'City you work from'} value={s.city} onChange={city => update({ city })} options={cities}
           placeholder="Choose a city" searchPlaceholder="Search cities" testID="discovery-city" />
-        <ChoiceChips label="Alert me about locum shifts within" value={String(s.max_distance_km) as typeof DISTANCES[number]}
+        {student ? null : <ChoiceChips label="Alert me about locum shifts within" value={String(s.max_distance_km) as typeof DISTANCES[number]}
           onChange={v => v && update({ max_distance_km: Number(v) })} testID="discovery-distance"
-          choices={DISTANCES.map(d => ({ value: d, label: `${d} km` }))} />
+          choices={DISTANCES.map(d => ({ value: d, label: `${d} km` }))} />}
       </Card>
 
-      <Card title="Locum matching">
-        <MultiChips label="Roles you cover" options={LOCUM_ROLES} value={s.locum_roles}
-          onChange={v => update({ locum_roles: v })} testID="discovery-roles" />
-        <Text style={recruiterStyles.muted}>Leave empty to hear about every role.</Text>
-      </Card>
+      {student ? null : (
+        <Card title="Locum matching">
+          <MultiChips label="Roles you cover" options={LOCUM_ROLES} value={s.locum_roles}
+            onChange={v => update({ locum_roles: v })} testID="discovery-roles" />
+          <Text style={recruiterStyles.muted}>Leave empty to hear about every role.</Text>
+        </Card>
+      )}
 
       <Card title="Alerts">
-        <ToggleRow label="Locum shift matches" value={s.locum_alerts === 'immediate'}
-          onChange={v => update({ locum_alerts: v ? 'immediate' : 'off' })}
-          hint="A notification when a new shift matches your role, distance and availability." testID="toggle-locum-alerts" />
+        {student ? null : (
+          <ToggleRow label="Locum shift matches" value={s.locum_alerts === 'immediate'}
+            onChange={v => update({ locum_alerts: v ? 'immediate' : 'off' })}
+            hint="A notification when a new shift matches your role, distance and availability." testID="toggle-locum-alerts" />
+        )}
         <ToggleRow label="Recruiter invitations" value={s.invitation_alerts === 'immediate'}
           onChange={v => update({ invitation_alerts: v ? 'immediate' : 'off' })} testID="toggle-invite-alerts" />
       </Card>

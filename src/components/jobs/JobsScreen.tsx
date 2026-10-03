@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSubmit } from '../../hooks/useSubmit';
 import { ApiError } from '../../utils/api';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -17,6 +17,7 @@ import { ApplySheet, type ApplyExtras } from './ApplySheet';
 import { applyToJob, createJobAlert, fetchJob, toggleSaveJob } from '../../api/jobs';
 import { useCollapsibleHeader } from '../../hooks/useCollapsibleHeader';
 import type { Job, JobFilters } from '../../types/jobs';
+import { acceptsRole, appliesForWork, isStudent } from '../../utils/roles';
 
 /** Width of the list pane in the split view. See the arithmetic below. */
 const LIST_PANE = 400;
@@ -62,6 +63,17 @@ export function JobsScreen({
   const { token, user } = useAuth();
   const { isDesktop } = useBreakpoint();
   const router = useRouter();
+  const student = user?.role === 'student';
+  // A student's board shows what they can apply to; Internships narrows it.
+  const preset = useMemo<JobFilters | undefined>(() => {
+    if (segment === 'internships') return { audience: 'students', employment_type: ['internship'] };
+    return student ? { audience: 'students' } : undefined;
+  }, [segment, student]);
+  const emptyAction = student
+    ? (segment === 'internships'
+      ? { label: 'Browse all opportunities', onPress: () => router.replace('/jobs' as any) }
+      : undefined)
+    : undefined;
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -170,8 +182,9 @@ export function JobsScreen({
       onQuickApply={setApplyFor}
       appliedIds={appliedIds}
       compact={split}
+      preset={preset}
       emptyAction={
-        user?.role
+        student ? emptyAction : user?.role
           ? { label: 'Post an opportunity', onPress: () => router.push('/jobs/posted' as any) }
           : undefined
       }
@@ -226,8 +239,9 @@ export function JobsScreen({
               scrollProps={scrollProps}
               contentInsetTop={headerHeight}
               onSaveSearch={saveSearch}
+              preset={preset}
               emptyAction={
-                user?.role
+                student ? emptyAction : user?.role
                   ? { label: 'Post an opportunity', onPress: () => router.push('/jobs/new' as any) }
                   : undefined
               }
@@ -264,7 +278,10 @@ export function JobActionBar({
   onShare: () => void;
   bottomInset: number;
 }) {
+  const { user } = useAuth();
   const closed = job.status !== 'active';
+  // Applicants only where the posting takes their account type.
+  const notEligible = !!user && appliesForWork(user) && !acceptsRole(job, user.role);
   return (
     <View style={[styles.actionBar, { paddingBottom: bottomInset + spacing.md }]}>
       <Pressable
@@ -291,9 +308,10 @@ export function JobActionBar({
         <Ionicons name="share-social-outline" size={22} color={colors.textSecondary} />
       </Pressable>
       <Button
-        label={job.has_applied ? 'Applied' : closed ? 'Closed' : 'Apply now'}
+        label={job.has_applied ? 'Applied' : closed ? 'Closed'
+          : notEligible ? (isStudent(user) ? 'Not open to students' : 'Students only') : 'Apply now'}
         onPress={onApply}
-        disabled={job.has_applied || closed}
+        disabled={job.has_applied || closed || notEligible}
         style={styles.barApply}
         testID="job-apply"
       />
