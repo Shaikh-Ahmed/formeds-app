@@ -11,6 +11,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Animated } from 'react-native';
+import { focusScrollInset, type CollapsibleHeader } from '../../hooks/useCollapsibleHeader';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { Book } from '../../types/books';
@@ -41,9 +43,16 @@ const SPECIALTY_FILTERS = [
 
 interface Props {
   testID?: string;
+  /**
+   * Content that sits above the search box in the header -- the page's tabs.
+   * With `collapse`, it slides away with the search and chips.
+   */
+  topSlot?: React.ReactNode;
+  /** A collapsible header from useCollapsibleHeader: hides on scroll down. */
+  collapse?: CollapsibleHeader;
 }
 
-export function BooksCatalog({ testID }: Props) {
+export function BooksCatalog({ testID, topSlot, collapse }: Props) {
   const router = useRouter();
   const { token, user } = useAuth();
 
@@ -155,7 +164,9 @@ export function BooksCatalog({ testID }: Props) {
   }, [books]);
 
   return (
-    <View style={styles.container} testID={testID || 'books-catalog'}>
+    <View style={[styles.container, collapse && styles.collapseHost]} testID={testID || 'books-catalog'}>
+      <CollapsingHead collapse={collapse}>
+      {topSlot}
       {/* 1. Search Bar */}
       <View style={styles.searchBar}>
         <Ionicons name="search-outline" size={18} color={colors.textMuted} style={styles.searchIcon} />
@@ -206,15 +217,16 @@ export function BooksCatalog({ testID }: Props) {
           );
         })}
       </ScrollView>
+      </CollapsingHead>
 
       {/* 3. Catalog Body */}
       {loading && !refreshing ? (
-        <View style={styles.loadingContainer} testID="books-loading">
+        <View style={[styles.loadingContainer, collapse && { paddingTop: collapse.headerHeight }]} testID="books-loading">
           <ActivityIndicator size="large" color={colors.navy} />
           <Text style={styles.loadingText}>Loading medical library...</Text>
         </View>
       ) : error ? (
-        <View style={styles.errorContainer} testID="books-error">
+        <View style={[styles.errorContainer, collapse && { paddingTop: collapse.headerHeight + 60 }]} testID="books-error">
           <Ionicons name="alert-circle-outline" size={44} color={colors.redText} />
           <Text style={styles.errorTitle}>Could not load catalog</Text>
           <Text style={styles.errorSubtitle}>{error}</Text>
@@ -224,7 +236,8 @@ export function BooksCatalog({ testID }: Props) {
         </View>
       ) : (
         <FlatList
-          style={styles.flatList}
+          style={[styles.flatList, collapse ? focusScrollInset(collapse.headerHeight) : null]}
+          {...(collapse ? collapse.scrollProps : {})}
           data={books}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
@@ -234,7 +247,7 @@ export function BooksCatalog({ testID }: Props) {
               onToggleFavorite={handleToggleFavorite}
             />
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, collapse && { paddingTop: collapse.headerHeight }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -341,10 +354,26 @@ export function BooksCatalog({ testID }: Props) {
   );
 }
 
+/**
+ * Tabs + search + chips. With a collapsible header they float over the list
+ * (which is inset by their height) and slide out of the way on scroll.
+ */
+function CollapsingHead({ collapse, children }: { collapse?: CollapsibleHeader; children: React.ReactNode }) {
+  if (!collapse) return <>{children}</>;
+  return (
+    <Animated.View style={[styles.floatingHead, collapse.headerStyle]} onLayout={collapse.onHeaderLayout}>
+      {children}
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  // The list scrolls under the header; the host clips it as it slides away.
+  collapseHost: { overflow: 'hidden' },
+  floatingHead: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2, backgroundColor: colors.bg },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',

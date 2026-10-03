@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ComingSoon, BooksCatalog, ResearchCatalog } from '../../src/components';
+import { useCollapsibleHeader } from '../../src/hooks/useCollapsibleHeader';
 import { useAuth } from '../../src/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { PageGrid, ProfileRail } from '../../src/components/web';
@@ -51,6 +52,30 @@ export default function LearningScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('books');
   const active = TABS.find(t => t.key === activeTab)!;
   const { isMobile } = useBreakpoint();
+  // Books and Research: tabs, search and chips slide away on scroll down and
+  // come back on scroll up, as on Jobs and the feed.
+  const collapse = useCollapsibleHeader();
+  const catalog = activeTab === 'books' || activeTab === 'research';
+  const switchTab = (key: TabKey) => { setActiveTab(key); collapse.reveal(true); };
+
+  const tabs = (
+      <View style={[styles.tabBar, !isMobile && styles.tabBarWide, isPremium && styles.cBar, isPremium && isMobile && styles.cBarMobile]}>
+        {TABS.map(t => (
+          <TouchableOpacity
+            key={t.key}
+            testID={`tab-${t.key}`}
+            style={[styles.tab, activeTab === t.key && styles.tabActive, isPremium && styles.cTab, isPremium && activeTab === t.key && styles.cTabActive]}
+            onPress={() => switchTab(t.key)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === t.key }}
+            accessibilityLabel={t.key === 'books' ? t.label : `${t.label} — coming soon`}
+          >
+            <Ionicons name={t.icon} size={16} color={activeTab === t.key ? (isPremium ? colors.teal : colors.textOnDark) : colors.textSubtle} />
+            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive, isPremium && styles.cTabText, isPremium && activeTab === t.key && styles.cTabTextActive]}>{t.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
@@ -80,30 +105,15 @@ export default function LearningScreen() {
       </View>
       ) : null}
 
-      <View style={[styles.tabBar, !isMobile && styles.tabBarWide, isPremium && styles.cBar, isPremium && isMobile && styles.cBarMobile]}>
-        {TABS.map(t => (
-          <TouchableOpacity
-            key={t.key}
-            testID={`tab-${t.key}`}
-            style={[styles.tab, activeTab === t.key && styles.tabActive, isPremium && styles.cTab, isPremium && activeTab === t.key && styles.cTabActive]}
-            onPress={() => setActiveTab(t.key)}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === t.key }}
-            accessibilityLabel={t.key === 'books' ? t.label : `${t.label} — coming soon`}
-          >
-            <Ionicons name={t.icon} size={16} color={activeTab === t.key ? (isPremium ? colors.teal : colors.textOnDark) : colors.textSubtle} />
-            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive, isPremium && styles.cTabText, isPremium && activeTab === t.key && styles.cTabTextActive]}>{t.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {catalog ? null : tabs}
 
       {activeTab === 'books' ? (
         <View style={styles.booksWrapper}>
-          <BooksCatalog />
+          <BooksCatalog topSlot={<View style={styles.slotPad}>{tabs}</View>} collapse={collapse} />
         </View>
       ) : activeTab === 'research' ? (
         <View style={styles.booksWrapper}>
-          <ResearchCatalog />
+          <ResearchCatalog topSlot={<View style={styles.slotPad}>{tabs}</View>} collapse={collapse} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
@@ -157,6 +167,8 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.action, ...gloss.fill },
   tabText: { fontSize: 13, fontWeight: '600', color: colors.textSubtle },
   tabTextActive: { color: colors.textOnDark },
+  // The tabs inside the floating header keep the gap they had above the search.
+  slotPad: { paddingBottom: spacing.sm },
   // Premium: the shared tonal segmented control (slate track, white thumb).
   cBar: { backgroundColor: colors.bgMuted, borderColor: colors.bgMuted, padding: 4, gap: 4, borderRadius: radius.pill },
   cBarMobile: { marginHorizontal: spacing.lg, marginVertical: spacing.xs },
