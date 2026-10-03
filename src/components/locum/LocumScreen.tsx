@@ -195,12 +195,9 @@ export function LocumScreen({ selectedId = null }: { selectedId?: string | null 
   return (
     <View style={styles.flex}>
       <PageGrid fluid testID="locum-grid">
-        <View style={styles.header}>
-          <Text style={styles.h1} accessibilityRole="header">Locum shifts</Text>
-          <Text style={styles.sub}>
-            Short-notice cover from hospitals and clinics — apply in one tap.
-          </Text>
-        </View>
+        {/* No visible page title -- the tabs say where you are. The heading
+            stays for screen readers, which navigate by headings. */}
+        <Text style={styles.srOnly} accessibilityRole="header">Locum shifts</Text>
         <LocumNav active="discover" />
         {user?.role === 'healthcare_professional' ? (
           <View style={styles.notice}><KycNotice action="apply for locums" /></View>
@@ -255,9 +252,7 @@ export function LocumScreen({ selectedId = null }: { selectedId?: string | null 
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: { paddingTop: isPremium ? spacing.lg : spacing.xl, paddingHorizontal: spacing.lg, gap: isPremium ? 2 : spacing.xs, paddingBottom: isPremium ? 0 : spacing.sm },
-  h1: { ...typography.h2, color: colors.text },
-  sub: { ...typography.caption, color: colors.textSecondary, lineHeight: 20 },
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
   notice: { paddingHorizontal: spacing.lg },
   postRow: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, alignItems: 'flex-start' },
 

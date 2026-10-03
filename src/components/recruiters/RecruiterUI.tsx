@@ -232,14 +232,19 @@ export function RecruiterScreen({
     );
   }
 
+  // No visible page title or subtitle -- the portal's nav says where you are.
+  // The heading stays for screen readers; a page action (e.g. "Post a job")
+  // keeps its place on the right.
   const heading = hideTitle ? null : (
-    <View style={styles.pageHead}>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={styles.pageTitle} accessibilityRole="header">{title}</Text>
-        {subtitle ? <Text style={styles.pageSubtitle}>{subtitle}</Text> : null}
-      </View>
-      {right}
-    </View>
+    <>
+      <Text style={styles.srOnly} accessibilityRole="header">{title}</Text>
+      {right ? (
+        <View style={styles.pageHead}>
+          <View style={{ flex: 1, minWidth: 0 }} />
+          {right}
+        </View>
+      ) : null}
+    </>
   );
 
   // The rail from laptop widths up: the app's own desktop breakpoint (1128)
@@ -268,7 +273,7 @@ export function RecruiterScreen({
         <PortalNav active={active} />
         <FormScrollView style={styles.flex} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled"
           refreshControl={refresh}>
-          {isMobile ? (subtitle && !hideTitle ? <Text style={styles.pageSubtitle}>{subtitle}</Text> : null) : heading}
+          {isMobile ? null : heading}
           {children}
         </FormScrollView>
       </PageColumn>
@@ -455,6 +460,7 @@ export const recruiterStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
   safe: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.md },
@@ -485,8 +491,6 @@ const styles = StyleSheet.create({
   },
   wideScroll: { paddingTop: spacing.xxl, paddingBottom: spacing.xxxl * 2, gap: spacing.lg },
   pageHead: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md, marginBottom: spacing.xs },
-  pageTitle: { ...typography.h1, color: colors.text },
-  pageSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: 2 },
 
   rail: { width: 248, paddingTop: spacing.xxl, gap: spacing.lg },
   railCard: {

@@ -55,14 +55,13 @@ export default function LearningScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={[]}>
       <PageGrid left={<ProfileRail />} testID="learning-grid">
+      {/* No visible page title (the tabs say where you are); the heading stays
+          for screen readers. Admins keep their Upload action here. */}
+      <Text style={styles.srOnly} accessibilityRole="header">Learning Hub</Text>
+      {user?.is_admin ? (
       <View style={[styles.wideTitleWrap, isMobile && styles.titleWrapMobile]}>
         <View style={styles.headerRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.wideTitle} accessibilityRole="header">Learning Hub</Text>
-            <Text style={styles.wideSubtitle}>
-              Reference texts, accredited CME and peer-reviewed research, in one place.
-            </Text>
-          </View>
+          <View style={{ flex: 1 }} />
           {user?.is_admin && (
             <TouchableOpacity
               style={styles.adminHeaderUploadBtn}
@@ -79,6 +78,7 @@ export default function LearningScreen() {
           )}
         </View>
       </View>
+      ) : null}
 
       <View style={[styles.tabBar, !isMobile && styles.tabBarWide, isPremium && styles.cBar, isPremium && isMobile && styles.cBarMobile]}>
         {TABS.map(t => (
@@ -126,11 +126,10 @@ export default function LearningScreen() {
 }
 
 const styles = StyleSheet.create({
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
   safe: { flex: 1, backgroundColor: colors.bg },
   wideTitleWrap: { paddingTop: spacing.xxl, paddingBottom: spacing.lg },
   titleWrapMobile: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
-  wideTitle: { ...typography.h2, color: colors.text },
-  wideSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   tabBar: {
     flexDirection: 'row',
     backgroundColor: colors.white,
