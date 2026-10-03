@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     alignSelf: 'flex-start',
     paddingHorizontal: spacing.md,
-    minHeight: isPremium ? 32 : 36,
+    minHeight: isPremium ? 28 : 36,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: isPremium ? colors.border : colors.navy,

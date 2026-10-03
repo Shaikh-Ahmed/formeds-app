@@ -66,7 +66,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs,
     paddingHorizontal: spacing.md,
-    minHeight: isPremium ? 30 : 38,
+    minHeight: isPremium ? 26 : 38,
+    ...(isPremium ? { paddingHorizontal: spacing.sm + 2 } : {}),
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
@@ -74,7 +75,7 @@ const styles = StyleSheet.create({
     ...gloss.glass,
   },
   chipOn: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
-  text: isPremium ? { fontSize: 12, lineHeight: 16, fontFamily: fonts.body.regular, color: colors.textSecondary }
+  text: isPremium ? { fontSize: 11.5, lineHeight: 15, fontFamily: fonts.body.regular, color: colors.textSecondary }
     : { ...typography.caption, color: colors.textSecondary },
   textOn: { color: colors.white, fontFamily: fonts.body.semibold },
   pressed: { opacity: 0.7 },

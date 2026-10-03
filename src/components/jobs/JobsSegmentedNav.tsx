@@ -63,14 +63,14 @@ export function JobsSegmentedNav({ active }: { active: JobsSegment }) {
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={segment.label}
-            hitSlop={isPremium ? { top: 7, bottom: 7, left: 3, right: 3 } : undefined}
+            hitSlop={isPremium ? { top: 8, bottom: 8, left: 2, right: 2 } : undefined}
             style={({ pressed }) => [
               styles.segment, isPremium && styles.cSegment, selected && styles.segmentActive, pressed && styles.pressed,
             ]}
           >
             <Ionicons
               name={segment.icon}
-              size={isPremium ? 14 : 16}
+              size={isPremium ? 13 : 16}
               color={selected ? colors.white : colors.textSecondary}
             />
             <Text style={[styles.label, isPremium && styles.cLabel, selected && styles.labelActive]}>{segment.label}</Text>
@@ -127,6 +127,6 @@ const styles = StyleSheet.create({
   labelActive: { color: colors.white, fontFamily: fonts.body.semibold },
   pressed: { opacity: 0.7 },
   // Premium: compact segments (touch area restored by hit slop).
-  cSegment: { minHeight: 32, paddingHorizontal: spacing.md, gap: 5 },
-  cLabel: { fontSize: 12.5, lineHeight: 17 },
+  cSegment: { minHeight: 28, paddingHorizontal: spacing.sm + 2, gap: 4 },
+  cLabel: { fontSize: 12, lineHeight: 16 },
 });

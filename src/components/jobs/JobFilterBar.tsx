@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET, gloss, isPremium } from '../../theme';
@@ -86,7 +86,7 @@ export function JobFilterBar({
         >
           <Ionicons
             name="options-outline"
-            size={isPremium ? 15 : 18}
+            size={isPremium ? 14 : 18}
             color={activeCount ? colors.white : colors.text}
           />
           <Text style={[styles.filterText, isPremium && styles.cFilterText, activeCount > 0 && styles.filterTextActive]}>
@@ -95,7 +95,9 @@ export function JobFilterBar({
         </Pressable>
       </View>
 
-      <View style={styles.sortRow} accessibilityRole="tablist">
+      {/* Premium keeps the sorts on ONE line: compact enough to fit the list
+          pane, and scrollable sideways (never clipped) if a pane is narrower. */}
+      <SortRow>
         {SORTS.map(key => {
           const active = sort === key;
           const label = key === 'newest' && searching ? 'Newest matches' : SORT_LABELS[key];
@@ -107,7 +109,7 @@ export function JobFilterBar({
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={`Sort by ${label}`}
-              hitSlop={isPremium ? { top: 7, bottom: 7, left: 3, right: 3 } : undefined}
+              hitSlop={isPremium ? { top: 9, bottom: 9, left: 2, right: 2 } : undefined}
               style={({ pressed }) => [
                 styles.sortChip,
                 isPremium && styles.cSortChip,
@@ -119,7 +121,7 @@ export function JobFilterBar({
             </Pressable>
           );
         })}
-      </View>
+      </SortRow>
 
       {resultLabel ? (
         // One atomic status string, not a bare number: a screen reader
@@ -134,6 +136,18 @@ export function JobFilterBar({
         </Text>
       ) : null}
     </View>
+  );
+}
+
+function SortRow({ children }: { children: React.ReactNode }) {
+  if (!isPremium) {
+    return <View style={styles.sortRow} accessibilityRole="tablist">{children}</View>;
+  }
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist"
+      contentContainerStyle={styles.cSortRow} style={styles.cSortScroller}>
+      {children}
+    </ScrollView>
   );
 }
 
@@ -154,12 +168,12 @@ const styles = StyleSheet.create({
     // Premium: search is a compact recessed pill, as in the header.
     ...(isPremium ? {
       backgroundColor: colors.bgMuted, borderColor: 'transparent', borderRadius: radius.pill, paddingHorizontal: spacing.md + 2,
-      minHeight: 38,
+      minHeight: 34,
       ...(Platform.OS === 'web' ? ({ boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)' } as object) : {}),
     } : {}),
   },
   searchInput: isPremium
-    ? { flex: 1, fontSize: 13, fontFamily: fonts.body.medium, color: colors.text, paddingVertical: 6 }
+    ? { flex: 1, fontSize: 12.5, fontFamily: fonts.body.medium, color: colors.text, paddingVertical: 5 }
     : { flex: 1, ...typography.body, color: colors.text, paddingVertical: spacing.sm },
 
   filterBtn: {
@@ -198,9 +212,11 @@ const styles = StyleSheet.create({
 
   resultCount: { ...typography.caption, color: colors.textSecondary },
   // -- Premium: compact controls (touch area restored by hit slop) -----------
-  cFilterBtn: { minHeight: 38, paddingHorizontal: spacing.md, gap: 5 },
-  cFilterText: { fontSize: 13, lineHeight: 17 },
-  cSortChip: { minHeight: 30, paddingVertical: 4, paddingHorizontal: spacing.md },
-  cSortText: { fontSize: 12, lineHeight: 16 },
+  cFilterBtn: { minHeight: 34, paddingHorizontal: spacing.sm + 2, gap: 4 },
+  cFilterText: { fontSize: 12.5, lineHeight: 16 },
+  cSortScroller: { flexGrow: 0 },
+  cSortRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 5, alignItems: 'center' },
+  cSortChip: { minHeight: 26, paddingVertical: 3, paddingHorizontal: spacing.sm + 2 },
+  cSortText: { fontSize: 11.5, lineHeight: 15 },
   pressed: { opacity: 0.7 },
 });

@@ -105,10 +105,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     ...gloss.glass,
     // Premium: compact segments, as on Jobs.
-    ...(isPremium ? { minHeight: 32, gap: 5 } : {}),
+    ...(isPremium ? { minHeight: 28, gap: 4, paddingHorizontal: spacing.sm + 2 } : {}),
   },
   segmentActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
-  label: isPremium ? { fontSize: 12.5, lineHeight: 17, fontFamily: fonts.body.regular, color: colors.textSecondary }
+  label: isPremium ? { fontSize: 12, lineHeight: 16, fontFamily: fonts.body.regular, color: colors.textSecondary }
     : { ...typography.caption, color: colors.textSecondary },
   labelActive: { color: colors.white, fontFamily: fonts.body.semibold },
   pressed: { opacity: 0.7 },
