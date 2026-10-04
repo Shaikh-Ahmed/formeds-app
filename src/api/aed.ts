@@ -95,6 +95,11 @@ export function aedErrorMessage(e: any): string {
     case 'aed_file_too_large':
     case 'aed_tokens_exhausted':
     case 'aed_upgrade_required':
+    case 'aed_verification_required':
+    case 'aed_run_in_progress':
+    case 'aed_duplicate_request':
+    case 'aed_wallet_busy':
+    case 'not_your_session':
       return e.message;
     case 'aed_empty':
     case 'aed_unavailable':

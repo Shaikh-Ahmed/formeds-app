@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from './colors';
 
-export type Role = 'healthcare_professional' | 'hospital' | 'clinic' | 'recruiter' | 'Official' ;
+// Keys are lower case: getRoleMeta() normalises, so the backend's "Official"
+// (feed newsletter posts) resolves to `official`.
+export type Role = 'healthcare_professional' | 'hospital' | 'clinic' | 'recruiter' | 'official';
 
 export interface RoleMeta {
   /** Short label for badges (feed, people cards). */

@@ -206,6 +206,18 @@ async function rawFetch(path: string, token: string | null | undefined, options:
   }
 }
 
+/**
+ * After a 401: refresh the session once. Resolves to the new access token, or
+ * null after signing the user out -- the same rule apiFetch follows, for
+ * callers that make their own requests (the AED stream).
+ */
+export async function refreshAfterUnauthorized(): Promise<string | null> {
+  if (!authHandlers) return null;
+  const newToken = await authHandlers.refreshTokens();
+  if (!newToken) await authHandlers.onAuthFailure();
+  return newToken;
+}
+
 export async function apiFetch(path: string, token?: string | null, options: ApiFetchOptions = {}) {
   let res = await rawFetch(path, token, options);
 

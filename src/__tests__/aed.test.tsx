@@ -9,8 +9,10 @@ import { aedErrorMessage } from '../api/aed';
  * words with a way to retry -- never as a stack trace or a made-up answer.
  */
 
+const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
+  useLocalSearchParams: () => ({}),
 }));
 jest.mock('expo-image-picker', () => ({
   requestMediaLibraryPermissionsAsync: jest.fn(async () => ({ granted: false })),
@@ -46,8 +48,33 @@ jest.mock('../api/subscriptions', () => ({
   fetchPlans: jest.fn(async () => ({ plans: [], features: [], token_costs: [] })),
 }));
 
+// The AED agent client. By default the backend "has no agent" (config is
+// null), so the classic tests above exercise the legacy endpoints; the agent
+// tests below switch it on.
+const mockConfig = jest.fn<Promise<any>, any[]>(async () => null);
+const mockStream = jest.fn();
+const mockFeedback = jest.fn<Promise<any>, any[]>(async () => ({ id: 'f1' }));
+jest.mock('../api/aedMemory', () => {
+  const actual = jest.requireActual('../api/aedMemory');
+  return { ...actual, sendFeedback: (...args: any[]) => mockFeedback(...args) };
+});
+
+jest.mock('../api/aedStream', () => {
+  const actual = jest.requireActual('../api/aedStream');
+  return {
+    ...actual,
+    fetchAedConfig: (...args: any[]) => mockConfig(...args),
+    streamAedRun: (...args: any[]) => mockStream(...args),
+    runAedWithFile: jest.fn(),
+    fetchAgentConversation: jest.fn(async () => ({ messages: [] })),
+    clearAgentConversation: jest.fn(async () => ({})),
+  };
+});
+
 // eslint-disable-next-line import/first
 import AEDChatScreen from '../../app/aed-chat';
+// eslint-disable-next-line import/first
+import { SSEParser } from '../api/aedStream';
 
 describe('parseMarkdown', () => {
   it('reads the structure AED answers use', () => {
@@ -196,5 +223,212 @@ describe('AED and the token allowance', () => {
     fireEvent.changeText(screen.getByTestId('aed-chat-input'), 'Summarize the evidence on statins');
     await act(async () => { fireEvent.press(screen.getByTestId('aed-send-btn')); });
     await waitFor(() => expect(screen.getByTestId('aed-limited')).toBeTruthy());
+  });
+});
+
+describe('SSEParser', () => {
+  it('reassembles events however the network chunks them', () => {
+    const raw = 'id: 1\nevent: meta\ndata: {"type":"meta","seq":1}\n\n: ping\n\nid: 2\nevent: token\ndata: {"type":"token","text":"Hi [1]"}\n\n';
+    for (const size of [1, 3, 7, raw.length]) {
+      const p = new SSEParser();
+      const out: any[] = [];
+      for (let i = 0; i < raw.length; i += size) out.push(...p.feed(raw.slice(i, i + size)));
+      expect(out).toEqual([{ type: 'meta', seq: 1 }, { type: 'token', text: 'Hi [1]' }]);
+    }
+  });
+});
+
+describe('AED agent (streamed answers)', () => {
+  const CONFIG = {
+    contract_version: 1, available: true,
+    disclosure: 'AED is an AI assistant for healthcare professionals.', disclosure_version: 'v',
+    features: { streaming: true, think_deeper: true, deep_research: false, document_analysis: false, image_analysis: false },
+    token_costs: { standard: 1, thinking: 8 },
+  };
+  const SOURCE = { n: 1, source: 'PubMed', id: '36914068', title: 'SGLT2 inhibitors and outcomes', year: '2023',
+                   url: 'https://pubmed.ncbi.nlm.nih.gov/36914068/', evidence_type: 'meta_analysis' };
+  const FINAL = {
+    response: 'SGLT2 inhibitors reduce admissions [1].', conversation_id: 'aed-u1-abc', intent: 'MEDICAL_RESEARCH',
+    mode: 'instant', request_type: 'standard', urgent: false, outcome: 'answered', sources: [SOURCE], cited: [1],
+    tokens_charged: 1, answered_locally: false, limited_by_plan: null, missing_information: [],
+    aed_tokens: { plan_code: 'core', allocated: 100, used: 1, remaining: 99, period_start: '', resets_at: '', low: false, exhausted: false },
+  };
+
+  beforeEach(() => {
+    mockConfig.mockResolvedValue(CONFIG);
+    mockStream.mockReset();
+    mockAsk.mockReset();
+  });
+  afterAll(() => mockConfig.mockResolvedValue(null));
+
+  async function ask(text: string) {
+    await waitFor(() => expect(screen.getByTestId('aed-disclosure')).toBeTruthy());
+    fireEvent.changeText(screen.getByTestId('aed-chat-input'), text);
+    await act(async () => { fireEvent.press(screen.getByTestId('aed-send-btn')); });
+  }
+
+  it('marks same-day answers as urgent, and routine ones not at all', async () => {
+    mockStream.mockImplementation(async (_t: string, _input: any, onEvent: (e: any) => void) => {
+      onEvent({ type: 'meta', conversation_id: 'aed-u1-abc', run_id: 'r1', mode: 'thinking', request_type: 'standard',
+                tokens_charged: 1, urgency: 'same_day' });
+      return { ...FINAL, urgency: 'same_day' };
+    });
+    render(<AEDChatScreen />);
+    await ask('58-year-old with chest discomfort, ST depression and a raised troponin. Next step?');
+    await waitFor(() => expect(screen.getByTestId('aed-urgency')).toBeTruthy());
+    expect(screen.getByText('URGENT · SAME DAY')).toBeTruthy();
+
+    mockStream.mockImplementation(async () => ({ ...FINAL, urgency: 'routine' }));
+    fireEvent.changeText(screen.getByTestId('aed-chat-input'), 'What is the mechanism of action of metformin?');
+    await act(async () => { fireEvent.press(screen.getByTestId('aed-send-btn')); });
+    await waitFor(() => expect(screen.getAllByTestId('aed-answer')).toHaveLength(2));
+    expect(screen.getAllByTestId('aed-urgency')).toHaveLength(1);
+  });
+
+  it('says plainly when a chat could not be saved', async () => {
+    mockConfig.mockResolvedValue({ ...CONFIG, features: { ...CONFIG.features, saved_history: true } });
+    mockStream.mockImplementation(async (_t: string, _input: any, onEvent: (e: any) => void) => {
+      onEvent({ type: 'meta', conversation_id: 'aed-u1-abc', run_id: 'r1', mode: 'instant', request_type: 'standard', tokens_charged: 1 });
+      return { ...FINAL, saved: false };
+    });
+    render(<AEDChatScreen />);
+    await ask('Do SGLT2 inhibitors reduce heart failure admissions?');
+    await waitFor(() => expect(screen.getByTestId('aed-not-saved')).toBeTruthy());
+  });
+
+  it('starts a new chat without deleting the previous one, which stays saved', async () => {
+    const { clearAgentConversation } = jest.requireMock('../api/aedStream');
+    mockStream.mockImplementation(async (_t: string, _input: any, onEvent: (e: any) => void) => {
+      onEvent({ type: 'meta', conversation_id: 'aed-u1-abc', mode: 'instant', request_type: 'standard', tokens_charged: 1 });
+      return { ...FINAL, saved: true };
+    });
+    render(<AEDChatScreen />);
+    await ask('Do SGLT2 inhibitors reduce heart failure admissions?');
+    await waitFor(() => expect(screen.getByTestId('aed-answer')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('aed-new-chat'));
+    await waitFor(() => expect(screen.getByTestId('aed-welcome')).toBeTruthy());
+    expect(clearAgentConversation).not.toHaveBeenCalled();
+    expect(screen.getByTestId('aed-new-chat')).toBeTruthy();          // always there, even on an empty chat
+  });
+
+  it('streams through the agent, then shows the checked answer with numbered sources', async () => {
+    mockStream.mockImplementation(async (_t: string, _input: any, onEvent: (e: any) => void) => {
+      onEvent({ type: 'meta', conversation_id: 'aed-u1-abc', mode: 'instant', request_type: 'standard', tokens_charged: 1 });
+      onEvent({ type: 'status', stage: 'searching', label: 'Searching PubMed' });
+      onEvent({ type: 'sources', items: [SOURCE] });
+      onEvent({ type: 'token', text: 'SGLT2 inhibitors reduce' });
+      return FINAL;
+    });
+    render(<AEDChatScreen />);
+    expect(await screen.findByText(CONFIG.disclosure)).toBeTruthy();
+    await ask('Summarize the evidence for SGLT2 inhibitors');
+
+    expect(mockAsk).not.toHaveBeenCalled();
+    expect(mockStream.mock.calls[0][1]).toMatchObject({ message: 'Summarize the evidence for SGLT2 inhibitors', mode: 'auto' });
+    await waitFor(() => expect(screen.getByTestId('aed-evidence-toggle')).toBeTruthy());
+    expect(screen.queryByTestId('aed-source-1')).toBeNull();              // evidence folds away by default
+    fireEvent.press(screen.getByTestId('aed-evidence-toggle'));
+    expect(screen.getByTestId('aed-source-1')).toBeTruthy();
+    expect(screen.getByTestId('aed-cite-1')).toBeTruthy();
+    expect(screen.queryByTestId('aed-status')).toBeNull();      // finished: no progress line
+  });
+
+  it('sends Think deeper when the member turns it on', async () => {
+    mockStream.mockResolvedValue({ ...FINAL, mode: 'thinking', request_type: 'thinking' });
+    render(<AEDChatScreen />);
+    await waitFor(() => expect(screen.getByTestId('aed-think-deeper')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('aed-think-deeper'));
+    await ask('Work up this case');
+    expect(mockStream.mock.calls[0][1].mode).toBe('thinking');
+  });
+
+  it('shows Think deeper as locked on a plan without it', async () => {
+    mockConfig.mockResolvedValue({ ...CONFIG, features: { ...CONFIG.features, think_deeper: false } });
+    render(<AEDChatScreen />);
+    await waitFor(() => expect(screen.getByTestId('aed-think-deeper-locked')).toBeTruthy());
+    expect(screen.queryByTestId('aed-think-deeper')).toBeNull();
+  });
+
+  it('asks unverified professionals to verify, with no retry', async () => {
+    mockStream.mockRejectedValue({
+      status: 403, code: 'aed_verification_required',
+      message: 'AED is available to verified healthcare professionals. Verify your registration to use it.',
+      data: { detail: { code: 'aed_verification_required' } },
+    });
+    render(<AEDChatScreen />);
+    await ask('What is sepsis?');
+    await waitFor(() => expect(screen.getByTestId('aed-verify')).toBeTruthy());
+    expect(screen.getByTestId('aed-verify-btn')).toBeTruthy();
+    expect(screen.queryByTestId('aed-retry')).toBeNull();
+  });
+});
+
+describe('AED agent: related content, feedback and history', () => {
+  const CONFIG = {
+    contract_version: 1, available: true, disclosure: 'AED is an AI assistant for healthcare professionals.',
+    disclosure_version: 'v',
+    features: { streaming: true, saved_history: true, think_deeper: false, deep_research: false,
+                document_analysis: false, image_analysis: false },
+    token_costs: {},
+  };
+  const FINAL = {
+    response: 'Answer [1].', conversation_id: 'aed-u1-abc', intent: 'MEDICATION', mode: 'instant',
+    request_type: 'standard', urgent: false, outcome: 'answered', cited: [1], tokens_charged: 1,
+    answered_locally: false, limited_by_plan: null, missing_information: [], saved: true,
+    sources: [{ n: 1, source: 'openFDA', id: 's', title: 'Metformin label', url: 'https://x', evidence_type: 'drug_label' }],
+    resources: [{ kind: 'case', id: 'c1', title: 'Metformin and lactic acidosis', subtitle: '2 answers', path: '/case/c1' }],
+  };
+
+  beforeEach(() => {
+    mockConfig.mockResolvedValue(CONFIG);
+    mockStream.mockReset();
+    mockFeedback.mockClear();
+    mockPush.mockClear();
+    mockStream.mockImplementation(async (_t: string, _i: any, onEvent: (e: any) => void) => {
+      onEvent({ type: 'meta', run_id: 'run-1', conversation_id: 'aed-u1-abc', mode: 'instant',
+                request_type: 'standard', tokens_charged: 1 });
+      return FINAL;
+    });
+  });
+  afterAll(() => mockConfig.mockResolvedValue(null));
+
+  async function answer() {
+    render(<AEDChatScreen />);
+    await waitFor(() => expect(screen.getByTestId('aed-history-btn')).toBeTruthy());
+    fireEvent.changeText(screen.getByTestId('aed-chat-input'), 'Contraindications of metformin?');
+    await act(async () => { fireEvent.press(screen.getByTestId('aed-send-btn')); });
+    await waitFor(() => expect(screen.getByTestId('aed-feedback')).toBeTruthy());
+  }
+
+  it('shows related ForMeds content apart from the cited sources, and opens it', async () => {
+    await answer();
+    expect(screen.getByTestId('aed-resources')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('aed-resource-c1'));
+    expect(mockPush).toHaveBeenCalledWith('/case/c1');
+    expect(screen.getByText('Saved')).toBeTruthy();
+  });
+
+  it('sends a thumbs-up for the run at once', async () => {
+    await answer();
+    await act(async () => { fireEvent.press(screen.getByTestId('aed-thumb-up')); });
+    expect(mockFeedback).toHaveBeenCalledWith('t', { run_id: 'run-1', rating: 'up' });
+  });
+
+  it('asks what was wrong before sending a thumbs-down', async () => {
+    await answer();
+    await act(async () => { fireEvent.press(screen.getByTestId('aed-thumb-down')); });
+    expect(mockFeedback).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('aed-reason-outdated'));
+    fireEvent.press(screen.getByTestId('aed-reason-not_india_specific'));
+    await act(async () => { fireEvent.press(screen.getByTestId('aed-feedback-send')); });
+    expect(mockFeedback).toHaveBeenCalledWith('t', { run_id: 'run-1', rating: 'down',
+                                                     reasons: ['outdated', 'not_india_specific'] });
+  });
+
+  it('opens saved history from the header', async () => {
+    render(<AEDChatScreen />);
+    await waitFor(() => expect(screen.getByTestId('aed-history-btn')).toBeTruthy());
+    fireEvent.press(screen.getByTestId('aed-history-btn'));
+    expect(mockPush).toHaveBeenCalledWith('/aed/history');
   });
 });
