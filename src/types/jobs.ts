@@ -8,6 +8,8 @@
  * two different things to someone scanning quickly.
  */
 
+import type { ScreeningQuestion, ScreeningAnswer } from './applicants';
+
 export type EmploymentType =
   | 'full_time' | 'part_time' | 'contract' | 'locum' | 'temporary' | 'telemedicine'
   | 'fellowship' | 'residency' | 'research' | 'academic' | 'internship';
@@ -17,34 +19,9 @@ export type PayPeriod = 'hour' | 'shift' | 'day' | 'month' | 'year';
 export type JobStatus = 'draft' | 'active' | 'paused' | 'closed' | 'filled' | 'expired';
 export type JobSort = 'newest' | 'pay_high' | 'closing_soon' | 'urgent';
 
-import type { ScreeningQuestion } from './applicants';
-
 export type ApplicationStatusKey =
   | 'applied' | 'reviewing' | 'shortlisted' | 'interviewing'
   | 'offered' | 'hired' | 'rejected' | 'withdrawn';
-
-/**
- * A yes/no screening question. The public shape (what an applicant browsing
- * or applying sees) carries only `id`/`text` — `required_answer` and
- * `knockout` are withheld server-side so an applicant can never see which
- * answer is "correct" and game a knockout question. The owner-only shape
- * (what the poster sees managing their own job) carries all four; treat the
- * extra two fields as present only when `can_manage` is true.
- */
-export interface ScreeningQuestion {
-  id: string;
-  text: string;
-  required_answer?: 'yes' | 'no';
-  knockout?: boolean;
-}
-
-export interface ScreeningAnswer {
-  question_id: string;
-  answer: 'yes' | 'no';
-  /** Denormalised at apply time, so it still reads correctly even after the
-   *  job's own question list is later edited. */
-  text?: string;
-}
 
 export interface Job {
   id: string;
@@ -90,7 +67,6 @@ export interface Job {
   status: JobStatus;
   expires_at?: string | null;
   published_at?: string | null;
-  screening_questions: ScreeningQuestion[];
 
   applicant_count: number;
   view_count: number;

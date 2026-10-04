@@ -200,7 +200,7 @@ export default function FeedScreen() {
           isLiked={isLiked}
           onLike={handleLike}
           onComment={(id: string) => router.push({ pathname: '/post/[id]', params: { id } } as any)}
-          onShare={handleShare}
+          onShare={() => handleShare(item)}
         />
       );
     }
