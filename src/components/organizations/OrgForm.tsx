@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography, fonts } from '../../theme';
+import { colors, radius, spacing, typography, fonts, gloss } from '../../theme';
 import { Button, FormInput, NumberField, SelectField } from '../index';
 import { yearOptions } from '../InputFields';
 import {
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     minHeight: 36,
     justifyContent: 'center',
   },
-  chipOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipOn: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   chipText: { ...typography.caption, color: colors.textSecondary },
   chipTextOn: { color: colors.white, fontFamily: fonts.body.semibold },
 

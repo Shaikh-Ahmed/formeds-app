@@ -7,6 +7,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import { apiFetch } from '../../src/utils/api';
 import { PageColumn } from '../../src/components/web';
 
+import { colors } from '../../src/theme';
 interface KycRequest {
   id: string;
   registration_type: string;
@@ -16,8 +17,14 @@ interface KycRequest {
   applicant_name?: string;
   applicant_email?: string;
   applicant_role?: string;
+  applicant_education?: {
+    student_course?: string | null; student_institution?: string | null; student_university?: string | null;
+    student_year?: number | null; graduation_year?: number | null;
+  };
   created_at: string;
 }
+
+const TYPE_LABELS: Record<string, string> = { student_id: 'Student ID', nmc: 'NMC', rohini: 'ROHINI' };
 
 export default function AdminKycScreen() {
   const { user, token } = useAuth();
@@ -71,7 +78,7 @@ export default function AdminKycScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.empty}>
-          <Ionicons name="lock-closed-outline" size={48} color="#94A3B8" />
+          <Ionicons name="lock-closed-outline" size={48} color={colors.textMuted} />
           <Text style={styles.emptyText}>Admin access required</Text>
           <TouchableOpacity style={styles.backLink} onPress={() => router.back()}><Text style={styles.backLinkText}>Go back</Text></TouchableOpacity>
         </View>
@@ -83,31 +90,48 @@ export default function AdminKycScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <PageColumn maxWidth={840} testID="admin-kyc-column">
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color="#1A3A5C" /></TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()}><Ionicons name="arrow-back" size={24} color={colors.navy} /></TouchableOpacity>
         <Text style={styles.headerTitle}>KYC Review</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity
+          style={styles.uploadSwitchBtn}
+          onPress={() => router.push('/admin/upload' as any)}
+          accessibilityRole="button"
+        >
+          <Ionicons name="cloud-upload-outline" size={15} color="#0D9488" style={{ marginRight: 4 }} />
+          <Text style={styles.uploadSwitchBtnText}>Upload Content</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 40 }} size="large" color="#1A3A5C" />
+        <ActivityIndicator style={{ marginTop: 40 }} size="large" color={colors.navy} />
       ) : (
         <FlatList
           data={items}
           keyExtractor={(i) => i.id}
           contentContainerStyle={{ padding: 16 }}
-          ListEmptyComponent={<View style={styles.empty}><Ionicons name="checkmark-done-outline" size={48} color="#94A3B8" /><Text style={styles.emptyText}>No pending requests</Text></View>}
+          ListEmptyComponent={<View style={styles.empty}><Ionicons name="checkmark-done-outline" size={48} color={colors.textMuted} /><Text style={styles.emptyText}>No pending requests</Text></View>}
           renderItem={({ item }) => (
             <View style={styles.card}>
               <Text style={styles.name}>{item.applicant_name || 'Unknown'} <Text style={styles.role}>· {item.applicant_role}</Text></Text>
               <Text style={styles.meta}>{item.applicant_email}</Text>
-              <Text style={styles.meta}>{item.registration_type.toUpperCase()}: {item.registration_number}{item.state_council ? ` · ${item.state_council}` : ''}</Text>
+              <Text style={styles.meta}>{TYPE_LABELS[item.registration_type] ?? item.registration_type.toUpperCase()}: {item.registration_number}{item.state_council ? ` · ${item.state_council}` : ''}</Text>
+              {item.applicant_education?.student_course ? (
+                <Text style={styles.meta} testID={`kyc-education-${item.id}`}>
+                  {[item.applicant_education.student_course,
+                    item.applicant_education.student_year ? `Year ${item.applicant_education.student_year}` : '',
+                    item.applicant_education.student_institution,
+                    item.applicant_education.student_university,
+                    item.applicant_education.graduation_year ? `Graduating ${item.applicant_education.graduation_year}` : '',
+                  ].filter(Boolean).join(' · ')}
+                </Text>
+              ) : null}
               {/* The old "Auto-check: verified" line came from a mock provider that
                   derived that verdict from a string prefix. Showing a fabricated
                   pass to a human reviewer invites rubber-stamping — approval must
                   rest on the document alone. */}
               <View style={styles.actions}>
                 {item.document_path ? (
-                  <TouchableOpacity style={[styles.btn, styles.viewBtn]} onPress={() => viewDoc(item.id)}><Ionicons name="document-text-outline" size={16} color="#1A3A5C" /><Text style={styles.viewText}>Document</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.btn, styles.viewBtn]} onPress={() => viewDoc(item.id)}><Ionicons name="document-text-outline" size={16} color={colors.navy} /><Text style={styles.viewText}>Document</Text></TouchableOpacity>
                 ) : null}
                 <TouchableOpacity style={[styles.btn, styles.rejectBtn]} onPress={() => setRejecting(item.id)}><Text style={styles.rejectText}>Reject</Text></TouchableOpacity>
                 <TouchableOpacity style={[styles.btn, styles.approveBtn]} onPress={() => approve(item.id)}><Text style={styles.approveText}>Approve</Text></TouchableOpacity>
@@ -135,29 +159,45 @@ export default function AdminKycScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
+  safe: { flex: 1, backgroundColor: colors.bg },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: colors.border },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.text },
   empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 8 },
-  emptyText: { color: '#64748B', fontSize: 15 },
+  emptyText: { color: colors.textSubtle, fontSize: 15 },
   backLink: { marginTop: 12 },
-  backLinkText: { color: '#1A3A5C', fontWeight: '600' },
-  card: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  name: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
-  role: { fontSize: 13, fontWeight: '500', color: '#64748B' },
-  meta: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  backLinkText: { color: colors.navy, fontWeight: '600' },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
+  name: { fontSize: 16, fontWeight: '700', color: colors.text },
+  role: { fontSize: 13, fontWeight: '500', color: colors.textSubtle },
+  meta: { fontSize: 13, color: colors.textSubtle, marginTop: 2 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 },
-  viewBtn: { backgroundColor: '#F1F5F9' },
-  viewText: { color: '#1A3A5C', fontWeight: '600', fontSize: 13 },
+  viewBtn: { backgroundColor: colors.bgMuted },
+  viewText: { color: colors.navy, fontWeight: '600', fontSize: 13 },
   rejectBtn: { backgroundColor: '#FEF2F2' },
   rejectText: { color: '#E84545', fontWeight: '700', fontSize: 13 },
   approveBtn: { backgroundColor: '#0F766E', marginLeft: 'auto' },
   approveText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', paddingHorizontal: 24 },
   modalCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20 },
-  modalTitle: { fontSize: 17, fontWeight: '700', color: '#0F172A', marginBottom: 12 },
-  modalInput: { backgroundColor: '#F8FAFC', borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', padding: 12, minHeight: 80, textAlignVertical: 'top', fontSize: 15 },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: 12 },
+  modalInput: { backgroundColor: colors.bg, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 12, minHeight: 80, textAlignVertical: 'top', fontSize: 15 },
   modalActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
-  cancelText: { color: '#64748B', fontWeight: '600', fontSize: 15 },
+  cancelText: { color: colors.textSubtle, fontWeight: '600', fontSize: 15 },
+
+  uploadSwitchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#CCFBF1',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#0D9488',
+  },
+  uploadSwitchBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0D9488',
+  },
 });

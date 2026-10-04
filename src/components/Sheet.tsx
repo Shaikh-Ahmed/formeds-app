@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FormScrollView } from './FormScrollView';
 import {
   AccessibilityInfo, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Text, View, type StyleProp, type ViewStyle,
@@ -100,9 +101,9 @@ export function Sheet({
           ) : null}
 
           {scroll ? (
-            <ScrollView keyboardShouldPersistTaps="handled" testID={testID ? `${testID}-scroll` : undefined}>
+            <FormScrollView keyboardShouldPersistTaps="handled" testID={testID ? `${testID}-scroll` : undefined}>
               {children}
-            </ScrollView>
+            </FormScrollView>
           ) : children}
 
           {footer ? <View style={styles.footer}>{footer}</View> : null}

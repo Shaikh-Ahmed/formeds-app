@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react-native';
+import { Text } from 'react-native';
 import { ArticleFeedCard, formatArticleUrl } from '../components/articles/ArticleFeedCard';
 import type { ArticleFeedPost } from '../types/feed';
 
@@ -111,5 +112,30 @@ describe('ArticleFeedCard Component', () => {
 
     fireEvent.press(screen.getByTestId(`article-share-btn-${SAMPLE_PUBMED_FEED_ARTICLE.id}`));
     expect(onShare).toHaveBeenCalledWith(SAMPLE_PUBMED_FEED_ARTICLE);
+  });
+});
+
+describe('ArticleFeedCard: the shared post actions', () => {
+  it('saves and reposts an article like any other post, and shows who reposted it', () => {
+    const onRepost = jest.fn();
+    const onSave = jest.fn();
+    const post = { ...SAMPLE_PUBMED_FEED_ARTICLE, saved: true, reposted: true, repost_count: 3 };
+    render(
+      <ArticleFeedCard
+        post={post}
+        onRepost={onRepost}
+        onSave={onSave}
+        header={<Text>Dr. Rao reposted</Text>}
+      />,
+    );
+    expect(screen.getByText('Dr. Rao reposted')).toBeTruthy();
+    expect(screen.getByText('3')).toBeTruthy();
+    expect(screen.getByLabelText('Undo repost, 3 reposts')).toBeTruthy();
+    expect(screen.getByLabelText('Remove from saved')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId(`article-repost-btn-${post.id}`));
+    expect(onRepost).toHaveBeenCalledWith(post.id);
+    fireEvent.press(screen.getByTestId(`article-save-btn-${post.id}`));
+    expect(onSave).toHaveBeenCalledWith(post.id);
   });
 });

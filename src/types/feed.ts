@@ -9,6 +9,10 @@ export interface BaseFeedPost {
   like_count: number;
   comment_count: number;
   created_at: string;
+  /** For the reader: saved for later / reposted to their network. */
+  saved?: boolean;
+  reposted?: boolean;
+  repost_count?: number;
 }
 
 export interface UserFeedPost extends BaseFeedPost {

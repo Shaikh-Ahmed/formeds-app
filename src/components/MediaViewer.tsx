@@ -14,6 +14,7 @@ import { colors, spacing, radius, typography, useBreakpoint, MIN_TOUCH_TARGET } 
 import { Avatar } from './Avatar';
 import { RoleBadge } from './RoleBadge';
 import { timeAgo } from '../utils/time';
+import { mediaUri } from '../utils/media';
 
 /**
  * Full-bleed media viewer for a feed post.
@@ -124,7 +125,7 @@ export function MediaViewer({
               cropping the image. */}
           <View style={styles.stage} pointerEvents="box-none">
             <Image
-              source={{ uri: imageUri }}
+              source={{ uri: mediaUri(imageUri) }}
               style={styles.image}
               resizeMode="contain"
               accessibilityLabel={

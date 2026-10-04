@@ -5,7 +5,8 @@ import {
   type StyleProp, type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../theme';
+import { colors, radius, spacing, typography, fonts, isPremium, MIN_TOUCH_TARGET } from '../theme';
+import { FieldError, useFieldError } from './FieldError';
 
 /**
  * A single-choice field backed by a searchable sheet.
@@ -35,6 +36,8 @@ export interface SelectFieldProps {
   disabledHint?: string;
   /** Small print under the field. */
   helper?: string;
+  /** What is wrong with the choice; shown under the field in place of `helper`. */
+  error?: string | null;
   searchPlaceholder?: string;
   /** Sheet heading; falls back to the label. */
   title?: string;
@@ -52,8 +55,9 @@ export interface SelectFieldProps {
 export function SelectField({
   label, value, onChange, options, placeholder = 'Select…', icon,
   disabled = false, disabledHint, helper, searchPlaceholder = 'Search…',
-  title, hideLabel = false, containerStyle, testID,
+  title, hideLabel = false, containerStyle, testID, error,
 }: SelectFieldProps) {
+  const err = useFieldError(error);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const { height: windowHeight, width: windowWidth } = useWindowDimensions();
@@ -94,8 +98,11 @@ export function SelectField({
         accessibilityLabel={`${label}. ${value || 'Nothing selected'}`}
         accessibilityHint={disabled ? disabledHint : 'Opens a list of options'}
         accessibilityState={{ disabled }}
+        {...err.inputProps}
         style={({ pressed }) => [
           styles.trigger,
+          isPremium && styles.pTrigger,
+          error ? styles.triggerError : null,
           disabled && styles.triggerDisabled,
           pressed && !disabled && styles.triggerPressed,
         ]}
@@ -114,7 +121,8 @@ export function SelectField({
         />
       </Pressable>
 
-      {helper ? <Text style={styles.helper}>{helper}</Text> : null}
+      {error ? <FieldError message={error} id={err.id} />
+        : helper ? <Text style={styles.helper}>{helper}</Text> : null}
 
       <Modal
         visible={open}
@@ -231,7 +239,7 @@ export function SelectField({
 const styles = StyleSheet.create({
   // Matches FormInput so a form mixing the two reads as one set of fields.
   group: { marginBottom: spacing.lg + 2 },
-  label: { ...typography.label, color: '#334155', marginBottom: 6 },
+  label: { ...typography.label, color: colors.textBody, marginBottom: 6 },
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -243,10 +251,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg - 2,
     minHeight: Math.max(MIN_TOUCH_TARGET, 52),
   },
+  triggerError: { borderColor: colors.red },
   triggerPressed: { backgroundColor: colors.bgMuted, borderColor: colors.textMuted },
   triggerDisabled: { opacity: 0.6 },
   icon: { marginRight: spacing.xs },
-  triggerText: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: spacing.md },
+  triggerText: isPremium
+    ? { flex: 1, fontSize: 15, fontFamily: fonts.body.medium, color: colors.text, paddingVertical: spacing.md }
+    : { flex: 1, fontSize: 16, color: colors.text, paddingVertical: spacing.md },
+  // Premium: the same recessed well as FormInput.
+  pTrigger: {
+    backgroundColor: colors.bgMuted, borderColor: 'transparent', borderRadius: radius.input, minHeight: 48,
+    ...(Platform.OS === 'web' ? ({ boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)' } as object) : {}),
+  },
   triggerPlaceholder: { color: colors.textMuted },
   helper: { ...typography.small, color: colors.textMuted, marginTop: 4 },
 

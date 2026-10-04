@@ -2,9 +2,13 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ComingSoon } from '../../src/components';
+import { ComingSoon, BooksCatalog, ResearchCatalog } from '../../src/components';
+import { useCollapsibleHeader } from '../../src/hooks/useCollapsibleHeader';
+import { useAuth } from '../../src/context/AuthContext';
+import { useRouter } from 'expo-router';
 import { PageGrid, ProfileRail } from '../../src/components/web';
-import { colors, spacing, radius, typography, useBreakpoint } from '../../src/theme';
+import { colors, spacing, radius, typography, useBreakpoint, gloss, fonts, elevation, isPremium } from '../../src/theme';
+import { Platform } from 'react-native';
 
 type TabKey = 'books' | 'cme' | 'research';
 
@@ -20,9 +24,9 @@ const TABS: {
     key: 'books',
     label: 'Books',
     icon: 'book-outline',
-    title: 'Medical books are coming soon',
+    title: 'Medical Reference E-Books',
     description: 'A curated library of reference texts and clinical handbooks, readable inside the app.',
-    bullets: ['Specialty-filtered catalogue', 'Offline reading', 'Bookmarks and highlights'],
+    bullets: ['Specialty-filtered catalogue', 'Continue reading shelf', 'Bookmarks and highlights'],
   },
   {
     key: 'cme',
@@ -43,61 +47,99 @@ const TABS: {
 ];
 
 export default function LearningScreen() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('books');
   const active = TABS.find(t => t.key === activeTab)!;
   const { isMobile } = useBreakpoint();
+  // Books and Research: tabs, search and chips slide away on scroll down and
+  // come back on scroll up, as on Jobs and the feed.
+  const collapse = useCollapsibleHeader();
+  const catalog = activeTab === 'books' || activeTab === 'research';
+  const switchTab = (key: TabKey) => { setActiveTab(key); collapse.reveal(true); };
 
-  return (
-    <SafeAreaView style={styles.safe} edges={[]}>
-      <PageGrid left={<ProfileRail />} testID="learning-grid">
-      <View style={[styles.wideTitleWrap, isMobile && styles.titleWrapMobile]}>
-        <Text style={styles.wideTitle} accessibilityRole="header">Learning Hub</Text>
-        <Text style={styles.wideSubtitle}>
-          Reference texts, accredited CME and peer-reviewed research, in one place.
-        </Text>
-      </View>
-
-      <View style={[styles.tabBar, !isMobile && styles.tabBarWide]}>
+  const tabs = (
+      <View style={[styles.tabBar, !isMobile && styles.tabBarWide, isPremium && styles.cBar, isPremium && isMobile && styles.cBarMobile]}>
         {TABS.map(t => (
           <TouchableOpacity
             key={t.key}
             testID={`tab-${t.key}`}
-            style={[styles.tab, activeTab === t.key && styles.tabActive]}
-            onPress={() => setActiveTab(t.key)}
+            style={[styles.tab, activeTab === t.key && styles.tabActive, isPremium && styles.cTab, isPremium && activeTab === t.key && styles.cTabActive]}
+            onPress={() => switchTab(t.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === t.key }}
-            accessibilityLabel={`${t.label} — coming soon`}
+            accessibilityLabel={t.key === 'books' ? t.label : `${t.label} — coming soon`}
           >
-            <Ionicons name={t.icon} size={16} color={activeTab === t.key ? colors.textOnDark : '#64748B'} />
-            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive]}>{t.label}</Text>
+            <Ionicons name={t.icon} size={16} color={activeTab === t.key ? (isPremium ? colors.teal : colors.textOnDark) : colors.textSubtle} />
+            <Text style={[styles.tabText, activeTab === t.key && styles.tabTextActive, isPremium && styles.cTabText, isPremium && activeTab === t.key && styles.cTabTextActive]}>{t.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
+  );
 
-      <ScrollView contentContainerStyle={styles.body}>
-        <ComingSoon
-          testID={`coming-soon-${active.key}`}
-          icon={active.icon}
-          title={active.title}
-          description={active.description}
-          bullets={active.bullets}
-        />
+  return (
+    <SafeAreaView style={styles.safe} edges={[]}>
+      <PageGrid left={<ProfileRail />} testID="learning-grid">
+      {/* No visible page title (the tabs say where you are); the heading stays
+          for screen readers. Admins keep their Upload action here. */}
+      <Text style={styles.srOnly} accessibilityRole="header">Learning Hub</Text>
+      {user?.is_admin ? (
+      <View style={[styles.wideTitleWrap, isMobile && styles.titleWrapMobile]}>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }} />
+          {user?.is_admin && (
+            <TouchableOpacity
+              style={styles.adminHeaderUploadBtn}
+              onPress={() => router.push(`/admin/upload?tab=${activeTab === 'research' ? 'research' : 'books'}` as any)}
+              accessibilityRole="button"
+              accessibilityLabel="Upload Content"
+              testID="learning-header-upload-btn"
+            >
+              <Ionicons name="cloud-upload" size={16} color={colors.white} style={{ marginRight: 6 }} />
+              <Text style={styles.adminHeaderUploadBtnText}>
+                {activeTab === 'books' ? 'Upload Book' : activeTab === 'research' ? 'Upload Research Paper' : 'Upload Content'}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+      ) : null}
 
-        <Text style={styles.footnote}>
-          Books, CME and Research all arrive in a later phase. Nothing to do here yet.
-        </Text>
-      </ScrollView>
+      {catalog ? null : tabs}
+
+      {activeTab === 'books' ? (
+        <View style={styles.booksWrapper}>
+          <BooksCatalog topSlot={<View style={styles.slotPad}>{tabs}</View>} collapse={collapse} />
+        </View>
+      ) : activeTab === 'research' ? (
+        <View style={styles.booksWrapper}>
+          <ResearchCatalog topSlot={<View style={styles.slotPad}>{tabs}</View>} collapse={collapse} />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.body}>
+          <ComingSoon
+            testID={`coming-soon-${active.key}`}
+            icon={active.icon}
+            title={active.title}
+            description={active.description}
+            bullets={active.bullets}
+          />
+
+          <Text style={styles.footnote}>
+            {active.label} arrives in a later phase. Stay tuned for updates.
+          </Text>
+        </ScrollView>
+      )}
       </PageGrid>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
   safe: { flex: 1, backgroundColor: colors.bg },
   wideTitleWrap: { paddingTop: spacing.xxl, paddingBottom: spacing.lg },
   titleWrapMobile: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md },
-  wideTitle: { ...typography.h2, color: colors.text },
-  wideSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   tabBar: {
     flexDirection: 'row',
     backgroundColor: colors.white,
@@ -120,10 +162,23 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md - 2,
     borderRadius: radius.md,
     backgroundColor: colors.bgMuted,
+    ...gloss.glass,
   },
-  tabActive: { backgroundColor: colors.navy },
-  tabText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
+  tabActive: { backgroundColor: colors.action, ...gloss.fill },
+  tabText: { fontSize: 13, fontWeight: '600', color: colors.textSubtle },
   tabTextActive: { color: colors.textOnDark },
+  // The tabs inside the floating header keep the gap they had above the search.
+  slotPad: { paddingBottom: spacing.sm },
+  // Premium: the shared tonal segmented control (slate track, white thumb).
+  cBar: { backgroundColor: colors.bgMuted, borderColor: colors.bgMuted, padding: 4, gap: 4, borderRadius: radius.pill },
+  cBarMobile: { marginHorizontal: spacing.lg, marginVertical: spacing.xs },
+  cTab: { backgroundColor: 'transparent', borderRadius: radius.pill, paddingVertical: 9 },
+  cTabActive: {
+    backgroundColor: colors.white,
+    ...(Platform.OS === 'web' ? ({ boxShadow: '0 1px 3px rgba(15,23,42,0.10), 0 1px 2px rgba(15,23,42,0.06)' } as object) : elevation.subtle),
+  },
+  cTabText: { fontFamily: fonts.body.semibold, fontWeight: undefined },
+  cTabTextActive: { color: colors.teal, fontFamily: fonts.body.bold },
   body: { padding: spacing.lg, paddingBottom: 100 },
   footnote: {
     ...typography.small,
@@ -132,5 +187,31 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     paddingHorizontal: spacing.xl,
     lineHeight: 18,
+  },
+  booksWrapper: {
+    flex: 1,
+    padding: spacing.lg,
+    paddingBottom: 0,
+  },
+
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  adminHeaderUploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.teal,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    alignSelf: 'center',
+  },
+  adminHeaderUploadBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.white,
   },
 });

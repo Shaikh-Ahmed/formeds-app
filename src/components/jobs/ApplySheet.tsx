@@ -12,6 +12,7 @@ import { KycNotice } from '../KycNotice';
 import type { Job } from '../../types/jobs';
 import type { MyResume } from '../../types/applicants';
 import { ResumeCard } from './ResumeCard';
+import { canApplyNow, isStudent, studentLine } from '../../utils/roles';
 import { type Answers, ScreeningAnswerInput, answerErrors, cleanAnswers } from './Screening';
 
 const MAX_NOTE = 1500;
@@ -42,6 +43,10 @@ export function ApplySheet({
 }) {
   const { user, isKycApproved } = useAuth();
   const router = useRouter();
+  // Applying needs an approved verification -- a professional's registration,
+  // a student's college ID. The server checks it too.
+  const ready = canApplyNow(user, isKycApproved);
+  const student = isStudent(user);
   const [note, setNote] = useState('');
   const [step, setStep] = useState<Step>('profile');
   const [answers, setAnswers] = useState<Answers>({});
@@ -77,7 +82,14 @@ export function ApplySheet({
   // Exactly the fields `public_card` puts on the wire. Anything shown here that
   // the employer does not actually receive would be a lie about the applicant's
   // own data, which is worse than showing less.
-  const shared: { icon: keyof typeof Ionicons.glyphMap; label: string; value?: string }[] = [
+  const shared: { icon: keyof typeof Ionicons.glyphMap; label: string; value?: string }[] = student ? [
+    { icon: 'person-outline', label: 'Name', value: user?.name },
+    { icon: 'reader-outline', label: 'Headline', value: user?.headline },
+    { icon: 'school-outline', label: 'Course', value: studentLine(user) || undefined },
+    { icon: 'business-outline', label: 'College', value: user?.student_institution },
+    { icon: 'ribbon-outline', label: 'Graduating', value: user?.graduation_year ? String(user.graduation_year) : undefined },
+    { icon: 'location-outline', label: 'Location', value: user?.city || user?.location },
+  ] : [
     { icon: 'person-outline', label: 'Name', value: user?.name },
     { icon: 'reader-outline', label: 'Headline', value: user?.headline },
     { icon: 'medical-outline', label: 'Specialty', value: user?.specialty },
@@ -106,13 +118,14 @@ export function ApplySheet({
             <Button
               label="Submit application"
               onPress={submit}
+              loadingLabel="Applying…"
               loading={submitting}
-              disabled={!isKycApproved}
+              disabled={!ready}
               style={styles.footerBtn}
               testID="apply-submit"
             />
           ) : (
-            <Button label="Continue" onPress={next} disabled={!isKycApproved} style={styles.footerBtn}
+            <Button label="Continue" onPress={next} disabled={!ready} style={styles.footerBtn}
               testID="apply-next" />
           )}
         </>
@@ -145,7 +158,7 @@ export function ApplySheet({
 
         {/* Verification is the gate, so it is stated before the form rather
             than sprung as an error on submit. */}
-        <KycNotice action="apply for jobs" />
+        <KycNotice action={student ? 'apply for internships and jobs' : 'apply for jobs'} />
         <ErrorBanner message={error} />
 
         {step === 'profile' ? (
@@ -195,8 +208,16 @@ export function ApplySheet({
               ) : null}
             </View>
 
-            <ResumeCard compact onChange={setResume} />
-            {resume?.has_resume ? (
+            {/* A student account has no file uploads: the profile itself
+                (course, college, year) goes to the employer. */}
+            {student ? (
+              <View style={styles.attachRow} testID="apply-student-profile-note">
+                <Text style={styles.attachText}>
+                  Your student profile goes with this application. Resumes are not attached from student accounts.
+                </Text>
+              </View>
+            ) : <ResumeCard compact onChange={setResume} />}
+            {!student && resume?.has_resume ? (
               <View style={styles.attachRow}>
                 <Text style={styles.attachText}>Attach my resume to this application</Text>
                 <Switch value={includeResume} onValueChange={setIncludeResume} accessibilityLabel="Attach my resume"
@@ -282,7 +303,7 @@ const styles = StyleSheet.create({
     width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: colors.border,
     alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white,
   },
-  stepDotOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  stepDotOn: { backgroundColor: colors.primaryFill, borderColor: colors.primaryFill },
   stepNum: { ...typography.small, color: colors.textSecondary },
   stepNumOn: { color: colors.white },
   stepLabel: { ...typography.caption, color: colors.textSecondary },

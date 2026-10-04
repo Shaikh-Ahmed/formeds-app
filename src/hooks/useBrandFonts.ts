@@ -12,6 +12,16 @@ import { IBMPlexSans_400Regular } from '@expo-google-fonts/ibm-plex-sans/400Regu
 import { IBMPlexSans_500Medium } from '@expo-google-fonts/ibm-plex-sans/500Medium';
 import { IBMPlexSans_600SemiBold } from '@expo-google-fonts/ibm-plex-sans/600SemiBold';
 import { IBMPlexSans_700Bold } from '@expo-google-fonts/ibm-plex-sans/700Bold';
+import { SourceSerif4_400Regular } from '@expo-google-fonts/source-serif-4/400Regular';
+import { SourceSerif4_500Medium } from '@expo-google-fonts/source-serif-4/500Medium';
+import { SourceSerif4_600SemiBold } from '@expo-google-fonts/source-serif-4/600SemiBold';
+import { SourceSerif4_700Bold } from '@expo-google-fonts/source-serif-4/700Bold';
+import { PlusJakartaSans_400Regular } from '@expo-google-fonts/plus-jakarta-sans/400Regular';
+import { PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans/500Medium';
+import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold';
+import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/700Bold';
+import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans/800ExtraBold';
+import { activeTheme } from '../theme/activeTheme';
 
 /**
  * Fonts are worth waiting for, but never worth being blocked by.
@@ -24,17 +34,28 @@ import { IBMPlexSans_700Bold } from '@expo-google-fonts/ibm-plex-sans/700Bold';
 const FONT_TIMEOUT_MS = 3000;
 
 /** True once it is safe to render — fonts ready, failed, or simply too slow. */
-export function useBrandFonts(): boolean {
-  const [loaded, error] = useFonts({
-    Outfit_400Regular,
-    Outfit_500Medium,
-    Outfit_600SemiBold,
-    Outfit_700Bold,
+// Only the active theme's heading face is fetched.
+const HEADING_FACES: Record<string, number> = activeTheme === 'journal'
+  ? { SourceSerif4_400Regular, SourceSerif4_500Medium, SourceSerif4_600SemiBold, SourceSerif4_700Bold }
+  : { Outfit_400Regular, Outfit_500Medium, Outfit_600SemiBold, Outfit_700Bold };
+
+// Premium sets everything in Plus Jakarta Sans, so it fetches only that
+// family -- five faces -- and none of the others.
+const FACES: Record<string, number> = activeTheme === 'premium'
+  ? {
+    PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold,
+  }
+  : {
+    ...HEADING_FACES,
     IBMPlexSans_400Regular,
     IBMPlexSans_500Medium,
     IBMPlexSans_600SemiBold,
     IBMPlexSans_700Bold,
-  });
+  };
+
+export function useBrandFonts(): boolean {
+  const [loaded, error] = useFonts(FACES);
 
   const [timedOut, setTimedOut] = useState(false);
 

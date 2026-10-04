@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { FormScrollView } from '../src/components/FormScrollView';
+import { useFormErrors } from '../src/hooks/useFormErrors';
 import { View, Text, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,11 +25,11 @@ export default function RecruiterLoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const errs = useFormErrors<'email' | 'password'>({ known: ['email', 'password'] });
   const [loading, setLoading] = useState(false);
 
   const submit = async () => {
-    const problem = firstError(validateEmail(email), validateRequired(password, 'Password'));
-    if (problem) { setError(problem); return; }
+    if (!errs.check({ email: validateEmail(email), password: validateRequired(password, 'Password') }) || loading) return;
     setLoading(true);
     setError(null);
     try {
@@ -41,7 +43,7 @@ export default function RecruiterLoginScreen() {
         });
         return;
       }
-      setError(e?.message || 'Login failed');
+      if (!errs.fromError(e)) setError(e?.message || 'Could not sign in. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -51,7 +53,7 @@ export default function RecruiterLoginScreen() {
     <SafeAreaView style={styles.safe}>
       <AuthShell maxWidth={460}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <FormScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
             <TouchableOpacity testID="recruiter-login-back" style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
               accessibilityRole="button" accessibilityLabel="Go back">
               <Ionicons name="arrow-back" size={24} color={colors.navy} />
@@ -65,12 +67,14 @@ export default function RecruiterLoginScreen() {
 
             <ErrorBanner message={error} />
             <FormInput maxLength={200} testID="recruiter-login-email" label="Work email" icon="mail-outline" value={email}
-              onChangeText={setEmail} placeholder="you@agency.com" keyboardType="email-address" autoCapitalize="none"
+              onChangeText={v => { setEmail(v); errs.clear('email'); }}
+              error={errs.fields.email} placeholder="you@agency.com" keyboardType="email-address" autoCapitalize="none"
               autoComplete="email" />
             <FormInput testID="recruiter-login-password" label="Password" icon="lock-closed-outline" value={password}
-              onChangeText={setPassword} placeholder="Enter password" autoCapitalize="none"
+              onChangeText={v => { setPassword(v); errs.clear('password'); }}
+              error={errs.fields.password} placeholder="Enter password" autoCapitalize="none"
               autoComplete="current-password" secure returnKeyType="done" onSubmitEditing={submit} />
-            <Button testID="recruiter-login-submit" label="Sign in" onPress={submit} loading={loading} />
+            <Button testID="recruiter-login-submit" label="Sign in" loadingLabel="Signing in…" onPress={submit} loading={loading} />
 
             <TouchableOpacity style={styles.linkBtn} onPress={() => router.replace('/recruiter-register')} accessibilityRole="link">
               <Text style={styles.linkText}>New recruiter? <Text style={styles.linkBold}>Create an account</Text></Text>
@@ -78,7 +82,7 @@ export default function RecruiterLoginScreen() {
             <TouchableOpacity style={styles.linkBtnSmall} onPress={() => router.push('/forgot-password')} accessibilityRole="link">
               <Text style={styles.linkSmall}>Forgot password?</Text>
             </TouchableOpacity>
-          </ScrollView>
+          </FormScrollView>
         </KeyboardAvoidingView>
       </AuthShell>
     </SafeAreaView>

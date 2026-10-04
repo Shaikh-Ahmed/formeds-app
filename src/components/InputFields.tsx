@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, radius, spacing, typography, MIN_TOUCH_TARGET } from '../theme';
+import { FieldError, useFieldError } from './FieldError';
 import { SelectField } from './SelectField';
 import { Sheet } from './Sheet';
 import { Button } from './Button';
@@ -101,6 +102,7 @@ function PickerField({ mode, label, value, onChange, min, max, error, helper, pl
   PickerProps & { mode: Mode }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Date | null>(null);
+  const err = useFieldError(error);
 
   const frame = (control: React.ReactNode) => (
     <View style={styles.group}>
@@ -115,7 +117,7 @@ function PickerField({ mode, label, value, onChange, min, max, error, helper, pl
           </Pressable>
         ) : null}
       </View>
-      {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text>
+      {error ? <FieldError message={error} id={err.id} />
         : helper ? <Text style={styles.helper}>{helper}</Text> : null}
     </View>
   );
@@ -129,7 +131,7 @@ function PickerField({ mode, label, value, onChange, min, max, error, helper, pl
       max,
       disabled,
       'aria-label': label,
-      'aria-invalid': error ? true : undefined,
+      ...err.inputProps,
       'data-testid': testID,
       // An impossible or half-typed entry reads back as '' -- the browser
       // never hands over "2026-02-30".
@@ -214,6 +216,7 @@ export function MonthField({ label, value, onChange, minYear = 1950, maxYear = n
   label: string; value: string; onChange: (v: string) => void; minYear?: number; maxYear?: number;
   error?: string | null; helper?: string; testID?: string;
 }) {
+  const err = useFieldError(error);
   const [y, m] = (value || '').split('-');
   const [year, setYear] = useState(y || '');
   const [month, setMonth] = useState(m ? MONTH_NAMES[Number(m) - 1] : '');
@@ -251,7 +254,7 @@ export function MonthField({ label, value, onChange, minYear = 1950, maxYear = n
           </Pressable>
         ) : null}
       </View>
-      {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text>
+      {error ? <FieldError message={error} id={err.id} />
         : helper ? <Text style={styles.helper}>{helper}</Text> : null}
     </View>
   );
@@ -277,6 +280,8 @@ export function NumberField({ value, onChangeText, decimals = false, maxDigits =
     }
     return out.slice(0, maxDigits + (decimals ? 3 : 0));
   };
+  const err = useFieldError(error);
+  const inputRef = useRef<TextInput>(null);
   return (
     <View style={styles.group}>
       <Text style={styles.label}>{label}</Text>
@@ -284,6 +289,7 @@ export function NumberField({ value, onChangeText, decimals = false, maxDigits =
         {prefix ? <Text style={styles.affix}>{prefix}</Text> : null}
         <TextInput
           {...rest}
+          ref={inputRef}
           testID={testID}
           value={value}
           onChangeText={t => onChangeText(clean(t))}
@@ -292,11 +298,12 @@ export function NumberField({ value, onChangeText, decimals = false, maxDigits =
           placeholder={placeholder}
           placeholderTextColor={colors.textMuted}
           accessibilityLabel={label}
+          {...err.inputProps}
           style={styles.input}
         />
         {suffix ? <Text style={styles.affix}>{suffix}</Text> : null}
       </View>
-      {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text>
+      {error ? <FieldError message={error} id={err.id} onFocusField={() => inputRef.current?.focus()} />
         : helper ? <Text style={styles.helper}>{helper}</Text> : null}
     </View>
   );

@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET, gloss, isPremium } from '../../theme';
 import { SORT_LABELS, type JobFilters, type JobSort } from '../../types/jobs';
 
 const SORTS: JobSort[] = ['newest', 'pay_high', 'closing_soon', 'urgent'];
@@ -75,24 +76,28 @@ export function JobFilterBar({
           accessibilityLabel={
             activeCount ? `Filters, ${activeCount} applied` : 'Filters'
           }
+          hitSlop={isPremium ? { top: 4, bottom: 4 } : undefined}
           style={({ pressed }) => [
             styles.filterBtn,
+            isPremium && styles.cFilterBtn,
             activeCount > 0 && styles.filterBtnActive,
             pressed && styles.pressed,
           ]}
         >
           <Ionicons
             name="options-outline"
-            size={18}
+            size={isPremium ? 14 : 18}
             color={activeCount ? colors.white : colors.text}
           />
-          <Text style={[styles.filterText, activeCount > 0 && styles.filterTextActive]}>
+          <Text style={[styles.filterText, isPremium && styles.cFilterText, activeCount > 0 && styles.filterTextActive]}>
             {activeCount ? `Filters (${activeCount})` : 'Filters'}
           </Text>
         </Pressable>
       </View>
 
-      <View style={styles.sortRow} accessibilityRole="tablist">
+      {/* Premium keeps the sorts on ONE line: compact enough to fit the list
+          pane, and scrollable sideways (never clipped) if a pane is narrower. */}
+      <SortRow>
         {SORTS.map(key => {
           const active = sort === key;
           const label = key === 'newest' && searching ? 'Newest matches' : SORT_LABELS[key];
@@ -104,17 +109,19 @@ export function JobFilterBar({
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={`Sort by ${label}`}
+              hitSlop={isPremium ? { top: 9, bottom: 9, left: 2, right: 2 } : undefined}
               style={({ pressed }) => [
                 styles.sortChip,
+                isPremium && styles.cSortChip,
                 active && styles.sortChipActive,
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={[styles.sortText, active && styles.sortTextActive]}>{label}</Text>
+              <Text style={[styles.sortText, isPremium && styles.cSortText, active && styles.sortTextActive]}>{label}</Text>
             </Pressable>
           );
         })}
-      </View>
+      </SortRow>
 
       {resultLabel ? (
         // One atomic status string, not a bare number: a screen reader
@@ -132,8 +139,20 @@ export function JobFilterBar({
   );
 }
 
+function SortRow({ children }: { children: React.ReactNode }) {
+  if (!isPremium) {
+    return <View style={styles.sortRow} accessibilityRole="tablist">{children}</View>;
+  }
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist"
+      contentContainerStyle={styles.cSortRow} style={styles.cSortScroller}>
+      {children}
+    </ScrollView>
+  );
+}
+
 const styles = StyleSheet.create({
-  wrap: { gap: spacing.md, paddingBottom: spacing.md },
+  wrap: { gap: isPremium ? spacing.sm : spacing.md, paddingBottom: isPremium ? spacing.sm : spacing.md },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   searchBar: {
     flex: 1,
@@ -146,8 +165,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingHorizontal: spacing.md,
     minHeight: MIN_TOUCH_TARGET,
+    // Premium: search is a compact recessed pill, as in the header.
+    ...(isPremium ? {
+      backgroundColor: colors.bgMuted, borderColor: 'transparent', borderRadius: radius.pill, paddingHorizontal: spacing.md + 2,
+      minHeight: 34,
+      ...(Platform.OS === 'web' ? ({ boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)' } as object) : {}),
+    } : {}),
   },
-  searchInput: { flex: 1, ...typography.body, color: colors.text, paddingVertical: spacing.sm },
+  searchInput: isPremium
+    ? { flex: 1, fontSize: 12.5, fontFamily: fonts.body.medium, color: colors.text, paddingVertical: 5 }
+    : { flex: 1, ...typography.body, color: colors.text, paddingVertical: spacing.sm },
 
   filterBtn: {
     flexDirection: 'row',
@@ -155,18 +182,19 @@ const styles = StyleSheet.create({
     gap: spacing.xs + 2,
     paddingHorizontal: spacing.md,
     minHeight: MIN_TOUCH_TARGET,
-    borderRadius: radius.lg,
+    borderRadius: isPremium ? radius.pill : radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.white,
+    ...gloss.glass,
   },
-  filterBtnActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  filterBtnActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   filterText: { ...typography.label, color: colors.text },
   filterTextActive: { color: colors.white },
 
   // flexWrap, not a horizontal scroller: options must never be clipped out of
   // sight, and this row grows with the user's text size.
-  sortRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  sortRow: { flexDirection: 'row', flexWrap: 'wrap', gap: isPremium ? 6 : spacing.sm },
   sortChip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
@@ -176,11 +204,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     minHeight: 36,
     justifyContent: 'center',
+    ...gloss.glass,
   },
-  sortChipActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  sortChipActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   sortText: { ...typography.caption, color: colors.textSecondary },
   sortTextActive: { color: colors.white, fontFamily: fonts.body.semibold },
 
   resultCount: { ...typography.caption, color: colors.textSecondary },
+  // -- Premium: compact controls (touch area restored by hit slop) -----------
+  cFilterBtn: { minHeight: 34, paddingHorizontal: spacing.sm + 2, gap: 4 },
+  cFilterText: { fontSize: 12.5, lineHeight: 16 },
+  cSortScroller: { flexGrow: 0 },
+  cSortRow: { flexDirection: 'row', flexWrap: 'nowrap', gap: 5, alignItems: 'center' },
+  cSortChip: { minHeight: 26, paddingVertical: 3, paddingHorizontal: spacing.sm + 2 },
+  cSortText: { fontSize: 11.5, lineHeight: 15 },
   pressed: { opacity: 0.7 },
 });

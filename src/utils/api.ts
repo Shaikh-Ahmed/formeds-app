@@ -87,6 +87,9 @@ export function setAuthHandlers(handlers: AuthHandlers | null) {
   authHandlers = handlers;
 }
 
+/** Parts of a FastAPI error location that are not field names. */
+const LOC_NOISE = new Set(['body', 'query', 'path', 'data', 'slots']);
+
 export class ApiError extends Error {
   status: number;
   /** Stable machine-readable code from the server (e.g. 'email_unverified',
@@ -116,6 +119,14 @@ export class ApiError extends Error {
       detail.forEach((e: any) => {
         if (e && typeof e.field === 'string' && typeof e.msg === 'string' && !this.fieldErrors[e.field]) {
           this.fieldErrors[e.field] = e.msg;
+        }
+        // Nested fields also by their full path ("location.city"), so a form
+        // with two `city` inputs can tell them apart.
+        const path = Array.isArray(e?.loc)
+          ? e.loc.map(String).filter((x: string) => !LOC_NOISE.has(x) && !/^\d+$/.test(x)).join('.')
+          : '';
+        if (path.includes('.') && typeof e.msg === 'string' && !this.fieldErrors[path]) {
+          this.fieldErrors[path] = e.msg;
         }
       });
     }
@@ -165,12 +176,21 @@ export function detailToMessage(data: any, fallback: string): string {
  * default except calls that are slow by nature -- an AED answer from a model
  * that reasons before replying can legitimately take longer.
  */
-export type ApiFetchOptions = RequestInit & { timeoutMs?: number };
+export type ApiFetchOptions = RequestInit & {
+  timeoutMs?: number;
+  /**
+   * One logical submission's key (see hooks/useSubmit). The server stores the
+   * first response under it and replays that for any repeat, so a double
+   * click or a retry after a lost response never creates a second record.
+   */
+  idempotencyKey?: string;
+};
 
 async function rawFetch(path: string, token: string | null | undefined, options: ApiFetchOptions) {
-  const { timeoutMs, ...init } = options;
+  const { timeoutMs, idempotencyKey, ...init } = options;
   options = init;
   const headers: any = { ...options.headers };
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   const isFormData = options.body && typeof (options.body as any).append === 'function';
   if (!isFormData) {
     headers['Content-Type'] = headers['Content-Type'] || 'application/json';
@@ -206,7 +226,21 @@ async function rawFetch(path: string, token: string | null | undefined, options:
   }
 }
 
+/** Unique enough for a request key; see hooks/useSubmit for the full story. */
+function requestKey(): string {
+  const c: any = (globalThis as any).crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
+
 export async function apiFetch(path: string, token?: string | null, options: ApiFetchOptions = {}) {
+  // Every write carries a key, so the refresh-and-resend below (and any
+  // future retry) can never run it twice. Forms that go through useSubmit
+  // pass their own, which also covers a user clicking again.
+  const method = (options.method || 'GET').toUpperCase();
+  if (method !== 'GET' && token && !options.idempotencyKey && !path.startsWith('/api/auth')) {
+    options = { ...options, idempotencyKey: requestKey() };
+  }
   let res = await rawFetch(path, token, options);
 
   // Access token expired: refresh once and retry with the new token.

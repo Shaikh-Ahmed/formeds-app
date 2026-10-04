@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { FormScrollView } from '../../../src/components/FormScrollView';
+import { useSubmit } from '../../../src/hooks/useSubmit';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../src/context/AuthContext';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../../src/theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../../../src/theme';
 import { PageColumn } from '../../../src/components/web';
 import {
   Avatar, Button, EmptyState, ErrorBanner, ErrorState, FormInput, LoadingState, Sheet,
@@ -99,12 +101,16 @@ export default function ManageOrganizationScreen() {
     }
   }, [token, id]);
 
-  const sendInvite = useCallback(async () => {
+  const inviteGuard = useSubmit();
+  const sendInvite = useCallback(() => inviteGuard.run(key => inviteOnce(key),
+    { id, email: inviteEmail.trim(), inviteRole }), [inviteGuard, id, inviteEmail, inviteRole]);
+
+  const inviteOnce = useCallback(async (key: string) => {
     if (!token || !id) return;
     setInviting(true);
     setActionError(null);
     try {
-      const res = await inviteMember(token, id, inviteEmail.trim(), inviteRole);
+      const res = await inviteMember(token, id, inviteEmail.trim(), inviteRole, key);
       // The token comes back to the INVITER, who shares the link. It never
       // appears in the members list, because anyone holding it can join.
       setInviteLink(`${API_URL.replace(/\/$/, '')}/org/invite/${res.invite_token}`);
@@ -238,7 +244,7 @@ export default function ManageOrganizationScreen() {
 
         <View style={styles.notice}><ErrorBanner message={actionError} /></View>
 
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <FormScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           {tab === 'details' ? (
             canEdit ? (
               <OrgForm
@@ -361,7 +367,7 @@ export default function ManageOrganizationScreen() {
               )}
             </View>
           ) : null}
-        </ScrollView>
+        </FormScrollView>
       </PageColumn>
 
       <Sheet
@@ -484,7 +490,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     minHeight: 36,
   },
-  tabOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  tabOn: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   tabText: { ...typography.small, color: colors.textSecondary },
   tabTextOn: { color: colors.white, fontFamily: fonts.body.semibold },
 
@@ -535,7 +541,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  roleChipOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  roleChipOn: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   roleChipText: { ...typography.caption, color: colors.textSecondary },
   roleChipTextOn: { color: colors.white, fontFamily: fonts.body.semibold },
   pressed: { opacity: 0.7 },

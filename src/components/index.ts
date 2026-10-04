@@ -21,3 +21,5 @@ export { NotificationsView } from './NotificationsView';
 export { ExpandableText } from './ExpandableText';
 export { MediaViewer } from './MediaViewer';
 export { ArticleFeedCard, formatArticleUrl } from './articles';
+export { BookCard, ContinueReadingCard, BooksCatalog } from './books';
+export { ResearchCard, ResearchCatalog } from './research';

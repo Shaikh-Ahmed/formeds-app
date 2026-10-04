@@ -51,9 +51,11 @@ export interface AedHistoryItem {
 
 export const askAed = (
   token: string, message: string, sessionId?: string | null, action?: AedAction | null,
+  idempotencyKey?: string,
 ): Promise<AedReply> =>
   apiFetch('/api/chat/message', token, {
     method: 'POST',
+    idempotencyKey,
     body: JSON.stringify({
       message, ...(sessionId ? { session_id: sessionId } : {}), ...(action ? { action } : {}),
     }),
@@ -66,6 +68,7 @@ export async function askAedWithFile(
   message: string,
   sessionId?: string | null,
   action?: AedAction | null,
+  idempotencyKey?: string,
 ): Promise<AedReply> {
   const form = new FormData();
   await appendFile(form, 'file', file);
@@ -73,7 +76,7 @@ export async function askAedWithFile(
   if (sessionId) form.append('session_id', sessionId);
   if (action) form.append('action', action);
   return apiFetch('/api/chat/attachment', token, {
-    method: 'POST', body: form as any, timeoutMs: AED_TIMEOUT_MS,
+    method: 'POST', body: form as any, timeoutMs: AED_TIMEOUT_MS, idempotencyKey,
   });
 }
 

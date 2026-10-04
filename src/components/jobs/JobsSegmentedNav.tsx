@@ -3,10 +3,10 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET, gloss, isPremium } from '../../theme';
 import { JobsModuleTabs } from './JobsModuleTabs';
 
-export type JobsSegment = 'discover' | 'saved' | 'applications' | 'posted';
+export type JobsSegment = 'discover' | 'internships' | 'saved' | 'applications' | 'posted';
 
 interface Segment {
   key: JobsSegment;
@@ -19,6 +19,15 @@ const SEEKER_SEGMENTS: Segment[] = [
   { key: 'discover', label: 'Discover', icon: 'compass-outline', href: '/jobs' },
   { key: 'saved', label: 'Saved', icon: 'bookmark-outline', href: '/jobs/saved' },
   { key: 'applications', label: 'Applications', icon: 'document-text-outline', href: '/jobs/applications' },
+];
+
+// Students: internships get their own place beside Discover. A student never
+// posts, so never sees Posted.
+const STUDENT_SEGMENTS: Segment[] = [
+  SEEKER_SEGMENTS[0],
+  { key: 'internships', label: 'Internships', icon: 'school-outline', href: '/jobs/internships' },
+  SEEKER_SEGMENTS[1],
+  SEEKER_SEGMENTS[2],
 ];
 
 const POSTED_SEGMENT: Segment = {
@@ -43,8 +52,9 @@ export function JobsSegmentedNav({ active }: { active: JobsSegment }) {
   const { isMobile } = useBreakpoint();
   const router = useRouter();
 
-  const canPost = !!user?.role;
-  const segments = canPost ? [...SEEKER_SEGMENTS, POSTED_SEGMENT] : SEEKER_SEGMENTS;
+  const student = user?.role === 'student';
+  const canPost = !!user?.role && !student;
+  const segments = student ? STUDENT_SEGMENTS : canPost ? [...SEEKER_SEGMENTS, POSTED_SEGMENT] : SEEKER_SEGMENTS;
 
   const content = (
     <View style={styles.row} accessibilityRole="tablist">
@@ -63,16 +73,17 @@ export function JobsSegmentedNav({ active }: { active: JobsSegment }) {
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={segment.label}
+            hitSlop={isPremium ? { top: 8, bottom: 8, left: 2, right: 2 } : undefined}
             style={({ pressed }) => [
-              styles.segment, selected && styles.segmentActive, pressed && styles.pressed,
+              styles.segment, isPremium && styles.cSegment, selected && styles.segmentActive, pressed && styles.pressed,
             ]}
           >
             <Ionicons
               name={segment.icon}
-              size={16}
+              size={isPremium ? 13 : 16}
               color={selected ? colors.white : colors.textSecondary}
             />
-            <Text style={[styles.label, selected && styles.labelActive]}>{segment.label}</Text>
+            <Text style={[styles.label, isPremium && styles.cLabel, selected && styles.labelActive]}>{segment.label}</Text>
           </Pressable>
         );
       })}
@@ -88,7 +99,8 @@ export function JobsSegmentedNav({ active }: { active: JobsSegment }) {
   // component gained when Locum arrived; the segments themselves are unchanged.
   return (
     <View>
-      <JobsModuleTabs active="jobs" />
+      {/* Locum is clinical cover; a student has no Jobs | Locum switch. */}
+      {student ? null : <JobsModuleTabs active="jobs" />}
       {isMobile ? (
         <ScrollView
           horizontal
@@ -105,9 +117,9 @@ export function JobsSegmentedNav({ active }: { active: JobsSegment }) {
 }
 
 const styles = StyleSheet.create({
-  scroller: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  wide: { paddingVertical: spacing.lg },
-  row: { flexDirection: 'row', gap: spacing.sm },
+  scroller: { paddingHorizontal: spacing.lg, paddingVertical: isPremium ? spacing.sm : spacing.md },
+  wide: { paddingVertical: isPremium ? spacing.md : spacing.lg },
+  row: { flexDirection: 'row', gap: isPremium ? 6 : spacing.sm },
   segment: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -119,9 +131,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     minHeight: MIN_TOUCH_TARGET - 6,
     justifyContent: 'center',
+    ...gloss.glass,
   },
-  segmentActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  segmentActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   label: { ...typography.caption, color: colors.textSecondary },
   labelActive: { color: colors.white, fontFamily: fonts.body.semibold },
   pressed: { opacity: 0.7 },
+  // Premium: compact segments (touch area restored by hit slop).
+  cSegment: { minHeight: 28, paddingHorizontal: spacing.sm + 2, gap: 4 },
+  cLabel: { fontSize: 12, lineHeight: 16 },
 });

@@ -7,8 +7,9 @@
 
 import { apiFetch } from '../utils/api';
 import type {
-  Locum, LocumFilters, LocumHistoryEvent, LocumsPage,
-  ManagedLocumApplication, MyLocumApplication,
+  Locum, LocumCancelReason, LocumFilters, LocumHistoryEvent, LocumRebooking, LocumReliability,
+  LocumReview, LocumStrike, LocumsPage, ManagedLocumApplication, ManagedShifts,
+  MyLocumApplication, ProfessionalShifts, UnblockCheckout,
 } from '../types/locum';
 
 export function buildLocumQuery(filters: LocumFilters = {}): string {
@@ -65,8 +66,8 @@ export const fetchLocumApplicationHistory = (
 
 // ── Writes ───────────────────────────────────────────────────────────────────
 
-export const createLocum = (token: string, data: Record<string, unknown>): Promise<Locum> =>
-  apiFetch('/api/locums/', token, { method: 'POST', body: JSON.stringify(data) });
+export const createLocum = (token: string, data: Record<string, unknown>, idempotencyKey?: string): Promise<Locum> =>
+  apiFetch('/api/locums/', token, { method: 'POST', body: JSON.stringify(data), idempotencyKey });
 
 export const updateLocum = (
   token: string, id: string, patch: Record<string, unknown>,
@@ -81,10 +82,10 @@ export const setLocumStatus = (
   });
 
 export const applyToLocum = (
-  token: string, id: string, note = '',
+  token: string, id: string, note = '', idempotencyKey?: string,
 ): Promise<MyLocumApplication> =>
   apiFetch(`/api/locums/${id}/apply`, token, {
-    method: 'POST', body: JSON.stringify({ note }),
+    method: 'POST', body: JSON.stringify({ note }), idempotencyKey,
   });
 
 export const withdrawLocumApplication = (
@@ -105,7 +106,89 @@ export const moveLocumApplication = (
 export const recordLocumInterview = (
   token: string, applicationId: string,
   data: { result: 'scheduled' | 'passed' | 'failed'; interview_at?: string; notes?: string },
+  idempotencyKey?: string,
 ): Promise<{ application: ManagedLocumApplication }> =>
   apiFetch(`/api/locums/applications/${applicationId}/interview`, token, {
-    method: 'POST', body: JSON.stringify(data),
+    method: 'POST', body: JSON.stringify(data), idempotencyKey,
   });
+
+// ── Shifts ───────────────────────────────────────────────────────────────────
+// Every time rule and every amount is the server's. These send intent only.
+
+const post = <T>(token: string, path: string, body: unknown = {}, idempotencyKey?: string): Promise<T> =>
+  apiFetch(`/api/locums/${path}`, token, { method: 'POST', body: JSON.stringify(body), idempotencyKey });
+
+export const fetchMyShifts = (token: string): Promise<ProfessionalShifts> =>
+  apiFetch('/api/locums/shifts/mine', token);
+
+export const fetchManagedShifts = (token: string): Promise<ManagedShifts> =>
+  apiFetch('/api/locums/shifts/managed', token);
+
+export const fetchMyReliability = (token: string): Promise<LocumReliability> =>
+  apiFetch('/api/locums/reliability', token);
+
+export const markArrival = (token: string, applicationId: string) =>
+  post<{ application: MyLocumApplication }>(token, `applications/${applicationId}/arrive`);
+
+export const cancelShift = (token: string, applicationId: string, reason: LocumCancelReason, details = '') =>
+  post<{ application: MyLocumApplication }>(token, `applications/${applicationId}/cancel`, { reason, details });
+
+export const disputeNoShow = (token: string, applicationId: string, reason: string) =>
+  post<{ strike: LocumStrike }>(token, `applications/${applicationId}/dispute`, { reason });
+
+export const approveAttendance = (token: string, applicationId: string) =>
+  post<{ application: ManagedLocumApplication }>(token, `applications/${applicationId}/attendance/approve`);
+
+export const reportNoShow = (token: string, applicationId: string) =>
+  post<{ application: ManagedLocumApplication; strike: LocumStrike }>(token, `applications/${applicationId}/no-show`);
+
+export interface LocumReviewInput {
+  overall: number;
+  punctuality?: number;
+  professionalism?: number;
+  communication?: number;
+  clinical?: number;
+  review?: string;
+}
+
+export const reviewShift = (token: string, applicationId: string, data: LocumReviewInput, idempotencyKey?: string) =>
+  post<{ review: LocumReview }>(token, `applications/${applicationId}/review`, data, idempotencyKey);
+
+export interface LocumRebookInput {
+  source_application_id: string;
+  shift_date: string;
+  start_time: string;
+  end_time: string;
+  shift_type?: string;
+  pay_amount: number;
+  pay_type?: string;
+  specialty?: string;
+  city?: string;
+  address?: string;
+  notes?: string;
+  message?: string;
+  require_interview?: boolean;
+  allow_outside_availability?: boolean;
+}
+
+export const requestAgain = (token: string, data: LocumRebookInput, idempotencyKey?: string) =>
+  post<LocumRebooking>(token, 'rebookings', data, idempotencyKey);
+
+export const acceptRebooking = (token: string, id: string, note = '') =>
+  post<LocumRebooking & { application: MyLocumApplication }>(token, `rebookings/${id}/accept`, { note });
+
+export const rejectRebooking = (token: string, id: string, note = '') =>
+  post<LocumRebooking>(token, `rebookings/${id}/reject`, { note });
+
+export const cancelRebooking = (token: string, id: string) =>
+  post<LocumRebooking>(token, `rebookings/${id}/cancel`);
+
+export const startUnblockCheckout = (token: string) =>
+  post<UnblockCheckout>(token, 'reliability/unblock/checkout');
+
+export const payUnblock = (
+  token: string, paymentId: string, outcome: 'success' | 'failure', method: 'card' | 'upi' | 'netbanking',
+  idempotencyKey?: string,
+) => post<{ status: string; already_processed: boolean; checkout: UnblockCheckout }>(
+  token, `reliability/unblock/${paymentId}/demo-pay`, { outcome, method }, idempotencyKey,
+);

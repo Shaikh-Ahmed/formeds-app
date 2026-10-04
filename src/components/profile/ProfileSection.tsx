@@ -33,6 +33,8 @@ interface Props {
   editable?: boolean;
   /** Suppresses the trailing rule on the last section of a column. */
   last?: boolean;
+  /** Overrides the header action's icon (e.g. "Manage" is not an add). */
+  actionIcon?: keyof typeof Ionicons.glyphMap;
   testID?: string;
 }
 
@@ -63,6 +65,7 @@ export function ProfileSection({
   onChangeVisibility,
   editable,
   last,
+  actionIcon: actionIconOverride,
   testID,
 }: Props) {
   // An empty optional section is a prompt to its owner and noise to everyone
@@ -72,7 +75,7 @@ export function ProfileSection({
 
   const showAdd = editable && !!onAdd;
   const actionLabel = singular && !isEmpty ? 'Edit' : addLabel;
-  const actionIcon = singular && !isEmpty ? 'pencil' : 'add';
+  const actionIcon = actionIconOverride ?? (singular && !isEmpty ? 'pencil' : 'add');
   const showPrivacy = editable && !!onChangeVisibility && !!visibility;
 
   return (

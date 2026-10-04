@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, TextInputProps } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Platform, View, Text, TextInput, StyleSheet, TouchableOpacity, TextInputProps } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, MIN_TOUCH_TARGET } from '../theme';
+import { colors, fonts, radius, spacing, typography, isPremium, MIN_TOUCH_TARGET } from '../theme';
+import { FieldError, useFieldError } from './FieldError';
 
 interface Props extends Omit<TextInputProps, 'style'> {
   label: string;
@@ -25,6 +26,9 @@ export function FormInput({ label, icon, error, secure, rows, testID, ...inputPr
   const multiline = !!inputProps.multiline;
   const minHeight = multiline ? ROW_HEIGHT * (rows ?? 4) : undefined;
   const [hidden, setHidden] = useState(true);
+  const err = useFieldError(error);
+  const inputRef = useRef<TextInput>(null);
+  const [focused, setFocused] = useState(false);
   return (
     <View style={styles.group}>
       <Text style={styles.label}>{label}</Text>
@@ -32,11 +36,14 @@ export function FormInput({ label, icon, error, secure, rows, testID, ...inputPr
         style={[
           styles.wrap,
           multiline ? styles.wrapMultiline : null,
+          isPremium && styles.pWrap,
+          isPremium && focused && styles.pFocus,
           error ? styles.wrapError : null,
         ]}
       >
         {icon ? <Ionicons name={icon} size={20} color={colors.textMuted} style={styles.icon} /> : null}
         <TextInput
+          ref={inputRef}
           testID={testID}
           style={[styles.input, multiline ? { minHeight } : null]}
           // Without this the cursor starts vertically centred on Android,
@@ -45,7 +52,10 @@ export function FormInput({ label, icon, error, secure, rows, testID, ...inputPr
           placeholderTextColor={colors.textMuted}
           secureTextEntry={secure && hidden}
           accessibilityLabel={label}
+          {...err.inputProps}
           {...inputProps}
+          onFocus={e => { setFocused(true); inputProps.onFocus?.(e); }}
+          onBlur={e => { setFocused(false); inputProps.onBlur?.(e); }}
         />
         {secure ? (
           <TouchableOpacity
@@ -58,7 +68,7 @@ export function FormInput({ label, icon, error, secure, rows, testID, ...inputPr
           </TouchableOpacity>
         ) : null}
       </View>
-      {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
+      <FieldError message={error} id={err.id} onFocusField={() => inputRef.current?.focus()} />
       {/* A counter for long text, once it is worth knowing: from 70% of the
           limit, so a short answer is not cluttered by "12 / 20000". */}
       {multiline && inputProps.maxLength && String(inputProps.value ?? '').length >= inputProps.maxLength * 0.7 ? (
@@ -70,9 +80,24 @@ export function FormInput({ label, icon, error, secure, rows, testID, ...inputPr
   );
 }
 
+
+// ── ForMeds Premium: the field as a recessed well ─────────────────────────────
+// A pale fill with no visible border and a faint inner shadow reads as a place
+// to type; on focus it lifts to white with a teal ring. Error keeps a red ring.
+const PREMIUM_WELL = {
+  backgroundColor: colors.bgMuted,
+  borderColor: 'transparent',
+  borderRadius: radius.input,
+  minHeight: 48,
+  ...(Platform.OS === 'web' ? ({ boxShadow: 'inset 0 1px 2px rgba(15,23,42,0.06)', transition: 'background-color 200ms cubic-bezier(0.2,0,0,1), box-shadow 200ms cubic-bezier(0.2,0,0,1)' } as object) : {}),
+};
+const PREMIUM_FOCUS = Platform.OS === 'web'
+  ? ({ backgroundColor: colors.white, borderColor: colors.teal, boxShadow: '0 0 0 3px rgba(15,118,110,0.14)' } as object)
+  : { backgroundColor: colors.white, borderColor: colors.teal };
+
 const styles = StyleSheet.create({
   group: { marginBottom: spacing.lg + 2 },
-  label: { ...typography.label, color: '#334155', marginBottom: 6 },
+  label: { ...typography.label, color: colors.textBody, marginBottom: 6 },
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -87,7 +112,11 @@ const styles = StyleSheet.create({
   // A tall field aligns its icon and toggle to the first line, not the middle.
   wrapMultiline: { alignItems: 'flex-start', paddingVertical: spacing.sm },
   icon: { marginRight: spacing.sm + 2 },
-  input: { flex: 1, fontSize: 16, color: colors.text, paddingVertical: spacing.md },
+  input: isPremium
+    ? { flex: 1, fontSize: 15, fontFamily: fonts.body.medium, color: colors.text, paddingVertical: spacing.md }
+    : { flex: 1, fontSize: 16, color: colors.text, paddingVertical: spacing.md },
+  pWrap: PREMIUM_WELL,
+  pFocus: PREMIUM_FOCUS,
   error: { color: colors.redText, fontSize: 13, marginTop: 4 },
   counter: { ...typography.small, color: colors.textSecondary, marginTop: 4, textAlign: 'right' },
 });

@@ -1,4 +1,5 @@
 import React from 'react';
+import { FieldError } from '../FieldError';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, radius, spacing, typography, MIN_TOUCH_TARGET } from '../../theme';
@@ -175,7 +176,7 @@ export function ScreeningEditor({ questions, onChange, errors, hasApplicants }: 
             <Switch value={q.required} onValueChange={v => update(i, { required: v })} accessibilityLabel="Required"
               trackColor={{ true: colors.teal, false: colors.border }} thumbColor={colors.white} />
           </View>
-          {errors[i] ? <Text style={styles.error} accessibilityRole="alert">{errors[i]}</Text> : null}
+          <FieldError message={errors[i]} />
         </View>
       ))}
 
@@ -252,7 +253,7 @@ export function ScreeningAnswerInput({ question: q, value, onChange, error, inde
     <View style={styles.answerBlock}>
       <Text style={styles.qLabel}>{label}</Text>
       {control}
-      {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
+      <FieldError message={error} />
     </View>
   );
 }
@@ -355,7 +356,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
     backgroundColor: colors.white,
   },
-  checkOn: { borderColor: colors.navy, backgroundColor: colors.bg },
+  checkOn: { borderColor: colors.primaryFill, backgroundColor: colors.bg },
   checkText: { ...typography.body, color: colors.text },
 
   summary: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radius.md },

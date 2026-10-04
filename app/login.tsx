@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
+import { FormScrollView } from '../src/components/FormScrollView';
+import { useFormErrors } from '../src/hooks/useFormErrors';
+import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,18 +11,23 @@ import { Button, FormInput, ErrorBanner } from '../src/components';
 import { colors, radius, spacing, typography } from '../src/theme';
 import { validateEmail, validateRequired, firstError } from '../src/utils/validation';
 import { AuthShell } from '../src/components/web';
+import { GoogleSignInButton } from '../src/components/auth/GoogleSignInButton';
+import { useGoogleSignIn } from '../src/components/auth/useGoogleSignIn';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const errs = useFormErrors<'email' | 'password'>({ known: ['email', 'password'] });
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  const google = useGoogleSignIn();
 
   const handleLogin = async () => {
-    const problem = firstError(validateEmail(email), validateRequired(password, 'Password'));
-    if (problem) { setError(problem); return; }
+    // Every field is checked, and each problem shown under its own field.
+    if (!errs.check({ email: validateEmail(email), password: validateRequired(password, 'Password') })) return;
+    if (loading) return;
 
     setLoading(true);
     setError(null);
@@ -44,7 +51,8 @@ export default function LoginScreen() {
         });
         return;
       }
-      setError(e?.message || 'Login failed');
+      // A wrong email/password pair is deliberately not pinned to either field.
+      if (!errs.fromError(e)) setError(e?.message || 'Could not sign in. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -54,29 +62,33 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.safe}>
       <AuthShell maxWidth={460}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <TouchableOpacity
-            testID="login-back-btn"
-            style={styles.backBtn}
-            onPress={() => router.back()}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.navy} />
-          </TouchableOpacity>
-
-          <Image source={require('../assets/images/formeds-logo.png')} style={styles.logo} resizeMode="contain" />
+        <FormScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          {/* Back button and logo share one line, so the whole form fits a
+              laptop screen without scrolling. */}
+          <View style={styles.headRow}>
+            <TouchableOpacity
+              testID="login-back-btn"
+              style={styles.backBtn}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.navy} />
+            </TouchableOpacity>
+            <Image source={require('../assets/images/formeds-logo.png')} style={styles.logo} resizeMode="contain" />
+          </View>
           <Text style={styles.title} accessibilityRole="header">Welcome back</Text>
           <Text style={styles.subtitle}>Sign in to your ForMeds account</Text>
 
-          <ErrorBanner message={error} />
+          <ErrorBanner message={error || google.error} />
 
           <FormInput maxLength={200}
             testID="login-email-input"
             label="Email"
             icon="mail-outline"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={v => { setEmail(v); errs.clear('email'); }}
+            error={errs.fields.email}
             placeholder="you@example.com"
             keyboardType="email-address"
             autoCapitalize="none"
@@ -88,7 +100,8 @@ export default function LoginScreen() {
             label="Password"
             icon="lock-closed-outline"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={v => { setPassword(v); errs.clear('password'); }}
+            error={errs.fields.password}
             placeholder="Enter password"
             autoCapitalize="none"
             autoComplete="current-password"
@@ -105,14 +118,19 @@ export default function LoginScreen() {
             <Text style={styles.forgotText}>Forgot password?</Text>
           </TouchableOpacity>
 
-          <Button testID="login-submit-btn" label="Sign in" onPress={handleLogin} loading={loading} />
+          <Button testID="login-submit-btn" label="Sign in" loadingLabel="Signing in…" onPress={handleLogin} loading={loading} />
+
+          {/* Normal ForMeds accounts only. Recruiters sign in on their own page,
+              which has no Google option. */}
+          <GoogleSignInButton divider="above" text="continue_with" testID="login-google"
+            onCredential={google.signIn} onError={google.setError} />
 
           <TouchableOpacity style={styles.linkBtn} onPress={() => router.replace('/')} accessibilityRole="link">
             <Text style={styles.linkText}>
               Don&apos;t have an account? <Text style={styles.linkBold}>Register</Text>
             </Text>
           </TouchableOpacity>
-        </ScrollView>
+        </FormScrollView>
       </KeyboardAvoidingView>
       </AuthShell>
     </SafeAreaView>
@@ -123,11 +141,13 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.white },
   flex: { flex: 1 },
   scroll: { paddingHorizontal: spacing.xxl, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
+  headRow: { height: 60, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xl },
   backBtn: {
+    position: 'absolute', left: 0, top: 8,
     width: 44, height: 44, borderRadius: radius.lg, backgroundColor: colors.bgMuted,
-    alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xxl,
+    alignItems: 'center', justifyContent: 'center',
   },
-  logo: { width: 140, height: 60, alignSelf: 'center', marginBottom: spacing.xxl },
+  logo: { width: 140, height: 60 },
   title: { ...typography.h1, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xxl },
   forgotBtn: { alignSelf: 'flex-end', paddingVertical: spacing.sm, marginBottom: spacing.md, minHeight: 44, justifyContent: 'center' },

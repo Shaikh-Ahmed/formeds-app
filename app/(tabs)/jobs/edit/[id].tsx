@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useSubmit } from '../../../../src/hooks/useSubmit';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,7 @@ import { fetchJob, setJobStatus, updateJob } from '../../../../src/api/jobs';
 import { fetchMyOrganizations } from '../../../../src/api/organizations';
 import type { Job } from '../../../../src/types/jobs';
 import type { Organization } from '../../../../src/types/organizations';
+import { eligibilityOf } from '../../../../src/utils/roles';
 
 /**
  * Editing an existing posting.
@@ -40,7 +42,7 @@ export default function EditJobScreen() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [actionError, setActionError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, run } = useSubmit();
 
   const load = useCallback(async () => {
     if (!token || !id) { setLoading(false); return; }
@@ -51,22 +53,22 @@ export default function EditJobScreen() {
         fetchMyOrganizations(token).catch(() => []),
       ]);
       setJob(j);
-      setOrgs(mine);
+      // Not the hospital/clinic account's own organisation -- see jobs/new.tsx.
+      setOrgs(mine.filter(o => o.account_user_id !== user?.id));
     } catch (e: any) {
       setError(e?.message || 'Could not load this posting.');
       setFieldErrors(errorFields(e, JOB_ERROR_FIELDS));
     } finally {
       setLoading(false);
     }
-  }, [token, id]);
+  }, [token, id, user?.id]);
 
   useEffect(() => { load(); }, [load]);
 
-  const submit = useCallback(async (
+  const submit = useCallback((
     payload: Record<string, unknown>, { publish }: { publish: boolean },
-  ) => {
+  ) => run(async () => {
     if (!token || !job) return;
-    setSubmitting(true);
     setActionError(null);
     try {
       // The employer cannot be moved after the fact — applications are attached
@@ -78,11 +80,11 @@ export default function EditJobScreen() {
       }
       router.replace(postingsHref as any);
     } catch (e: any) {
-      setActionError(e?.message || 'Could not save these changes.');
-    } finally {
-      setSubmitting(false);
+      const fields = errorFields(e, JOB_ERROR_FIELDS);
+      setFieldErrors(fields);
+      setActionError(Object.keys(fields).length ? null : e?.message || 'Could not save these changes. Please try again.');
     }
-  }, [token, job, router, postingsHref]);
+  }, payload), [token, job, router, postingsHref, run]);
 
   if (loading) return <LoadingState label="Loading posting…" />;
   if (error) return <ErrorState message={error} onRetry={load} />;
@@ -170,6 +172,7 @@ function toDraft(job: Job): Partial<JobDraft> {
     description: job.description ?? '',
     responsibilities: job.responsibilities ?? '',
     is_urgent: job.is_urgent,
+    eligibility: eligibilityOf(job),
   };
 }
 

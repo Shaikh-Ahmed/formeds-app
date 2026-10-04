@@ -69,7 +69,8 @@ export const fetchCities = (token: string): Promise<string[]> => apiFetch('/api/
 
 export const sendInvitation = (
   token: string, body: { professional_id: string; job_id?: string; locum_id?: string; message?: string },
-): Promise<Invitation> => apiFetch('/api/recruiters/invitations', token, json('POST', body));
+  idempotencyKey?: string,
+): Promise<Invitation> => apiFetch('/api/recruiters/invitations', token, { ...json('POST', body), idempotencyKey });
 
 export const fetchSentInvitations = (token: string): Promise<Invitation[]> =>
   apiFetch('/api/recruiters/invitations', token);

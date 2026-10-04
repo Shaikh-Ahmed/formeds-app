@@ -49,7 +49,8 @@ export default function OpportunitiesScreen() {
   const [tab, setTab] = useState<Tab>((['preferences', 'availability', 'invitations'].includes(params.tab || '')
     ? params.tab : 'preferences') as Tab);
 
-  if (user && user.role !== 'healthcare_professional') {
+  const student = user?.role === 'student';
+  if (user && user.role !== 'healthcare_professional' && !student) {
     return (
       <RecruiterScreen title="Opportunities">
         <Notice tone="neutral" title="For healthcare professionals"
@@ -58,21 +59,24 @@ export default function OpportunitiesScreen() {
     );
   }
 
+  // A student's career preferences: visibility and invitations to jobs and
+  // internships. Locum availability is for registered professionals.
+  const shown: Tab = student && tab === 'availability' ? 'preferences' : tab;
   return (
-    <RecruiterScreen title="Opportunities" testID="opportunities-screen">
-      <ChoiceChips value={tab} onChange={v => v && setTab(v)} testID="opportunities-tabs" choices={[
+    <RecruiterScreen title={student ? 'Career preferences' : 'Opportunities'} testID="opportunities-screen">
+      <ChoiceChips value={shown} onChange={v => v && setTab(v)} testID="opportunities-tabs" choices={[
         { value: 'preferences', label: 'Preferences', icon: 'options-outline' },
-        { value: 'availability', label: 'Availability', icon: 'calendar-outline' },
+        ...(student ? [] : [{ value: 'availability' as const, label: 'Availability', icon: 'calendar-outline' as const }]),
         { value: 'invitations', label: 'Invitations', icon: 'mail-outline' },
       ]} />
-      {tab === 'preferences' ? <Preferences /> : tab === 'availability' ? <Availability /> : <Invitations />}
+      {shown === 'preferences' ? <Preferences student={student} /> : shown === 'availability' ? <Availability /> : <Invitations />}
     </RecruiterScreen>
   );
 }
 
 // ── Preferences ─────────────────────────────────────────────────────────────
 
-function Preferences() {
+function Preferences({ student = false }: { student?: boolean }) {
   const { token } = useAuth();
   const [s, setS] = useState<DiscoverySettings | null>(null);
   const [cities, setCities] = useState<string[]>([]);
@@ -93,8 +97,10 @@ function Preferences() {
     if (!token) return;
     setSaving(true); setError(null);
     try {
-      const { city_known: _k, state: _s, ...body } = s;
-      setS(await saveDiscovery(token, body));
+      const { city_known: _k, state: _s, ...all } = s;
+      // A student never sends locum settings: the server refuses them.
+      const { available_for_locum: _l, locum_alerts: _a, locum_roles: _r, ...studentBody } = all;
+      setS(await saveDiscovery(token, (student ? studentBody : all) as typeof all));
       setSaved(true);
     } catch (e: any) {
       setError(e?.message || 'Could not save your preferences.');
@@ -106,11 +112,15 @@ function Preferences() {
   return (
     <>
       <Card title="Visibility" subtitle="All of these are off until you turn them on.">
-        <ToggleRow label="Open to job opportunities" value={s.open_to_jobs} onChange={v => update({ open_to_jobs: v })}
-          hint="Signals you'd consider new permanent or contract roles." testID="toggle-open-to-jobs" />
-        <ToggleRow label="Available for locum shifts" value={s.available_for_locum}
-          onChange={v => update({ available_for_locum: v })}
-          hint="Lets us alert you to shifts that fit your availability." testID="toggle-locum" />
+        <ToggleRow label={student ? 'Open to internships and jobs' : 'Open to job opportunities'} value={s.open_to_jobs}
+          onChange={v => update({ open_to_jobs: v })}
+          hint={student ? "Signals you'd consider internships and roles open to students." : "Signals you'd consider new permanent or contract roles."}
+          testID="toggle-open-to-jobs" />
+        {student ? null : (
+          <ToggleRow label="Available for locum shifts" value={s.available_for_locum}
+            onChange={v => update({ available_for_locum: v })}
+            hint="Lets us alert you to shifts that fit your availability." testID="toggle-locum" />
+        )}
         <ToggleRow label="Discoverable by verified recruiters" value={s.recruiter_discovery}
           onChange={v => update({ recruiter_discovery: v })}
           hint="Verified recruiters can find your public profile and invite you to apply. They never see your email, phone or exact location."
@@ -118,23 +128,27 @@ function Preferences() {
       </Card>
 
       <Card title="Location" subtitle="We only ever show your city and an approximate distance.">
-        <SelectField label="City you work from" value={s.city} onChange={city => update({ city })} options={cities}
+        <SelectField label={student ? 'City you study in' : 'City you work from'} value={s.city} onChange={city => update({ city })} options={cities}
           placeholder="Choose a city" searchPlaceholder="Search cities" testID="discovery-city" />
-        <ChoiceChips label="Alert me about locum shifts within" value={String(s.max_distance_km) as typeof DISTANCES[number]}
+        {student ? null : <ChoiceChips label="Alert me about locum shifts within" value={String(s.max_distance_km) as typeof DISTANCES[number]}
           onChange={v => v && update({ max_distance_km: Number(v) })} testID="discovery-distance"
-          choices={DISTANCES.map(d => ({ value: d, label: `${d} km` }))} />
+          choices={DISTANCES.map(d => ({ value: d, label: `${d} km` }))} />}
       </Card>
 
-      <Card title="Locum matching">
-        <MultiChips label="Roles you cover" options={LOCUM_ROLES} value={s.locum_roles}
-          onChange={v => update({ locum_roles: v })} testID="discovery-roles" />
-        <Text style={recruiterStyles.muted}>Leave empty to hear about every role.</Text>
-      </Card>
+      {student ? null : (
+        <Card title="Locum matching">
+          <MultiChips label="Roles you cover" options={LOCUM_ROLES} value={s.locum_roles}
+            onChange={v => update({ locum_roles: v })} testID="discovery-roles" />
+          <Text style={recruiterStyles.muted}>Leave empty to hear about every role.</Text>
+        </Card>
+      )}
 
       <Card title="Alerts">
-        <ToggleRow label="Locum shift matches" value={s.locum_alerts === 'immediate'}
-          onChange={v => update({ locum_alerts: v ? 'immediate' : 'off' })}
-          hint="A notification when a new shift matches your role, distance and availability." testID="toggle-locum-alerts" />
+        {student ? null : (
+          <ToggleRow label="Locum shift matches" value={s.locum_alerts === 'immediate'}
+            onChange={v => update({ locum_alerts: v ? 'immediate' : 'off' })}
+            hint="A notification when a new shift matches your role, distance and availability." testID="toggle-locum-alerts" />
+        )}
         <ToggleRow label="Recruiter invitations" value={s.invitation_alerts === 'immediate'}
           onChange={v => update({ invitation_alerts: v ? 'immediate' : 'off' })} testID="toggle-invite-alerts" />
       </Card>
@@ -175,6 +189,8 @@ function Availability() {
   const [start, setStart] = useState('09:00');
   const [end, setEnd] = useState('17:00');
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Problems that belong to one input: shown under that input, not the section.
+  const [fieldError, setFieldError] = useState<{ end?: string; date?: string; overrideEnd?: string }>({});
   const [override, setOverride] = useState({ on_date: '', available: false, allDay: true, start: '09:00', end: '17:00' });
 
   useEffect(() => {
@@ -189,20 +205,23 @@ function Availability() {
   // or a window overlapping one already on that day, are not.
   const addWeekly = (weekday: number) => {
     const problem = validateTimeRange(start, end, { allowOvernight: true });
-    if (problem) { setError(problem); return; }
+    setFieldError({ end: problem ?? undefined });
+    if (problem) { setError(null); return; }
     const slot: AvailabilitySlot = { kind: 'weekly', weekday, start_time: start, end_time: end, available: true };
+    // An overlap involves two windows, not one input: it stays a section message.
     if (overlaps(slots, slot)) { setError(`Availability periods overlap on ${FULL_DAYS[weekday]}.`); return; }
     setError(null);
     change([...slots, slot]);
     setAdding(null);
   };
   const addOverride = () => {
-    if (!override.on_date) { setError('Please choose the date.'); return; }
-    if (override.on_date < todayString()) { setError('Availability exceptions cannot be in the past.'); return; }
+    const dateProblem = !override.on_date ? 'Please choose the date.'
+      : override.on_date < todayString() ? 'Availability exceptions cannot be in the past.' : null;
     const st = override.allDay ? '00:00' : override.start;
     const en = override.allDay ? '23:59' : override.end;
     const problem = override.allDay ? null : validateTimeRange(st, en, { allowOvernight: true });
-    if (problem) { setError(problem); return; }
+    setFieldError({ date: dateProblem ?? undefined, overrideEnd: problem ?? undefined });
+    if (dateProblem || problem) { setError(null); return; }
     const slot: AvailabilitySlot = { kind: 'date', on_date: override.on_date, start_time: st, end_time: en, available: override.available };
     if (overlaps(slots, slot)) { setError(`You already have an exception covering ${displayDate(override.on_date)}.`); return; }
     setError(null);
@@ -252,7 +271,8 @@ function Availability() {
                         <TimeField label="From" value={start} onChange={setStart} testID="avail-start" />
                       </View>
                       <View style={styles.timeCol}>
-                        <TimeField label="To" value={end} onChange={setEnd} testID="avail-end" />
+                        <TimeField label="To" value={end} testID="avail-end" error={fieldError.end}
+                          onChange={v => { setEnd(v); setFieldError(f => ({ ...f, end: undefined })); }} />
                       </View>
                     </View>
                     {error ? <ErrorBanner message={error} /> : null}
@@ -294,7 +314,8 @@ function Availability() {
         ))}
         <View style={styles.overrideForm}>
           <DateField label="Date" value={override.on_date} min={todayString()} testID="override-date"
-            onChange={v => setOverride({ ...override, on_date: v })} />
+            error={fieldError.date}
+            onChange={v => { setOverride({ ...override, on_date: v }); setFieldError(f => ({ ...f, date: undefined })); }} />
           <ChoiceChips value={override.available ? 'yes' : 'no'} testID="override-kind"
             onChange={v => v && setOverride({ ...override, available: v === 'yes' })}
             choices={[{ value: 'no', label: 'Unavailable' }, { value: 'yes', label: 'Available' }]} />
@@ -305,7 +326,8 @@ function Availability() {
                 <TimeField label="From" value={override.start} onChange={v => setOverride({ ...override, start: v })} />
               </View>
               <View style={styles.timeCol}>
-                <TimeField label="To" value={override.end} onChange={v => setOverride({ ...override, end: v })} />
+                <TimeField label="To" value={override.end} error={fieldError.overrideEnd}
+                  onChange={v => { setOverride({ ...override, end: v }); setFieldError(f => ({ ...f, overrideEnd: undefined })); }} />
               </View>
             </View>
           ) : null}
@@ -454,7 +476,7 @@ const styles = StyleSheet.create({
   windows: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center', minHeight: 40 },
   window: {
     flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.md, minHeight: 34,
-    borderRadius: radius.pill, backgroundColor: '#EFF6FF',
+    borderRadius: radius.pill, backgroundColor: colors.tintBg,
   },
   windowText: { fontSize: 13, fontFamily: fonts.body.semibold, color: colors.navy },
   plus: {

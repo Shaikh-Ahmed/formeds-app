@@ -17,6 +17,7 @@ export default function JobsLayout() {
   return (
     <Stack screenOptions={{ headerShown: false, animation: 'fade' }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="internships" />
       <Stack.Screen name="saved" />
       <Stack.Screen name="applications" />
       <Stack.Screen name="posted" />

@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useSubmit } from '../../../src/hooks/useSubmit';
+import { ApiError } from '../../../src/utils/api';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -46,7 +48,7 @@ export default function JobDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [applyOpen, setApplyOpen] = useState(false);
-  const [applying, setApplying] = useState(false);
+  const { submitting: applying, run: runApply } = useSubmit();
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -78,20 +80,22 @@ export default function JobDetailScreen() {
     if (job) shareJob(job);
   }, [job]);
 
-  const submit = useCallback(async (note: string, extras?: ApplyExtras) => {
+  const submit = useCallback((note: string, extras?: ApplyExtras) => runApply(async key => {
     if (!token || !job) return;
-    setApplying(true);
     setActionError(null);
     try {
-      await applyToJob(token, job.id, note, extras);
+      // Keyed: a second tap or a retry returns this same application.
+      await applyToJob(token, job.id, note, extras, key);
       setApplyOpen(false);
       setJob(prev => (prev ? { ...prev, has_applied: true } : prev));
     } catch (e: any) {
-      setActionError(e?.message || 'Could not submit your application.');
-    } finally {
-      setApplying(false);
+      if (e instanceof ApiError && e.code === 'already_applied') {
+        setApplyOpen(false);
+        setJob(prev => (prev ? { ...prev, has_applied: true } : prev));
+      }
+      setActionError(e?.message || 'Could not submit your application. Please try again.');
     }
-  }, [token, job]);
+  }, { job: job?.id, note, extras }), [token, job, runApply]);
 
   if (mounted && isDesktop && !isRecruiter) {
     return (

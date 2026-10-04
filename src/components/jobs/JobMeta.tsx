@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts } from '../../theme';
+import { colors, radius, spacing, typography, fonts, isPremium } from '../../theme';
 import {
   EMPLOYMENT_TYPE_LABELS, PAY_PERIOD_LABELS, WORK_MODE_LABELS, isShiftRole,
   type Job,
@@ -80,10 +80,18 @@ export function formatTypeLine(job: Job): string {
   return `${type} · ${WORK_MODE_LABELS[job.work_mode] ?? job.work_mode}`;
 }
 
-const TONES = {
+// Premium: status pills carry a hairline in their own tint, as the reference's
+// "Peer review" / "Credentialing verified" marks do.
+const TONES = isPremium ? {
+  neutral: { bg: colors.bgMuted, fg: colors.textBody, line: colors.border },
+  teal: { bg: colors.tealBg, fg: colors.tealInk, line: colors.tealLine },
+  navy: { bg: colors.infoBg, fg: colors.info, line: colors.infoLine },
+  danger: { bg: colors.redBg, fg: colors.redText, line: colors.redLine },
+  warning: { bg: colors.warningBg, fg: colors.warning, line: colors.warningLine },
+} as const : {
   neutral: { bg: colors.bgMuted, fg: colors.textSecondary },
   teal: { bg: colors.tealBg, fg: colors.teal },
-  navy: { bg: '#EFF6FF', fg: colors.navy },
+  navy: { bg: colors.tintBg, fg: colors.navy },
   // redText, not red: `red` is 3.6:1 on redBg and fails contrast as text.
   danger: { bg: colors.redBg, fg: colors.redText },
   warning: { bg: colors.warningBg, fg: colors.warning },
@@ -105,9 +113,10 @@ export function JobBadge({
   icon?: keyof typeof Ionicons.glyphMap;
   tone?: BadgeTone;
 }) {
-  const { bg, fg } = TONES[tone];
+  const t = TONES[tone] as { bg: string; fg: string; line?: string };
+  const { bg, fg } = t;
   return (
-    <View style={[styles.badge, { backgroundColor: bg }]}>
+    <View style={[styles.badge, { backgroundColor: bg }, t.line ? { borderWidth: 1, borderColor: t.line } : null]}>
       {icon ? <Ionicons name={icon} size={12} color={fg} /> : null}
       <Text style={[styles.badgeText, { color: fg }]}>{label}</Text>
     </View>
@@ -123,7 +132,7 @@ export function MetaItem({
 }) {
   return (
     <View style={styles.meta}>
-      <Ionicons name={icon} size={14} color={colors.textSecondary} />
+      <Ionicons name={icon} size={isPremium ? 13 : 14} color={isPremium ? colors.textSubtle : colors.textSecondary} />
       <Text style={styles.metaText} numberOfLines={1}>{text}</Text>
     </View>
   );
@@ -139,7 +148,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignSelf: 'flex-start',
   },
-  badgeText: { ...typography.small, fontFamily: fonts.body.semibold },
+  badgeText: isPremium ? { fontSize: 11, lineHeight: 15, fontFamily: fonts.body.bold } : { ...typography.small, fontFamily: fonts.body.semibold },
   meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1 },
   metaText: { ...typography.caption, color: colors.textSecondary },
 });

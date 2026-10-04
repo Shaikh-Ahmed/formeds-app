@@ -30,6 +30,8 @@ export interface Job {
   posted_as: 'individual' | 'organization';
 
   employment_type: EmploymentType;
+  /** Who may apply. Missing on older postings = professionals only. */
+  eligibility?: 'professionals' | 'students' | 'both';
   title: string;
   specialty: string;
   department?: string;
@@ -111,6 +113,8 @@ export interface JobFilters {
   posted_within_days?: number;
   org_id?: string;
   sort?: JobSort;
+  /** 'students': only postings a student can apply to (set by the page, not a user filter). */
+  audience?: 'students';
 }
 
 export interface Application {

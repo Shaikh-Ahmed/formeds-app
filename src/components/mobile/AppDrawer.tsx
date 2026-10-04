@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, radius, typography, fonts, getRoleMeta, MIN_TOUCH_TARGET } from '../../theme';
 import { useAuth } from '../../context/AuthContext';
+import { kycCopy, useKycStatus } from '../../hooks/useKycStatus';
 import { Avatar } from '../Avatar';
 
 const DRAWER_MAX = 320;
@@ -44,9 +45,16 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
   // first frame would make the panel vanish instead of slide out.
   const [mounted, setMounted] = useState(visible);
   const [reduceMotion, setReduceMotion] = useState(false);
+  // "Under review" is not "pending": someone who has submitted must not be
+  // told to complete verification again. Recruiters verify through their own
+  // portal, so their status is not the KYC one.
+  const { state: kycStatus } = useKycStatus({
+    enabled: !!user && !isKycApproved && user.role !== 'recruiter',
+  });
+  const kyc = kycCopy(kycStatus?.status);
 
   useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
+    AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -120,9 +128,7 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
                 testID="drawer-kyc"
                 onPress={() => go(user?.role === 'recruiter' ? '/recruiter/account' : '/kyc')}
                 accessibilityRole="link"
-                accessibilityLabel={
-                  isKycApproved ? 'Verified account' : 'Verification pending. Complete verification'
-                }
+                accessibilityLabel={isKycApproved ? 'Verified account' : `${kyc.title}. ${kyc.cta}`}
                 style={({ pressed }) => [
                   styles.kyc,
                   isKycApproved ? styles.kycOk : styles.kycPending,
@@ -136,10 +142,12 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
                 />
                 <View style={styles.kycBody}>
                   <Text style={[styles.kycTitle, { color: isKycApproved ? colors.teal : colors.warning }]}>
-                    {isKycApproved ? 'Verified' : 'Verification pending'}
+                    {isKycApproved ? 'Verified' : kyc.title}
                   </Text>
                   {!isKycApproved && (
-                    <Text style={styles.kycHint}>Tap to complete verification</Text>
+                    <Text style={styles.kycHint}>
+                      {kycStatus?.status === 'pending' ? 'We are checking your documents' : `Tap to ${kyc.cta.toLowerCase()}`}
+                    </Text>
                   )}
                 </View>
                 {!isKycApproved && (
@@ -152,6 +160,10 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
               {user?.role === 'recruiter' ? (
                 <DrawerRow icon="grid-outline" label="Recruiter portal" iconColor={colors.recruiter}
                   onPress={() => go('/recruiter')} testID="drawer-recruiter" />
+              ) : null}
+              {user?.role === 'student' ? (
+                <DrawerRow icon="compass-outline" label="Career preferences & visibility"
+                  onPress={() => go('/opportunities')} testID="drawer-opportunities" />
               ) : null}
               {user?.role === 'healthcare_professional' ? (
                 <DrawerRow icon="compass-outline" label="Opportunities & availability"
@@ -177,6 +189,20 @@ export function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () 
                     iconColor={colors.teal}
                     onPress={() => go('/admin/recruiters')}
                     testID="drawer-admin-recruiters"
+                  />
+                  <DrawerRow
+                    icon="calendar-outline"
+                    label="Locum reliability"
+                    iconColor={colors.teal}
+                    onPress={() => go('/admin/locum')}
+                    testID="drawer-admin-locum"
+                  />
+                  <DrawerRow
+                    icon="school-outline"
+                    label="Student accounts"
+                    iconColor={colors.teal}
+                    onPress={() => go('/admin/students')}
+                    testID="drawer-admin-students"
                   />
                 </>
               ) : null}

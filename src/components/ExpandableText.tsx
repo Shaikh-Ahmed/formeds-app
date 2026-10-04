@@ -111,7 +111,7 @@ export function ExpandableText({
 }
 
 const styles = StyleSheet.create({
-  body: { ...typography.body, color: '#334155', lineHeight: 22 },
+  body: { ...typography.body, color: colors.textBody, lineHeight: 22 },
   toggle: { alignSelf: 'flex-start', paddingVertical: 2, marginTop: 2 },
   togglePressed: { opacity: 0.6 },
   toggleText: { ...typography.body, fontSize: 14, fontFamily: fonts.body.bold, color: colors.textSecondary },

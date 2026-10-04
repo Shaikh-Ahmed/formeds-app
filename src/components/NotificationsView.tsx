@@ -10,8 +10,8 @@ import { usePaginatedList } from '../hooks/usePaginatedList';
 import { LoadingState, EmptyState, ErrorState } from './States';
 import { PageColumn } from './web';
 import { JobBadge } from './jobs/JobMeta';
-import { isLocumNotification, locumNotificationMeta } from '../types/locum';
-import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET } from '../theme';
+import { isLocumNotification, isLocumShiftNotification, locumNotificationMeta } from '../types/locum';
+import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../theme';
 
 /**
  * The notifications screen, rendered by two routes.
@@ -34,7 +34,7 @@ interface Notification {
 }
 
 const TYPE_ICONS: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string }> = {
-  application: { icon: 'briefcase', color: colors.navy, bg: '#EFF6FF' },
+  application: { icon: 'briefcase', color: colors.navy, bg: colors.tintBg },
   optin: { icon: 'people', color: colors.teal, bg: '#F0FDF4' },
   message: { icon: 'chatbubble', color: '#7C3AED', bg: colors.recruiterBg },
   case: { icon: 'help-buoy', color: colors.teal, bg: colors.tealBg },
@@ -102,6 +102,10 @@ export function NotificationsView({ withBack = false }: { withBack?: boolean }) 
       router.push('/recruiter/invitations' as any);
     } else if (item.type === 'recruiter_status') {
       router.push('/recruiter' as any);
+    } else if (isLocumShiftNotification(item.type)) {
+      // After selection -- arrival, attendance, no-shows, strikes, requests,
+      // reviews -- the place to act is Shifts, not the locum's public page.
+      router.push('/jobs/locum/shifts' as any);
     } else if (isLocumNotification(item.type) && item.ref_id) {
       // Every Locum notification points at its locum; the page shows the
       // applicant their status and the hospital its Manage button.
@@ -254,7 +258,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: colors.tintBg,
     minHeight: 34,
     justifyContent: 'center',
   },
@@ -279,7 +283,7 @@ const styles = StyleSheet.create({
     minHeight: 34,
     justifyContent: 'center',
   },
-  chipActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   chipText: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.textSecondary },
   chipTextActive: { color: colors.white },
 
@@ -302,7 +306,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 3,
-    backgroundColor: colors.navy,
+    backgroundColor: colors.primaryFill,
   },
   notifIcon: {
     width: 44,

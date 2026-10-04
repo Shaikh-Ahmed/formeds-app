@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   icon: {
     width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.bgMuted, alignItems: 'center', justifyContent: 'center',
   },
-  iconOn: { backgroundColor: '#EFF6FF' },
+  iconOn: { backgroundColor: colors.tintBg },
   title: { ...typography.bodyStrong, color: colors.text },
   sub: { ...typography.caption, color: colors.textSecondary },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },

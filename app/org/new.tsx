@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { useSubmit } from '../../src/hooks/useSubmit';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,22 +23,20 @@ import { createOrganization } from '../../src/api/organizations';
 export default function NewOrganizationScreen() {
   const { token, isKycApproved } = useAuth();
   const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, run } = useSubmit();
   const [error, setError] = useState<string | null>(null);
 
-  const submit = useCallback(async (payload: Record<string, unknown>) => {
+  const submit = useCallback((payload: Record<string, unknown>) => run(async key => {
     if (!token) return;
-    setSubmitting(true);
     setError(null);
     try {
-      const org = await createOrganization(token, payload);
+      // Keyed: one organisation however many times Create is pressed.
+      const org = await createOrganization(token, payload, key);
       router.replace(`/org/manage/${org.id}` as any);
     } catch (e: any) {
-      setError(e?.message || 'Could not create this organisation.');
-    } finally {
-      setSubmitting(false);
+      setError(e?.message || 'Could not create this organisation. Please try again.');
     }
-  }, [token, router]);
+  }, payload), [token, router, run]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

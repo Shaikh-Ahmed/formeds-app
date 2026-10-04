@@ -15,6 +15,7 @@
 
 import { useWindowDimensions } from 'react-native';
 import { useEffect, useState } from 'react';
+import { isMaterial } from './activeTheme';
 
 export const breakpoints = {
   /** At or above this, the bottom tab bar is replaced by the top nav bar. */
@@ -41,8 +42,8 @@ export const layout = {
   narrowMax: 720,
   /** Height of the persistent desktop top bar. */
   topBar: 56,
-  /** Gutter between grid columns. */
-  gutter: 24,
+  /** Gutter between grid columns. Material sits a little tighter. */
+  gutter: isMaterial ? 20 : 24,
 } as const;
 
 export type Breakpoint = 'mobile' | 'tablet' | 'desktop';

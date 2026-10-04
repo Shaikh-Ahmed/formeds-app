@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { FormScrollView } from '../FormScrollView';
+import { FieldError, useFieldError } from '../FieldError';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../../theme';
 import { Sheet } from '../Sheet';
 import { Button } from '../Button';
 import { SelectField } from '../SelectField';
@@ -67,6 +69,10 @@ export function JobFiltersSheet({
     // search box from a "Clear filters" button is never what was meant.
     setDraft({ q: draft.q, sort: draft.sort });
 
+  // Only a contradiction is an error; leaving pay blank is a normal search.
+  const payError = draft.pay_min != null && draft.pay_max != null && draft.pay_max < draft.pay_min
+    ? 'Maximum pay must be greater than or equal to minimum pay.' : null;
+
   return (
     <Sheet
       visible={visible}
@@ -79,14 +85,14 @@ export function JobFiltersSheet({
           <Button label="Clear all" variant="outline" onPress={clearAll} style={styles.footerBtn} />
           <Button
             label="Show jobs"
-            onPress={() => onApply(draft)}
+            onPress={() => { if (!payError) onApply(draft); }}
             style={styles.footerBtn}
             testID="jobs-filters-apply"
           />
         </>
       }
     >
-      <ScrollView
+      <FormScrollView
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -172,6 +178,7 @@ export function JobFiltersSheet({
               label="To"
               value={draft.pay_max}
               onChange={v => set('pay_max', v)}
+              error={payError}
               testID="filter-pay-max"
             />
           </View>
@@ -223,7 +230,7 @@ export function JobFiltersSheet({
             testID="filter-urgent"
           />
         </View>
-      </ScrollView>
+      </FormScrollView>
     </Sheet>
   );
 }
@@ -265,10 +272,12 @@ function FilterChip({
 }
 
 function PayInput({
-  label, value, onChange, testID,
+  label, value, onChange, testID, error,
 }: {
   label: string; value?: number; onChange: (v: number | undefined) => void; testID?: string;
+  error?: string | null;
 }) {
+  const err = useFieldError(error);
   return (
     <View style={styles.payField}>
       <Text style={styles.payLabel}>{label}</Text>
@@ -284,7 +293,9 @@ function PayInput({
         placeholder="₹ per month"
         placeholderTextColor={colors.textMuted}
         accessibilityLabel={`${label} monthly pay`}
+        {...err.inputProps}
       />
+      <FieldError message={error} id={err.id} />
     </View>
   );
 }
@@ -307,7 +318,7 @@ const styles = StyleSheet.create({
     minHeight: 36,
     justifyContent: 'center',
   },
-  chipSelected: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipSelected: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   chipText: { ...typography.caption, color: colors.textSecondary },
   chipTextSelected: { color: colors.white, fontFamily: fonts.body.semibold },
 

@@ -70,10 +70,60 @@ export async function shareOrCopy(opts: { url: string; title?: string; message?:
       await nav.clipboard.writeText(opts.url);
       return 'copied';
     } catch {
-      return 'dismissed';
+      // The async clipboard only exists on https (and localhost). Opened over
+      // a plain-http address -- a LAN IP, say -- it is missing, so fall back
+      // to the older copy command, which still works there.
+      return legacyCopy(opts.url) ? 'copied' : 'dismissed';
     }
   }
   return (await shareLink(opts)) ? 'shared' : 'dismissed';
+}
+
+/** Copy plain text (a payment reference, say). Web only; true on success. */
+export async function copyText(text: string): Promise<boolean> {
+  if (Platform.OS !== 'web' || typeof navigator === 'undefined') return false;
+  try {
+    await (navigator as any).clipboard.writeText(text);
+    return true;
+  } catch {
+    return legacyCopy(text);
+  }
+}
+
+/** Copy via a hidden textarea and execCommand. Web only; true on success. */
+function legacyCopy(text: string): boolean {
+  if (typeof document === 'undefined') return false;
+  const el = document.createElement('textarea');
+  el.value = text;
+  el.setAttribute('readonly', '');
+  el.style.position = 'fixed';
+  el.style.opacity = '0';
+  document.body.appendChild(el);
+  el.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch { ok = false; }
+  document.body.removeChild(el);
+  return ok;
+}
+
+/** First line of a text, trimmed to a share-sheet-sized preview. */
+function preview(text: string, max = 140): string {
+  const line = (text || '').trim().split('\n')[0];
+  return line.length > max ? `${line.slice(0, max - 1)}…` : line;
+}
+
+/** A feed post's shareable link: the post's own page. */
+export function sharePost(post: { id: string; author_name: string; content: string }): Promise<ShareOutcome> {
+  return shareOrCopy({
+    url: webLink(`/post/${post.id}`),
+    title: `${post.author_name} on ForMeds`,
+    message: preview(post.content) || `${post.author_name} on ForMeds`,
+  });
+}
+
+/** A clinical case's shareable link. */
+export function shareCase(c: { id: string; title: string }): Promise<ShareOutcome> {
+  return shareOrCopy({ url: webLink(`/case/${c.id}`), title: c.title, message: `${c.title} — ForMeds Cases` });
 }
 
 /** A job's shareable link and text, in one place. */

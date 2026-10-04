@@ -15,13 +15,31 @@ export type LocumSort = 'soonest' | 'newest' | 'pay_high';
 
 export type LocumApplicationStatus =
   | 'applied' | 'under_review' | 'contacted' | 'interview_scheduled'
-  | 'interview_passed' | 'interview_failed' | 'selected' | 'not_selected' | 'withdrawn';
+  | 'interview_passed' | 'interview_failed' | 'selected' | 'not_selected' | 'withdrawn'
+  | 'cancelled';
+
+/** What happened on the day, once selected. A second axis on the application. */
+export type LocumAttendanceStatus =
+  | 'not_started' | 'arrival_reported' | 'attendance_approved' | 'no_show' | 'completed';
+
+/** Shift fields both sides see on an application once it is a shift. */
+export interface LocumAttendanceFields {
+  attendance_status?: LocumAttendanceStatus;
+  arrived_at?: string | null;
+  attendance_approved_at?: string | null;
+  no_show_at?: string | null;
+  completed_at?: string | null;
+  cancelled_at?: string | null;
+  cancel_reason?: LocumCancelReason | '';
+  cancel_details?: string;
+  rebooking_id?: string | null;
+}
 
 /** Which "My applications" tab an application sits in. Computed server-side. */
 export type LocumBucket = 'applied' | 'interview' | 'selected' | 'completed' | 'closed';
 
 /** The applicant's own view of their application. Never carries hospital notes. */
-export interface MyLocumApplication {
+export interface MyLocumApplication extends LocumAttendanceFields {
   id: string;
   locum_id: string;
   status: LocumApplicationStatus;
@@ -81,6 +99,12 @@ export interface Locum {
 
   my_application?: MyLocumApplication | null;
   can_manage: boolean;
+  /** 'direct' = offered to one professional through Request again. */
+  visibility?: 'public' | 'direct';
+  direct_professional_id?: string | null;
+  /** Present on shift rows: the start instant and the whole shift's pay. */
+  shift_starts_at?: string;
+  shift_pay?: number;
 }
 
 export interface LocumsPage {
@@ -109,7 +133,7 @@ export interface LocumClearance {
 }
 
 /** An application as the hospital sees it. */
-export interface ManagedLocumApplication {
+export interface ManagedLocumApplication extends LocumAttendanceFields {
   id: string;
   locum_id: string;
   applicant_id: string;
@@ -136,6 +160,7 @@ export interface ManagedLocumApplication {
   } | null;
   clearance: LocumClearance | null;
   interview_cleared: boolean;
+  reliability?: LocumReliabilitySummary | null;
   locum?: Pick<Locum, 'id' | 'specialty' | 'role_required' | 'shift_date'
     | 'start_time' | 'end_time' | 'status'>;
 }
@@ -198,6 +223,7 @@ export const LOCUM_APPLICATION_META: Record<
   selected: { label: 'Selected', icon: 'checkmark-circle', tone: 'teal' },
   not_selected: { label: 'Not selected', icon: 'close-circle-outline', tone: 'danger' },
   withdrawn: { label: 'Withdrawn', icon: 'arrow-undo-outline', tone: 'neutral' },
+  cancelled: { label: 'You cancelled', icon: 'close-circle-outline', tone: 'neutral' },
 };
 
 export const LOCUM_STATUS_META: Record<LocumStatus, { label: string; icon: string; tone: Tone }> = {
@@ -233,10 +259,203 @@ export const LOCUM_NOTIFICATION_META: Record<string, { label: string; icon: stri
   filled: { label: 'Filled', icon: 'people', tone: 'neutral' },
   cancelled: { label: 'Cancelled', icon: 'ban-outline', tone: 'danger' },
   updated: { label: 'Updated', icon: 'create-outline', tone: 'warning' },
+  arrival_reported: { label: 'Arrived', icon: 'location-outline', tone: 'teal' },
+  attendance_approved: { label: 'Attendance approved', icon: 'checkmark-done-outline', tone: 'teal' },
+  no_show: { label: 'No-show', icon: 'alert-circle-outline', tone: 'danger' },
+  blocked: { label: 'Locum blocked', icon: 'lock-closed-outline', tone: 'danger' },
+  restored: { label: 'Access restored', icon: 'lock-open-outline', tone: 'teal' },
+  rebook_request: { label: 'New request', icon: 'repeat-outline', tone: 'navy' },
+  rebook_cancelled: { label: 'Request withdrawn', icon: 'arrow-undo-outline', tone: 'neutral' },
+  rebook_accepted: { label: 'Request accepted', icon: 'checkmark-circle', tone: 'teal' },
+  rebook_rejected: { label: 'Request declined', icon: 'close-circle-outline', tone: 'neutral' },
+  professional_cancelled: { label: 'Cancelled by professional', icon: 'close-circle-outline', tone: 'warning' },
+  shift_completed: { label: 'Completed', icon: 'flag-outline', tone: 'teal' },
+  rating_pending: { label: 'Rate shift', icon: 'star-outline', tone: 'navy' },
+  reviewed: { label: 'Rated', icon: 'star', tone: 'teal' },
+  dispute_upheld: { label: 'Review decided', icon: 'document-text-outline', tone: 'neutral' },
+  strike_removed: { label: 'Strike removed', icon: 'shield-checkmark-outline', tone: 'teal' },
 };
+
+/** Notifications about a shift after selection open My shifts / Shifts,
+ *  not the locum's public page. */
+export const LOCUM_SHIFT_EVENTS = new Set([
+  'arrival_reported', 'attendance_approved', 'no_show', 'blocked', 'restored', 'rebook_request',
+  'rebook_cancelled', 'rebook_accepted', 'rebook_rejected', 'professional_cancelled',
+  'shift_completed', 'rating_pending', 'reviewed', 'dispute_upheld', 'strike_removed',
+]);
+
+export const isLocumShiftNotification = (type?: string): boolean =>
+  !!type?.startsWith('locum_') && LOCUM_SHIFT_EVENTS.has(type.slice('locum_'.length));
 
 export const isLocumNotification = (type?: string): boolean =>
   !!type && (type === 'locum' || type.startsWith('locum_'));
 
 export const locumNotificationMeta = (type?: string) =>
   type?.startsWith('locum_') ? LOCUM_NOTIFICATION_META[type.slice('locum_'.length)] ?? null : null;
+
+// ── Shifts: attendance, reliability, reviews, rebooking ─────────────────────
+
+export type LocumCancelReason = 'personal_emergency' | 'illness' | 'travel' | 'schedule_conflict' | 'other';
+
+export const LOCUM_CANCEL_REASONS: { value: LocumCancelReason; label: string }[] = [
+  { value: 'personal_emergency', label: 'Personal emergency' },
+  { value: 'illness', label: 'Illness' },
+  { value: 'travel', label: 'Travel issue' },
+  { value: 'schedule_conflict', label: 'Scheduling conflict' },
+  { value: 'other', label: 'Other' },
+];
+
+/** Where a shift stands. Computed by the server from the application, the
+ *  locum and the server clock -- never from the device's clock. */
+export type LocumShiftPhase =
+  | 'confirmed' | 'arrival_open' | 'not_arrived' | 'arrival_reported' | 'attendance_approved'
+  | 'in_progress' | 'awaiting_attendance' | 'completed' | 'no_show' | 'cancelled' | 'hospital_cancelled';
+
+export const LOCUM_PHASE_META: Record<LocumShiftPhase, { label: string; icon: string; tone: Tone }> = {
+  confirmed: { label: 'Confirmed', icon: 'checkmark-circle', tone: 'teal' },
+  arrival_open: { label: 'Arrival open', icon: 'location-outline', tone: 'navy' },
+  not_arrived: { label: 'Not arrived', icon: 'time-outline', tone: 'warning' },
+  arrival_reported: { label: 'Arrival reported', icon: 'location', tone: 'teal' },
+  attendance_approved: { label: 'Attendance approved', icon: 'checkmark-done-outline', tone: 'teal' },
+  in_progress: { label: 'Shift in progress', icon: 'pulse-outline', tone: 'teal' },
+  awaiting_attendance: { label: 'Attendance not recorded', icon: 'help-circle-outline', tone: 'warning' },
+  completed: { label: 'Completed', icon: 'flag-outline', tone: 'navy' },
+  no_show: { label: 'No-show', icon: 'alert-circle-outline', tone: 'danger' },
+  cancelled: { label: 'Cancelled by professional', icon: 'close-circle-outline', tone: 'neutral' },
+  hospital_cancelled: { label: 'Cancelled by hospital', icon: 'ban-outline', tone: 'neutral' },
+};
+
+export interface LocumStrike {
+  id: string;
+  application_id: string;
+  locum_id?: string | null;
+  strike_number: number;
+  pay_amount: number;
+  shift_date?: string;
+  status: 'active' | 'cleared' | 'removed';
+  dispute_status: 'none' | 'open' | 'upheld' | 'overturned';
+  dispute_reason?: string;
+  disputed_at?: string | null;
+  resolution_note?: string;
+  resolved_at?: string | null;
+  created_at: string;
+  employer_name?: string;
+  specialty?: string;
+  start_time?: string;
+  end_time?: string;
+}
+
+export interface LocumReview {
+  id: string;
+  application_id: string;
+  overall: number;
+  punctuality?: number | null;
+  professionalism?: number | null;
+  communication?: number | null;
+  clinical?: number | null;
+  review?: string;
+  created_at: string;
+  employer_name?: string;
+  specialty?: string;
+  shift_date?: string;
+}
+
+export interface LocumReliabilitySummary {
+  completed_shifts: number;
+  no_shows: number;
+  active_strikes: number;
+  strike_limit: number;
+  rating: number | null;
+  review_count: number;
+  locum_blocked: boolean;
+}
+
+export interface LocumReliability extends LocumReliabilitySummary {
+  cancellations: number;
+  block: null | {
+    id: string;
+    unblock_amount: number;
+    currency: string;
+    created_at: string;
+    strikes: { strike_id: string; pay_amount: number; employer_name: string; specialty: string; shift_date: string }[];
+  };
+  strike_history: LocumStrike[];
+  reviews: LocumReview[];
+}
+
+export interface LocumShift {
+  application: (MyLocumApplication | ManagedLocumApplication) & LocumAttendanceFields;
+  locum: Locum;
+  phase: LocumShiftPhase;
+  arrival_opens_at: string;
+  cancel_deadline: string;
+  no_show_from: string;
+  review: LocumReview | null;
+  strike: LocumStrike | null;
+  actions: {
+    arrive?: boolean; cancel?: boolean; dispute?: boolean;
+    approve_attendance?: boolean; flag_no_show?: boolean; review?: boolean; rebook?: boolean;
+  };
+  /** Hospital side only. */
+  professional?: ManagedLocumApplication['applicant'];
+  reliability?: LocumReliabilitySummary | null;
+}
+
+export type LocumRebookingStatus = 'sent' | 'viewed' | 'accepted' | 'rejected' | 'expired' | 'cancelled';
+
+export interface LocumRebooking {
+  id: string;
+  locum_id: string;
+  professional_id: string;
+  source_application_id: string;
+  application_id?: string | null;
+  message: string;
+  require_interview: boolean;
+  shift_starts_at: string;
+  shift_ends_at: string;
+  expires_at: string;
+  status: LocumRebookingStatus;
+  viewed_at?: string | null;
+  responded_at?: string | null;
+  response_note?: string;
+  created_at: string;
+  locum?: Locum;
+  professional?: ManagedLocumApplication['applicant'];
+}
+
+export const LOCUM_REBOOKING_META: Record<LocumRebookingStatus, { label: string; icon: string; tone: Tone }> = {
+  sent: { label: 'Sent', icon: 'paper-plane-outline', tone: 'navy' },
+  viewed: { label: 'Seen', icon: 'eye-outline', tone: 'navy' },
+  accepted: { label: 'Accepted', icon: 'checkmark-circle', tone: 'teal' },
+  rejected: { label: 'Declined', icon: 'close-circle-outline', tone: 'neutral' },
+  expired: { label: 'Expired', icon: 'time-outline', tone: 'neutral' },
+  cancelled: { label: 'Withdrawn', icon: 'arrow-undo-outline', tone: 'neutral' },
+};
+
+export interface ProfessionalShifts {
+  reliability: LocumReliability;
+  requests: LocumRebooking[];
+  upcoming: LocumShift[];
+  completed: LocumShift[];
+  cancelled: LocumShift[];
+  no_show: LocumShift[];
+}
+
+export interface ManagedShifts {
+  today: LocumShift[];
+  upcoming: LocumShift[];
+  completed: LocumShift[];
+  issues: LocumShift[];
+  requests: LocumRebooking[];
+  needs_action: number;
+}
+
+export interface UnblockCheckout {
+  payment_id: string;
+  status: string;
+  amount: number;
+  currency: string;
+  provider: string;
+  demo: boolean;
+  failure_reason?: string;
+}

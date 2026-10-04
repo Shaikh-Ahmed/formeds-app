@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { FormScrollView } from '../../FormScrollView';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../../theme';
+import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../../../theme';
 import { Button } from '../../Button';
 import { FormInput } from '../../FormInput';
 import { SelectField } from '../../SelectField';
 import { ErrorBanner } from '../../States';
+import { focusFirstInvalid } from '../../../hooks/useFormErrors';
 import { OrgVerifiedBadge } from '../../organizations/OrgVerifiedBadge';
 import { DateField, NumberField, TimeField } from '../../InputFields';
 import { ScreeningEditor, questionErrors } from '../Screening';
@@ -13,6 +15,7 @@ import {
   todayString, validateAmount, validateDate, validateDateOrder, validateInteger,
 } from '../../../utils/validation';
 import { SPECIALTY_OPTIONS } from '../../../data/specialties';
+import { ELIGIBILITY_LABELS, type Eligibility } from '../../../utils/roles';
 import { STATE_NAMES, citiesForState } from '../../../data/indiaLocations';
 import { JobCard } from '../JobCard';
 import { JobDetailPanel } from '../JobDetailPanel';
@@ -55,6 +58,8 @@ export interface JobDraft {
   description: string;
   responsibilities: string;
   is_urgent: boolean;
+  /** Who may apply. Shift cover (locum/temporary) is professionals only. */
+  eligibility: Eligibility;
 }
 
 const EMPTY: JobDraft = {
@@ -65,6 +70,7 @@ const EMPTY: JobDraft = {
   pay_period: 'month', pay_min: '', pay_max: '', pay_disclosed: true,
   experience_min: '', skills: '', requirements: '',
   description: '', responsibilities: '', is_urgent: false,
+  eligibility: 'professionals',
 };
 
 const STEPS = [
@@ -96,7 +102,6 @@ export function JobWizard({
   initial,
   mode = 'create',
   organizations = [],
-  onCreateOrganization,
   onSubmit,
   submitting,
   error,
@@ -110,8 +115,7 @@ export function JobWizard({
   initial?: Partial<JobDraft>;
   mode?: 'create' | 'edit';
   organizations?: Organization[];
-  onCreateOrganization?: () => void;
-  onSubmit: (payload: Record<string, unknown>, opts: { publish: boolean }) => void;
+  onSubmit: (payload: Record<string, unknown>, opts: { publish: boolean }) => void | Promise<unknown>;
   submitting?: boolean;
   error?: string | null;
   onCancel?: () => void;
@@ -136,6 +140,16 @@ export function JobWizard({
 
   const set = <K extends keyof JobDraft>(key: K, value: JobDraft[K]) =>
     setDraft(prev => ({ ...prev, [key]: value }));
+
+  // Changing the type keeps "who may apply" sensible: an internship opens to
+  // students by default, and shift cover is never open to them.
+  const setType = (t: EmploymentType) => setDraft(prev => ({
+    ...prev,
+    employment_type: t,
+    eligibility: isShiftRole(t)
+      ? 'professionals'
+      : t === 'internship' && prev.eligibility === 'professionals' ? 'both' : prev.eligibility,
+  }));
 
   const shift = isShiftRole(draft.employment_type);
   const needsCity = draft.work_mode !== 'remote';
@@ -208,7 +222,10 @@ export function JobWizard({
   }, [serverFieldErrors]);
   useEffect(() => {
     const first = [0, 1, 2, 3, 4].find(i => Object.keys(server[i]).length);
-    if (first !== undefined) setStep(first);
+    if (first !== undefined) {
+      setStep(first);
+      focusFirstInvalid();
+    }
   }, [server]);
 
   const stepOk = (i: number) => Object.keys(problems[i] ?? {}).length === 0;
@@ -217,11 +234,13 @@ export function JobWizard({
   const next = () => {
     setTouched(t => ({ ...t, [step]: true }));
     if (stepOk(step)) setStep(s => Math.min(s + 1, STEPS.length - 1));
+    else focusFirstInvalid();
   };
 
   const payload = () => ({
     title: draft.title.trim(),
     employment_type: draft.employment_type,
+    eligibility: shift ? 'professionals' : draft.eligibility,
     specialty: draft.specialty,
     department: draft.department.trim(),
     description: draft.description.trim(),
@@ -267,9 +286,16 @@ export function JobWizard({
     // rejected by the server anyway.
     setTouched({ 0: true, 1: true, 2: true, 3: true, 4: true });
     const firstBad = [0, 1, 2, 3, 4].find(i => !stepOk(i));
-    if (firstBad !== undefined) { setStep(firstBad); return; }
-    onSubmit(payload(), { publish });
+    if (firstBad !== undefined) {
+      setStep(firstBad);
+      focusFirstInvalid();
+      return;
+    }
+    setPressed(publish ? 'publish' : 'draft');
+    return onSubmit(payload(), { publish });
   };
+  // Which final button was pressed, so only that one says "Saving…".
+  const [pressed, setPressed] = useState<'draft' | 'publish' | null>(null);
 
   const org = organizations.find(o => o.id === draft.org_id);
   const preview = usePreviewJob(draft, org, posterName);
@@ -278,17 +304,15 @@ export function JobWizard({
     <View style={styles.flex}>
       <Progress step={step} />
 
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <FormScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <View style={styles.stepHead}>
           <Text style={styles.stepTitle} accessibilityRole="header">{STEPS[step].title}</Text>
           <Text style={styles.stepHint}>{STEPS[step].hint}</Text>
         </View>
 
-        <ErrorBanner message={error} />
-
         {step === 0 ? (
           <>
-            {organizations.length || onCreateOrganization ? (
+            {organizations.length ? (
               <Field label="Posting as">
                 <ChipRow>
                   {allowSelf ? (
@@ -314,16 +338,6 @@ export function JobWizard({
                 ) : allowSelf ? (
                   <Text style={styles.hint}>This role will show your own name as the employer.</Text>
                 ) : null}
-                {onCreateOrganization ? (
-                  <Pressable
-                    onPress={onCreateOrganization}
-                    accessibilityRole="button"
-                    accessibilityLabel="Create an organisation"
-                    style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}
-                  >
-                    <Text style={styles.link}>+ Create an organisation</Text>
-                  </Pressable>
-                ) : null}
               </Field>
             ) : null}
 
@@ -348,12 +362,28 @@ export function JobWizard({
                     key={t}
                     label={EMPLOYMENT_TYPE_LABELS[t]}
                     selected={draft.employment_type === t}
-                    onPress={() => set('employment_type', t)}
+                    onPress={() => setType(t)}
                     testID={`wizard-type-${t}`}
                   />
                 ))}
               </ChipRow>
             </Field>
+
+            {shift ? null : (
+              <Field label="Who can apply">
+                <ChipRow>
+                  {(Object.keys(ELIGIBILITY_LABELS) as Eligibility[]).map(e => (
+                    <Choice
+                      key={e}
+                      label={ELIGIBILITY_LABELS[e]}
+                      selected={draft.eligibility === e}
+                      onPress={() => set('eligibility', e)}
+                      testID={`wizard-eligibility-${e}`}
+                    />
+                  ))}
+                </ChipRow>
+              </Field>
+            )}
 
             <SelectField
               label="Specialty"
@@ -614,7 +644,10 @@ export function JobWizard({
             </View>
           </>
         ) : null}
-      </ScrollView>
+        {/* Beside the buttons: only what belongs to no field (a refusal, the
+            network). Field problems are shown under their fields. */}
+        <ErrorBanner message={error} />
+      </FormScrollView>
 
       <View style={styles.footer}>
         {step > 0 ? (
@@ -636,17 +669,21 @@ export function JobWizard({
             {mode === 'create' ? (
               <Button
                 label="Save draft"
+                loadingLabel="Saving…"
                 variant="outline"
                 onPress={() => finish(false)}
-                loading={submitting}
+                loading={submitting && pressed === 'draft'}
+                disabled={submitting}
                 style={styles.footerBtn}
                 testID="wizard-draft"
               />
             ) : null}
             <Button
               label={mode === 'edit' ? 'Save changes' : 'Publish'}
+              loadingLabel={mode === 'edit' ? 'Saving…' : 'Publishing…'}
               onPress={() => finish(true)}
-              loading={submitting}
+              loading={submitting && pressed === 'publish'}
+              disabled={submitting}
               style={styles.footerBtn}
               testID="wizard-publish"
             />
@@ -671,6 +708,7 @@ function usePreviewJob(draft: JobDraft, org: Organization | undefined, posterNam
     org_id: org?.id ?? null,
     posted_as: org ? 'organization' : 'individual',
     employment_type: draft.employment_type,
+    eligibility: draft.eligibility,
     title: draft.title.trim() || 'Untitled role',
     specialty: draft.specialty,
     department: draft.department,
@@ -829,7 +867,7 @@ const styles = StyleSheet.create({
   progressSeg: {
     flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border,
   },
-  progressSegOn: { backgroundColor: colors.navy },
+  progressSegOn: { backgroundColor: colors.primaryFill },
   progressText: { ...typography.small, color: colors.textSecondary },
 
   body: { padding: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.xs },
@@ -854,7 +892,7 @@ const styles = StyleSheet.create({
     minHeight: 36,
     justifyContent: 'center',
   },
-  chipOn: { backgroundColor: colors.navy, borderColor: colors.navy },
+  chipOn: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   chipText: { ...typography.caption, color: colors.textSecondary },
   chipTextOn: { color: colors.white, fontFamily: fonts.body.semibold },
 
@@ -877,8 +915,6 @@ const styles = StyleSheet.create({
     maxHeight: 460,
   },
 
-  linkRow: { alignSelf: 'flex-start', minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
-  link: { ...typography.caption, fontFamily: fonts.body.semibold, color: colors.navy },
 
   footer: {
     flexDirection: 'row',

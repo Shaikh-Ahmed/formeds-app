@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { useSubmit } from '../../../../src/hooks/useSubmit';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -14,25 +15,26 @@ import { createLocum } from '../../../../src/api/locum';
 export default function NewLocumScreen() {
   const { token } = useAuth();
   const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, run } = useSubmit();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const submit = useCallback(async (payload: Record<string, unknown>) => {
+  const submit = useCallback((payload: Record<string, unknown>) => run(async key => {
     if (!token) return;
-    setSubmitting(true);
     setError(null);
     try {
-      const locum = await createLocum(token, payload);
+      // Keyed: a double click or a retry after a lost response returns this
+      // same locum instead of posting a second one.
+      const locum = await createLocum(token, payload, key);
       // Straight to its applicant list: that is where the hospital waits next.
       router.replace(`/jobs/locum/manage/${locum.id}` as any);
     } catch (e: any) {
-      setError(e?.message || 'Could not post this locum.');
-      setFieldErrors(errorFields(e, LOCUM_ERROR_FIELDS));
-    } finally {
-      setSubmitting(false);
+      const fields = errorFields(e, LOCUM_ERROR_FIELDS);
+      setFieldErrors(fields);
+      // A field took it: say it there, not twice.
+      setError(Object.keys(fields).length ? null : e?.message || 'Could not post this locum. Please try again.');
     }
-  }, [token, router]);
+  }, payload), [token, router, run]);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

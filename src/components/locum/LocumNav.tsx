@@ -3,10 +3,10 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, radius, spacing, typography, fonts, useBreakpoint, MIN_TOUCH_TARGET, gloss, isPremium } from '../../theme';
 import { JobsModuleTabs } from '../jobs/JobsModuleTabs';
 
-export type LocumSegment = 'discover' | 'applications' | 'mine' | 'applicants';
+export type LocumSegment = 'discover' | 'applications' | 'mine' | 'applicants' | 'shifts';
 
 interface Segment {
   key: LocumSegment;
@@ -23,6 +23,9 @@ const MINE: Segment = { key: 'mine', label: 'My locums', icon: 'calendar-outline
 const APPLICANTS: Segment = {
   key: 'applicants', label: 'Applicants', icon: 'people-outline', href: '/jobs/locum/applicants',
 };
+// After selection: My shifts for a professional, the attendance board for a hospital.
+const MY_SHIFTS: Segment = { key: 'shifts', label: 'My shifts', icon: 'time-outline', href: '/jobs/locum/shifts' };
+const SHIFTS: Segment = { key: 'shifts', label: 'Shifts', icon: 'time-outline', href: '/jobs/locum/shifts' };
 
 /**
  * Locum's own navigation, under the same Jobs | Locum switch as Jobs.
@@ -43,9 +46,9 @@ export function LocumNav({ active }: { active: LocumSegment }) {
 
   const isProfessional = user?.role === 'healthcare_professional';
   const segments = isProfessional
-    ? [DISCOVER, APPLICATIONS, MINE]
+    ? [DISCOVER, APPLICATIONS, MY_SHIFTS, MINE]
     : user?.role
-      ? [DISCOVER, MINE, APPLICANTS]
+      ? [DISCOVER, MINE, APPLICANTS, SHIFTS]
       : [DISCOVER];
 
   const content = (
@@ -60,6 +63,7 @@ export function LocumNav({ active }: { active: LocumSegment }) {
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             accessibilityLabel={segment.label}
+            hitSlop={isPremium ? { top: 7, bottom: 7, left: 3, right: 3 } : undefined}
             style={({ pressed }) => [styles.segment, selected && styles.segmentActive, pressed && styles.pressed]}
           >
             <Ionicons name={segment.icon} size={16} color={selected ? colors.white : colors.textSecondary} />
@@ -85,9 +89,9 @@ export function LocumNav({ active }: { active: LocumSegment }) {
 }
 
 const styles = StyleSheet.create({
-  scroller: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  wide: { paddingVertical: spacing.lg },
-  row: { flexDirection: 'row', gap: spacing.sm },
+  scroller: { paddingHorizontal: spacing.lg, paddingVertical: isPremium ? spacing.sm : spacing.md },
+  wide: { paddingVertical: isPremium ? spacing.md : spacing.lg },
+  row: { flexDirection: 'row', gap: isPremium ? 6 : spacing.sm },
   segment: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -99,9 +103,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     minHeight: MIN_TOUCH_TARGET - 6,
     justifyContent: 'center',
+    ...gloss.glass,
+    // Premium: compact segments, as on Jobs.
+    ...(isPremium ? { minHeight: 28, gap: 4, paddingHorizontal: spacing.sm + 2 } : {}),
   },
-  segmentActive: { backgroundColor: colors.navy, borderColor: colors.navy },
-  label: { ...typography.caption, color: colors.textSecondary },
+  segmentActive: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
+  label: isPremium ? { fontSize: 12, lineHeight: 16, fontFamily: fonts.body.regular, color: colors.textSecondary }
+    : { ...typography.caption, color: colors.textSecondary },
   labelActive: { color: colors.white, fontFamily: fonts.body.semibold },
   pressed: { opacity: 0.7 },
 });

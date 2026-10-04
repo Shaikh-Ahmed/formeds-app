@@ -157,7 +157,7 @@ describe('Find talent (recruiter)', () => {
     await act(async () => { fireEvent.press(screen.getByTestId('invite-send')); });
     expect(mockApi.sendInvitation).toHaveBeenCalledWith('t', {
       professional_id: 'p1', job_id: 'job-1', locum_id: undefined, message: 'Strong fit for our client',
-    });
+    }, expect.any(String));
   });
 });
 

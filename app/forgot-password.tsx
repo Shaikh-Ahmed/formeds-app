@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { FormScrollView } from '../src/components/FormScrollView';
+import { useFormErrors } from '../src/hooks/useFormErrors';
 import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,11 +16,11 @@ export default function ForgotPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errs = useFormErrors<'email'>({ known: ['email'] });
   const router = useRouter();
 
   const handleSubmit = async () => {
-    const problem = validateEmail(email);
-    if (problem) { setError(problem); return; }
+    if (!errs.check({ email: validateEmail(email) }) || loading) return;
 
     setLoading(true);
     setError(null);
@@ -29,7 +31,7 @@ export default function ForgotPasswordScreen() {
       });
       setSent(true);
     } catch (e: any) {
-      setError(e?.message || 'Something went wrong. Please try again.');
+      if (!errs.fromError(e)) setError(e?.message || 'Could not send the reset link. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -39,7 +41,7 @@ export default function ForgotPasswordScreen() {
     <SafeAreaView style={styles.safe}>
       <AuthShell maxWidth={460}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <FormScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <TouchableOpacity
             style={styles.backBtn}
             onPress={() => router.back()}
@@ -70,7 +72,8 @@ export default function ForgotPasswordScreen() {
                 label="Email"
                 icon="mail-outline"
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={v => { setEmail(v); errs.clear('email'); }}
+              error={errs.fields.email}
                 placeholder="you@example.com"
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -79,10 +82,10 @@ export default function ForgotPasswordScreen() {
                 onSubmitEditing={handleSubmit}
               />
 
-              <Button testID="forgot-submit-btn" label="Send reset link" onPress={handleSubmit} loading={loading} />
+              <Button testID="forgot-submit-btn" label="Send reset link" loadingLabel="Sending…" onPress={handleSubmit} loading={loading} />
             </>
           )}
-        </ScrollView>
+        </FormScrollView>
       </KeyboardAvoidingView>
       </AuthShell>
     </SafeAreaView>

@@ -12,7 +12,9 @@
 
 import { apiFetch } from '../utils/api';
 import { appendFile } from '../utils/upload';
-import type { OrgMember, OrgRole, Organization } from '../types/organizations';
+import type {
+  OrgAffiliationRequest, OrgMember, OrgPhoto, OrgProfilePage, OrgRole, Organization,
+} from '../types/organizations';
 
 export interface OrgDirectoryFilters {
   q?: string;
@@ -56,9 +58,9 @@ export const fetchOrgMembers = (token: string, orgId: string): Promise<OrgMember
 // ── Writes ───────────────────────────────────────────────────────────────────
 
 export const createOrganization = (
-  token: string, data: Record<string, unknown>,
+  token: string, data: Record<string, unknown>, idempotencyKey?: string,
 ): Promise<Organization> =>
-  apiFetch('/api/organizations/', token, { method: 'POST', body: JSON.stringify(data) });
+  apiFetch('/api/organizations/', token, { method: 'POST', body: JSON.stringify(data), idempotencyKey });
 
 export const updateOrganization = (
   token: string, orgId: string, patch: Record<string, unknown>,
@@ -78,10 +80,10 @@ export const deleteOrganization = (
  * one can join the organisation.
  */
 export const inviteMember = (
-  token: string, orgId: string, email: string, role: OrgRole = 'recruiter',
+  token: string, orgId: string, email: string, role: OrgRole = 'recruiter', idempotencyKey?: string,
 ): Promise<{ invite_token: string }> =>
   apiFetch(`/api/organizations/${orgId}/members`, token, {
-    method: 'POST', body: JSON.stringify({ email, role }),
+    method: 'POST', body: JSON.stringify({ email, role }), idempotencyKey,
   });
 
 export const acceptInvite = (
@@ -127,3 +129,55 @@ export async function submitOrgKyc(
     method: 'POST', body: formData,
   }) as Promise<{ status: string }>;
 }
+
+// ── Organisation profile ─────────────────────────────────────────────────────
+
+/** The organisation a hospital or clinic account is presented as. The server
+ *  creates it on first use, so every such account has a profile. */
+export const fetchAccountOrganization = (token: string | null, userId: string): Promise<Organization> =>
+  apiFetch(`/api/organizations/account/${userId}`, token);
+
+/** The whole page in one request: organisation, team, jobs, locums. */
+export const fetchOrgProfile = (token: string | null, orgId: string): Promise<OrgProfilePage> =>
+  apiFetch(`/api/organizations/${orgId}/profile`, token);
+
+async function uploadOrgImage(
+  token: string, path: string, uri: string, extra: Record<string, string> = {}, idempotencyKey?: string,
+) {
+  const formData = new FormData();
+  await appendFile(formData, 'file', { uri });
+  for (const [k, v] of Object.entries(extra)) formData.append(k, v);
+  return apiFetch(path, token, { method: 'POST', body: formData, idempotencyKey });
+}
+
+export const uploadOrgCover = (token: string, orgId: string, uri: string) =>
+  uploadOrgImage(token, `/api/organizations/${orgId}/cover`, uri) as Promise<{ cover_photo: string }>;
+
+export const removeOrgCover = (token: string, orgId: string) =>
+  apiFetch(`/api/organizations/${orgId}/cover`, token, { method: 'DELETE' });
+
+export const removeOrgLogo = (token: string, orgId: string) =>
+  apiFetch(`/api/organizations/${orgId}/logo`, token, { method: 'DELETE' });
+
+export const addOrgPhoto = (token: string, orgId: string, uri: string, caption = '', idempotencyKey?: string) =>
+  uploadOrgImage(token, `/api/organizations/${orgId}/photos`, uri, { caption }, idempotencyKey) as Promise<{ photos: OrgPhoto[] }>;
+
+export const removeOrgPhoto = (token: string, orgId: string, photoId: string): Promise<{ photos: OrgPhoto[] }> =>
+  apiFetch(`/api/organizations/${orgId}/photos/${photoId}`, token, { method: 'DELETE' });
+
+export const requestAffiliation = (token: string, orgId: string, title = '', department = '',
+  idempotencyKey?: string) =>
+  apiFetch(`/api/organizations/${orgId}/affiliations`, token, {
+    method: 'POST', body: JSON.stringify({ title, department }), idempotencyKey,
+  }) as Promise<{ id: string; status: string }>;
+
+export const fetchAffiliations = (token: string, orgId: string): Promise<OrgAffiliationRequest[]> =>
+  apiFetch(`/api/organizations/${orgId}/affiliations`, token);
+
+export const decideAffiliation = (token: string, orgId: string, id: string, decision: 'approve' | 'decline') =>
+  apiFetch(`/api/organizations/${orgId}/affiliations/${id}/decision`, token, {
+    method: 'POST', body: JSON.stringify({ decision }),
+  });
+
+export const removeAffiliation = (token: string, orgId: string, id: string) =>
+  apiFetch(`/api/organizations/${orgId}/affiliations/${id}`, token, { method: 'DELETE' });

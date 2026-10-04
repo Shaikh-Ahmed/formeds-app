@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from './colors';
+import { isMaterial } from './activeTheme';
 
-export type Role = 'healthcare_professional' | 'hospital' | 'clinic' | 'recruiter' | 'Official' ;
+export type Role = 'healthcare_professional' | 'student' | 'hospital' | 'clinic' | 'recruiter' | 'official';
 
 export interface RoleMeta {
   /** Short label for badges (feed, people cards). */
@@ -27,9 +28,20 @@ export const ROLE_META: Record<Role, RoleMeta> = {
     label: 'Professional',
     longLabel: 'Healthcare Professional',
     color: colors.teal,
-    bg: colors.successBg,
+    // Material's accent is blue, so its tint is too (success stays green).
+    bg: isMaterial ? colors.tealBg : colors.successBg,
     icon: 'medkit',
     description: 'Doctor, Nurse, or Allied Health Worker',
+  },
+  student: {
+    label: 'Student',
+    longLabel: 'Healthcare Student',
+    // The info hue: learning and early career, distinct from the trust teal a
+    // verified professional carries.
+    color: colors.info,
+    bg: colors.infoBg,
+    icon: 'school',
+    description: 'MBBS, Nursing, Pharmacy or Allied Health student',
   },
   hospital: {
     label: 'Hospital',
@@ -50,8 +62,10 @@ export const ROLE_META: Record<Role, RoleMeta> = {
   official: {
     label: 'Official',
     longLabel: 'Official Newsletter',
-    color: '#4338CA',
-    bg: '#EEF2FF',
+    // The trust colour: an official, verified source. Follows the theme
+    // (teal in Classic, blue in Material, terracotta in Terracotta).
+    color: colors.verified,
+    bg: colors.verifiedBg,
     icon: 'checkmark-circle',
     description: 'Verified Formeds Medical Publication',
   },

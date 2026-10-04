@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { useSubmit } from '../src/hooks/useSubmit';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,7 +33,7 @@ type Confirm = { kind: 'cancel' } | { kind: 'downgrade'; plan: Plan };
  * scheduled for the end of the period, and the page says exactly when.
  */
 export default function SubscriptionScreen() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const router = useRouter();
   const [view, setView] = useState<SubscriptionView | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -43,6 +44,7 @@ export default function SubscriptionScreen() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const guard = useSubmit();
   const [confirm, setConfirm] = useState<Confirm | null>(null);
 
   const load = useCallback(async () => {
@@ -81,12 +83,15 @@ export default function SubscriptionScreen() {
     return scheduled ? 'scheduled' : 'downgrade';
   };
 
-  const upgrade = async (plan: Plan) => {
+  const upgrade = (plan: Plan) => guard.run(key => startUpgrade(key, plan), { plan: plan.code, cycle });
+
+  const startUpgrade = async (key: string, plan: Plan) => {
     if (!token) return;
     setBusy(plan.code);
     setActionError(null);
     try {
-      const checkout = await startCheckout(token, plan.code, cycle);
+      // Keyed: a double click opens one checkout, not two pending payments.
+      const checkout = await startCheckout(token, plan.code, cycle, key);
       router.push(`/checkout?payment=${checkout.payment_id}` as any);
     } catch (e: any) {
       setActionError(e?.message || 'Could not start checkout.');
@@ -95,7 +100,9 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const confirmChange = async () => {
+  const confirmChange = () => guard.run(changePlan);
+
+  const changePlan = async () => {
     if (!token || !confirm) return;
     setBusy('confirm');
     setActionError(null);
@@ -112,7 +119,9 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const resume = async () => {
+  const resume = () => guard.run(resumePlan);
+
+  const resumePlan = async () => {
     if (!token) return;
     setBusy('resume');
     setActionError(null);
@@ -130,8 +139,13 @@ export default function SubscriptionScreen() {
     : sub.cancel_at_period_end
       ? `Ends ${formatDay(sub.current_period_end)}. You'll move to Core, and keep everything you have created.`
       : sub.scheduled_plan
-        ? `Switches to ${sub.scheduled_plan.name} on ${formatDay(sub.current_period_end)}.`
-        : `Renews ${formatDay(sub.current_period_end)} · billed ${sub.billing_cycle}`;
+        ? (sub.auto_renews === false
+          ? `Ends ${formatDay(sub.current_period_end)}. Choose ${sub.scheduled_plan.name} then to continue on it.`
+          : `Switches to ${sub.scheduled_plan.name} on ${formatDay(sub.current_period_end)}.`)
+        : sub.auto_renews === false
+          // Paid once through Razorpay: nothing is charged automatically.
+          ? `Paid until ${formatDay(sub.current_period_end)} · ${sub.billing_cycle}. Renew here when it ends.`
+          : `Renews ${formatDay(sub.current_period_end)} · billed ${sub.billing_cycle}`;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -154,8 +168,9 @@ export default function SubscriptionScreen() {
                 <Text style={styles.renewal}>{renewalLine}</Text>
                 {!view.can_subscribe ? (
                   <Text style={styles.hint}>
-                    ProCare and MedElite are plans for healthcare professionals. Your organisation
-                    account includes AED on the Core allowance.
+                    {user?.role === 'student'
+                      ? 'ProCare and MedElite are plans for registered healthcare professionals. Your student account includes AED on the Core allowance.'
+                      : 'ProCare and MedElite are plans for healthcare professionals. Your organisation account includes AED on the Core allowance.'}
                   </Text>
                 ) : null}
                 {view.can_subscribe && sub ? (
@@ -232,10 +247,19 @@ export default function SubscriptionScreen() {
               </Text>
             </View>
 
-            <Pressable onPress={() => router.push('/aed-chat' as any)} accessibilityRole="link" style={styles.link}>
-              <Ionicons name="medical-outline" size={16} color={colors.navy} />
-              <Text style={styles.linkText}>Open AED</Text>
-            </Pressable>
+            <View style={styles.links}>
+              {view.can_subscribe ? (
+                <Pressable onPress={() => router.push('/payment-history' as any)} accessibilityRole="link"
+                  style={styles.link} testID="subscription-payments">
+                  <Ionicons name="receipt-outline" size={16} color={colors.navy} />
+                  <Text style={styles.linkText}>Payment history</Text>
+                </Pressable>
+              ) : null}
+              <Pressable onPress={() => router.push('/aed-chat' as any)} accessibilityRole="link" style={styles.link}>
+                <Ionicons name="medical-outline" size={16} color={colors.navy} />
+                <Text style={styles.linkText}>Open AED</Text>
+              </Pressable>
+            </View>
           </ScrollView>
         ) : null}
       </PageColumn>
@@ -296,6 +320,7 @@ const styles = StyleSheet.create({
   cycle: { gap: spacing.xs },
   saving: { ...typography.small, color: colors.teal },
   cards: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
+  links: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: spacing.xl },
   link: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'center' },
   linkText: { ...typography.label, color: colors.navy },
   sheetBody: { padding: spacing.xl, paddingTop: spacing.md },

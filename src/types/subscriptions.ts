@@ -76,6 +76,8 @@ export interface SubscriptionView {
     current_period_end: string;
     cancel_at_period_end: boolean;
     scheduled_plan: { code: string; name: string } | null;
+    /** False for a period paid once (Razorpay): it ends unless renewed. */
+    auto_renews?: boolean;
   };
   aed_tokens: AedWallet;
 }
@@ -90,7 +92,58 @@ export interface Checkout {
   currency: string;
   provider: string;
   demo: boolean;
+  /** Razorpay test keys: no real money moves. */
+  test_mode?: boolean;
   failure_reason: string;
+  paid_at?: string | null;
+}
+
+/** A settled subscription payment, newest first, from /history. */
+export interface PaymentRecord {
+  id: string;
+  plan: string;
+  amount: number;
+  currency: string;
+  status: 'succeeded' | 'failed' | 'refunded';
+  purpose: 'new' | 'upgrade' | 'renewal';
+  provider: string;
+  billing_cycle: BillingCycle;
+  paid_at?: string | null;
+  created_at?: string | null;
+  /** The gateway's payment id (pay_...), for support and bank statements. */
+  reference: string;
+  method: string;
+  failure_reason: string;
+  test_mode: boolean;
+}
+
+export interface BillingHistory {
+  payments: PaymentRecord[];
+  subscriptions: {
+    id: string; plan: string; status: string; billing_cycle: BillingCycle;
+    started_at?: string | null; ended_at?: string | null; current_period_end: string;
+  }[];
+}
+
+/** What Razorpay Checkout needs to open, from the server. Never a secret. */
+export interface GatewayOrder {
+  key_id: string;
+  test_mode: boolean;
+  payment_id: string;
+  order_id: string;
+  /** Integer paise. */
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  prefill: { name?: string; email?: string; contact?: string };
+}
+
+/** What Razorpay Checkout returns on success; verified by the server. */
+export interface GatewayResponse {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
 }
 
 /** "₹2,990" -- Indian digit grouping, whole rupees. */

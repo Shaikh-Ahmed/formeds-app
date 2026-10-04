@@ -1,9 +1,11 @@
 import React from 'react';
+import { TrustMark } from '../TrustMark';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, spacing, radius, typography, fonts, MIN_TOUCH_TARGET, gloss } from '../../theme';
 import { Profile, OPEN_TO_LABELS } from '../../types/profile';
 import { joinMeta } from './format';
+import { studentLine } from '../../utils/roles';
 
 interface Props {
   profile: Profile;
@@ -13,6 +15,8 @@ interface Props {
   isMobile: boolean;
   onEdit?: () => void;
   onShare?: () => void;
+  /** Connect / Message, on someone else's profile. */
+  networkAction?: React.ReactNode;
 }
 
 /**
@@ -23,19 +27,24 @@ interface Props {
  * scan for in the first two seconds.
  */
 export function ProfessionalIdentity({
-  profile, credentials, editable, isMobile, onEdit, onShare,
+  profile, credentials, editable, isMobile, onEdit, onShare, networkAction,
 }: Props) {
   // Comma, not the meta separator: 'Hyderabad, Telangana' is one location,
   // whereas 'Hyderabad · Telangana' reads as two unrelated facts.
   const location = [profile.city, profile.state].filter(Boolean).join(', ');
-  const primary = joinMeta(
-    profile.primary_specialization || profile.specialty || profile.professional_role,
-    profile.current_organization,
-    location,
-  );
-  const experience = profile.years_experience
+  const student = profile.role === 'student';
+  // A student is identified by what and where they study.
+  const primary = student
+    ? joinMeta(studentLine(profile), profile.student_institution, location)
+    : joinMeta(
+      profile.primary_specialization || profile.specialty || profile.professional_role,
+      profile.current_organization,
+      location,
+    );
+  const experience = !student && profile.years_experience
     ? `${profile.years_experience}+ years experience`
     : '';
+  const graduating = student && profile.graduation_year ? `Expected graduation ${profile.graduation_year}` : '';
   const openTo = (profile.availability?.open_to || []).slice(0, 2);
 
   return (
@@ -61,11 +70,12 @@ export function ProfessionalIdentity({
 
       {primary ? <Text style={styles.meta}>{primary}</Text> : null}
       {experience ? <Text style={styles.metaMuted}>{experience}</Text> : null}
+      {graduating ? <Text style={styles.metaMuted} testID="profile-graduation">{graduating}</Text> : null}
 
       {profile.account_verified ? (
         <View style={styles.verifiedRow}>
-          <Ionicons name="shield-checkmark" size={15} color={colors.teal} />
-          <Text style={styles.verifiedText}>Verified healthcare professional</Text>
+          <TrustMark size={15} classicIcon="shield-checkmark" />
+          <Text style={styles.verifiedText}>{student ? 'Verified student' : 'Verified healthcare professional'}</Text>
         </View>
       ) : null}
 
@@ -84,6 +94,7 @@ export function ProfessionalIdentity({
         {editable && onEdit ? (
           <Action label="Edit profile" icon="create-outline" primary onPress={onEdit} testID="profile-edit" />
         ) : null}
+        {networkAction}
         {onShare ? (
           <Action label="Share" icon="share-outline" onPress={onShare} testID="profile-share" />
         ) : null}
@@ -186,7 +197,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
   },
-  actionPrimary: { backgroundColor: colors.navy, borderColor: colors.navy },
+  actionPrimary: { backgroundColor: colors.action, ...gloss.fill, borderColor: colors.action },
   actionSecondary: { backgroundColor: colors.white, borderColor: colors.border },
   actionText: { ...typography.caption, fontFamily: fonts.body.semibold },
   actionTextPrimary: { color: colors.white },

@@ -1,13 +1,15 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { usePushNotifications } from '../src/hooks/usePushNotifications';
 import { useBrandFonts } from '../src/hooks/useBrandFonts';
 import { StatusBar } from 'expo-status-bar';
 import { TopBar } from '../src/components/web';
-import { colors, useBreakpoint } from '../src/theme';
+import { colors, useBreakpoint, isMaterial } from '../src/theme';
+import { PageBackdrop } from '../src/components/material/Surfaces';
+import { HeartLoader, signalBootDone } from '../src/components/HeartLoader';
 import { apiFetch } from '../src/utils/api';
 
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || '';
@@ -19,6 +21,7 @@ if (SENTRY_DSN) {
 // exists but holds only a signup token, so it is not yet an authenticated user.
 const PUBLIC_SEGMENTS = new Set([
   'index', 'login', 'register', 'verify', 'forgot-password', 'reset-password', 'verify-email',
+  'google-onboarding',
   'recruiter-register', 'recruiter-login',
 ]);
 
@@ -37,6 +40,24 @@ function recruiterMayOpen(segments: string[]): boolean {
   if (second !== 'jobs') return false;
   if (third === 'locum') return RECRUITER_LOCUM_SCREENS.has(fourth ?? '');
   return RECRUITER_JOB_SCREENS.has(third ?? '');
+}
+
+// Where a student may NOT go: employer and recruiter tools, locum shifts,
+// specialist listings and admin. The server refuses every one of these for a
+// student anyway; this keeps a student from landing on a screen that can only
+// say no. Everything else -- feed, jobs, internships, applications, learning,
+// AED, profile, messages -- is theirs.
+const STUDENT_BLOCKED_AREAS = new Set(['recruiter', 'admin']);
+const STUDENT_BLOCKED_JOB_SCREENS = new Set(['new', 'edit', 'applicants', 'posted', 'locum']);
+
+function studentMayOpen(segments: string[]): boolean {
+  const [first, second, third] = segments;
+  if (STUDENT_BLOCKED_AREAS.has(first ?? '')) return false;
+  if (first === 'org' && (second === 'new' || second === 'manage')) return false;
+  if (first !== '(tabs)') return true;
+  if (second === 'specialists') return false;
+  if (second === 'jobs') return !STUDENT_BLOCKED_JOB_SCREENS.has(third ?? '');
+  return true;
 }
 
 function RootNavigator() {
@@ -79,6 +100,10 @@ function RootNavigator() {
   // by any one screen's fetch.
   useEffect(() => { loadCounts(); }, [loadCounts, currentSegment]);
 
+  // The session is known and the first screen is about to render: let the
+  // HTML shell's boot heart fill to the top and fade.
+  useEffect(() => { if (!loading) signalBootDone(); }, [loading]);
+
   useEffect(() => {
     if (loading) return;
 
@@ -92,6 +117,10 @@ function RootNavigator() {
       router.replace('/recruiter' as any);
       return;
     }
+    if (user?.role === 'student' && !inPublicArea && !studentMayOpen(segments as string[])) {
+      router.replace('/(tabs)/community');
+      return;
+    }
     if (user && inPublicArea) {
       // Recruiters have their own home and their own verification flow.
       if (user.role === 'recruiter') {
@@ -101,6 +130,7 @@ function RootNavigator() {
       // A signed-in user who still needs KYC lands there first. `isKycApproved`
       // owns the admin exemption so this screen and every KYC-gated control
       // agree on who is approved.
+      // Students have no council registration to verify, so never land there.
       const needsKyc = !isKycApproved && !kycPrompted.current;
       kycPrompted.current = true;
       router.replace(needsKyc ? '/kyc' : '/(tabs)/community');
@@ -109,16 +139,17 @@ function RootNavigator() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.navy }}>
-        {/* Navy field, so the clock and battery need to be light here. */}
-        <StatusBar style="light" />
-        <ActivityIndicator size="large" color={colors.white} />
-      </View>
+      <>
+        <StatusBar style="dark" />
+        <HeartLoader />
+      </>
     );
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      {/* Material: the wallpaper behind the floating top bar. */}
+      {isMaterial && showTopBar ? <PageBackdrop /> : null}
       {showTopBar && (
         <TopBar unreadMessages={unreadMsgs} unreadNotifications={unreadNotifs} />
       )}
@@ -127,6 +158,7 @@ function RootNavigator() {
       <Stack.Screen name="login" />
       <Stack.Screen name="register" />
       <Stack.Screen name="verify" />
+      <Stack.Screen name="google-onboarding" />
       <Stack.Screen name="forgot-password" />
       <Stack.Screen name="reset-password" />
       <Stack.Screen name="verify-email" />
@@ -134,30 +166,38 @@ function RootNavigator() {
       <Stack.Screen name="kyc" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="admin/kyc" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="admin/recruiters" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="admin/locum" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="admin/students" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="recruiter-register" />
       <Stack.Screen name="recruiter-login" />
       <Stack.Screen name="opportunities" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="edit-profile" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="subscription" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="payment-history" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="checkout" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="help" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="lesson/[id]" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="learning/reader/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="post/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="case/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="case/new" options={{ animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="aed-chat" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+      {/* Material floats AED over the page you were on (a transparent modal
+          keeps that page rendered behind it); other themes open it full-page. */}
+      <Stack.Screen name="aed-chat" options={isMaterial
+        ? { presentation: 'transparentModal', animation: 'fade' }
+        : { presentation: 'modal', animation: 'slide_from_bottom' }} />
       <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="messages" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="conversation" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="people" options={{ animation: 'slide_from_right' }} />
       {/* Another professional's profile. Distinct from /(tabs)/profile,
           which is the signed-in user's own. */}
-      <Stack.Screen name="profile/[id]" options={{ animation: 'slide_from_right' }} />
-      {/* Fades rather than slides: search is a mode you enter from the header,
+        <Stack.Screen name="profile/[id]" options={{ animation: 'slide_from_right' }} />
+        {/* Fades rather than slides: search is a mode you enter from the header,
           not a place further along the stack. */}
-      <Stack.Screen name="search" options={{ animation: 'fade' }} />
-    </Stack>
+        <Stack.Screen name="search" options={{ animation: 'fade' }} />
+      </Stack>
     </View>
   );
 }
@@ -170,10 +210,10 @@ function RootLayout() {
 
   if (!fontsReady) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.navy }}>
-        <StatusBar style="light" />
-        <ActivityIndicator size="large" color={colors.white} />
-      </View>
+      <>
+        <StatusBar style="dark" />
+        <HeartLoader />
+      </>
     );
   }
 
@@ -182,9 +222,9 @@ function RootLayout() {
       {/*
         Dark content is the app-wide default because the signed-in shell is
         white — MobileTopBar now paints the status-bar strip, and light icons
-        on it were invisible. The two navy screens (the loading splash above
-        and the welcome gateway) mount their own light StatusBar, which wins
-        while they are on screen.
+        on it were invisible. The navy welcome gateway mounts its own light
+        StatusBar, which wins while it is on screen. The loading heart sits on
+        the light page ground, so it keeps the dark one.
       */}
       <StatusBar style="dark" />
       <RootNavigator />

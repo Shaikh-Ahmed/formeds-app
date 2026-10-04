@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useSubmit } from '../../../../src/hooks/useSubmit';
+import { ApiError } from '../../../../src/utils/api';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -31,7 +33,7 @@ export default function LocumDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [applyOpen, setApplyOpen] = useState(false);
-  const [applying, setApplying] = useState(false);
+  const { submitting: applying, run: runApply } = useSubmit();
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -47,20 +49,19 @@ export default function LocumDetailScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  const submit = useCallback(async (note: string) => {
+  const submit = useCallback((note: string) => runApply(async key => {
     if (!token || !locum) return;
-    setApplying(true);
     setActionError(null);
     try {
-      const mine = await applyToLocum(token, locum.id, note);
+      // Keyed: a second tap or a retry returns this same application.
+      const mine = await applyToLocum(token, locum.id, note, key);
       setLocum(prev => (prev ? { ...prev, my_application: mine } : prev));
       setApplyOpen(false);
     } catch (e: any) {
-      setActionError(e?.message || 'Could not send your application.');
-    } finally {
-      setApplying(false);
+      if (e instanceof ApiError && e.code === 'already_applied') { setApplyOpen(false); load(); }
+      setActionError(e?.message || 'Could not send your application. Please try again.');
     }
-  }, [token, locum]);
+  }, { locum: locum?.id, note }), [token, locum, runApply, load]);
 
   const withdraw = useCallback(async () => {
     const mine = locum?.my_application;

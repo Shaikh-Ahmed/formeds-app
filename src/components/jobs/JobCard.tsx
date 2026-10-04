@@ -1,7 +1,10 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
+import { TrustMark } from '../TrustMark';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, radius, spacing, typography, fonts, shadow, isRefined, isMaterial, isPremium, motion, MIN_TOUCH_TARGET, gloss } from '../../theme';
+import { Platform } from 'react-native';
 import { postedAgo } from '../../utils/time';
 import { Avatar } from '../Avatar';
 import { Chip } from '../Chip';
@@ -9,6 +12,7 @@ import {
   JobBadge, MetaItem, formatExperience, formatPay, formatShiftDates, formatTypeLine,
 } from './JobMeta';
 import { EMPLOYMENT_TYPE_LABELS, isShiftRole, type Job } from '../../types/jobs';
+import { eligibilityOf } from '../../utils/roles';
 
 interface Props {
   item: Job;
@@ -50,6 +54,8 @@ export const JobCard = React.memo(function JobCard({
   item, onPress, onToggleSave, onShare, onQuickApply, selected = false, compact = false,
 }: Props) {
   const pay = formatPay(item);
+  const eligibility = eligibilityOf(item);
+  const studentsWelcome = eligibility !== 'professionals';
   const experience = formatExperience(item);
   const shiftDates = formatShiftDates(item);
   const skills = item.skills?.slice(0, MAX_SKILL_CHIPS) ?? [];
@@ -57,7 +63,8 @@ export const JobCard = React.memo(function JobCard({
   const canQuickApply = !!onQuickApply && !item.has_applied && !item.can_manage && item.status === 'active';
 
   return (
-    <View style={[styles.card, compact && styles.cardCompact, selected && styles.cardSelected]}>
+    <View style={[styles.card, compact && styles.cardCompact, isRefined && styles.pCard, isPremium && styles.cCard,
+      selected && styles.cardSelected]}>
       <Pressable
         testID={`job-card-${item.id}`}
         onPress={onPress}
@@ -69,12 +76,18 @@ export const JobCard = React.memo(function JobCard({
         }
         style={({ pressed, hovered }: any) => [
           styles.hit,
-          (pressed || hovered) && !selected && styles.cardPressed,
+          (pressed || hovered) && !selected && (isPremium ? styles.cHover : styles.cardPressed),
         ]}
       />
 
       <View style={styles.topRow} pointerEvents="box-none">
         <View style={styles.titleBlock} pointerEvents="none">
+          {/* Premium: the specialty leads, as a crisp classification tag. */}
+          {isPremium && item.specialty ? (
+            <View style={styles.cSpecialty}>
+              <Text style={styles.cSpecialtyText} numberOfLines={1}>{item.specialty}</Text>
+            </View>
+          ) : null}
           <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
 
           <View style={styles.employerRow}>
@@ -86,13 +99,7 @@ export const JobCard = React.memo(function JobCard({
             />
             <Text style={styles.employer} numberOfLines={1}>{item.employer_name}</Text>
             {item.employer_verified ? (
-              <Ionicons
-                name="checkmark-circle"
-                size={14}
-                color={colors.teal}
-                // The tick is a claim, so it is announced rather than decorative.
-                accessibilityLabel="Verified organisation"
-              />
+              <TrustMark size={14} classicIcon="checkmark-circle" label="Verified organisation" />
             ) : null}
           </View>
           {item.posted_by_recruiter ? (
@@ -113,16 +120,23 @@ export const JobCard = React.memo(function JobCard({
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={({ pressed }) => [styles.saveBtn, pressed && styles.iconPressed]}
           >
-            <Ionicons
-              name={item.saved ? 'bookmark' : 'bookmark-outline'}
-              size={20}
-              color={item.saved ? colors.navy : colors.textSecondary}
-            />
+            <SaveGlyph saved={!!item.saved} />
           </Pressable>
         ) : null}
       </View>
 
       <View pointerEvents="none" style={styles.body}>
+        {/* Premium: compensation straight after who is offering it -- the
+            spec's decision order -- and set to read before the metadata. */}
+        {isRefined ? (pay ? (
+          <View style={[styles.pPayRow, isMaterial && styles.mPayRow]}>
+            <Ionicons name={isPremium ? 'cash-outline' : 'wallet-outline'} size={16}
+              color={isMaterial || isPremium ? colors.teal : colors.navy} />
+            <Text style={[styles.pPay, isPremium && styles.cPay]}>{pay}</Text>
+          </View>
+        ) : (
+          <Text style={styles.payHidden}>Pay not disclosed</Text>
+        )) : null}
         <View style={styles.metaRow}>
           {item.location ? <MetaItem icon="location-outline" text={item.location} /> : null}
           <MetaItem icon="briefcase-outline" text={formatTypeLine(item)} />
@@ -136,22 +150,31 @@ export const JobCard = React.memo(function JobCard({
           </View>
         ) : null}
 
-        {pay ? (
+        {isRefined ? null : pay ? (
           <Text style={styles.pay}>{pay}</Text>
         ) : (
           <Text style={styles.payHidden}>Pay not disclosed</Text>
         )}
 
-        {(item.is_urgent || isShiftRole(item.employment_type)) && !compact ? (
+        {/* Who may apply is shown even on a compact card: it decides whether
+            the posting is worth opening at all. */}
+        {((item.is_urgent || isShiftRole(item.employment_type)) && !compact) || studentsWelcome ? (
           <View style={styles.badgeRow}>
-            {item.is_urgent ? (
+            {item.is_urgent && !compact ? (
               <JobBadge label="Urgent" icon="alert-circle" tone="danger" />
             ) : null}
-            {isShiftRole(item.employment_type) ? (
+            {isShiftRole(item.employment_type) && !compact ? (
               <JobBadge
                 label={EMPLOYMENT_TYPE_LABELS[item.employment_type]}
                 icon="flash-outline"
                 tone="teal"
+              />
+            ) : null}
+            {studentsWelcome ? (
+              <JobBadge
+                label={eligibility === 'students' ? 'Students only' : 'Open to students'}
+                icon="school-outline"
+                tone="navy"
               />
             ) : null}
           </View>
@@ -167,6 +190,9 @@ export const JobCard = React.memo(function JobCard({
 
       <View style={styles.footer} pointerEvents="box-none">
         <View style={styles.footerInfo} pointerEvents="none">
+          {isPremium && item.employer_verified ? (
+            <Text style={styles.cVerifiedLine} numberOfLines={1}>Verified employer ·</Text>
+          ) : null}
           <Text style={styles.posted}>{postedAgo(item.created_at)}</Text>
           {!item.has_applied && item.applicant_count > 0 ? (
             <Text style={styles.posted}>
@@ -200,7 +226,7 @@ export const JobCard = React.memo(function JobCard({
               accessibilityLabel={`Quick apply to ${item.title}`}
               style={({ pressed, hovered }: any) => [styles.quick, hovered && styles.quickHover, pressed && styles.iconPressed]}
             >
-              <Ionicons name="flash" size={14} color={colors.white} />
+              <Ionicons name={isPremium ? 'paper-plane' : 'flash'} size={14} color={colors.white} />
               <Text style={styles.quickText}>Quick apply</Text>
             </Pressable>
           ) : null}
@@ -209,6 +235,33 @@ export const JobCard = React.memo(function JobCard({
     </View>
   );
 });
+
+/**
+ * The bookmark. In Premium, becoming saved gives a brief scale "pop" -- the
+ * confirmation the spec asks for -- skipped under reduce-motion.
+ */
+function SaveGlyph({ saved }: { saved: boolean }) {
+  const reduced = useReducedMotion();
+  const scale = useRef(new Animated.Value(1)).current;
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    if (!isRefined || reduced || !saved) return;
+    Animated.sequence([
+      Animated.timing(scale, { toValue: 1.25, duration: motion.fast, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: motion.base, useNativeDriver: true }),
+    ]).start();
+  }, [saved, reduced, scale]);
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Ionicons
+        name={saved ? 'bookmark' : 'bookmark-outline'}
+        size={20}
+        color={saved ? colors.navy : colors.textSecondary}
+      />
+    </Animated.View>
+  );
+}
 
 const styles = StyleSheet.create({
   card: {
@@ -222,7 +275,7 @@ const styles = StyleSheet.create({
   cardCompact: { borderRadius: radius.lg, padding: spacing.md + 2, gap: spacing.xs + 2 },
   // A 2px left edge rather than a fill: the selected row has to read as
   // selected without changing how legible its text is.
-  cardSelected: { borderColor: colors.navy, backgroundColor: '#EFF6FF' },
+  cardSelected: { borderColor: colors.primaryFill, backgroundColor: colors.selected },
   cardPressed: { backgroundColor: colors.bgMuted },
   // The card's own tap target, filling it behind the content.
   hit: { ...StyleSheet.absoluteFillObject, borderRadius: radius.xl + 2 },
@@ -273,8 +326,31 @@ const styles = StyleSheet.create({
   iconHover: { backgroundColor: colors.bgMuted },
   quick: {
     flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: spacing.md,
-    borderRadius: radius.pill, backgroundColor: colors.navy,
+    borderRadius: radius.pill, backgroundColor: colors.action, ...gloss.fill,
   },
-  quickHover: { backgroundColor: colors.navyLight },
+  quickHover: { backgroundColor: colors.actionHover },
   quickText: { ...typography.label, color: colors.white },
+
+  // ── ForMeds Premium ──────────────────────────────────────────────────────
+  pCard: { borderRadius: radius.card, ...shadow.card },
+  pPayRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  pPay: { ...typography.h3, color: colors.navy },
+  // Premium: a crisp card that answers a hover with a teal edge.
+  cCard: Platform.OS === 'web'
+    ? ({ transition: 'border-color 200ms cubic-bezier(0.2,0,0,1), box-shadow 200ms cubic-bezier(0.2,0,0,1)' } as object)
+    : {},
+  cSpecialty: {
+    alignSelf: 'flex-start', marginBottom: 2, paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: radius.tag, borderWidth: 1, borderColor: colors.tealLine, backgroundColor: colors.tealBg,
+  },
+  cSpecialtyText: { fontSize: 10, lineHeight: 14, fontFamily: fonts.body.bold, color: colors.tealInk, letterSpacing: 0.6, textTransform: 'uppercase' },
+  cPay: { color: colors.teal, fontSize: 15 },
+  // The hover edge is drawn by the card's own tap target, which fills it.
+  cHover: { borderWidth: 1, borderColor: 'rgba(20,184,166,0.45)', backgroundColor: 'rgba(240,253,250,0.35)' },
+  cVerifiedLine: { ...typography.small, color: colors.textSubtle },
+  // Material: the salary sits in a soft teal well -- the decision number.
+  mPayRow: {
+    alignSelf: 'flex-start', backgroundColor: colors.tealBg,
+    paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.md,
+  },
 });

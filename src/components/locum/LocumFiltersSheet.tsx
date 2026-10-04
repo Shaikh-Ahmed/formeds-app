@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FormScrollView } from '../FormScrollView';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { colors, spacing, typography } from '../../theme';
 import { Button } from '../Button';
@@ -70,7 +71,7 @@ export function LocumFiltersSheet({
         </>
       }
     >
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <FormScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <ChoiceChips
           label="When"
           choices={[
@@ -122,7 +123,7 @@ export function LocumFiltersSheet({
           value={draft.sort || 'soonest'}
           onChange={v => set({ sort: v ?? 'soonest' })}
         />
-      </ScrollView>
+      </FormScrollView>
     </Sheet>
   );
 }

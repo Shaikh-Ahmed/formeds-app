@@ -46,14 +46,8 @@ export default function SpecialistsScreen() {
     <SafeAreaView style={styles.safe} edges={[]}>
       <PageGrid left={<ProfileRail />} testID="specialists-grid">
         <ScrollView contentContainerStyle={[styles.body, !isMobile && styles.bodyWide]}>
-          <View style={[styles.wideTitleWrap, isMobile && styles.titleWrapMobile]}>
-              <Text style={styles.wideTitle} accessibilityRole="header">{title}</Text>
-              <Text style={styles.wideSubtitle}>
-                {isClinic
-                  ? 'Visiting-specialist slots your clinic has published.'
-                  : 'Visiting-specialist openings at clinics near you.'}
-              </Text>
-          </View>
+          {/* No visible page title; the heading stays for screen readers. */}
+          <Text style={styles.srOnly} accessibilityRole="header">{title}</Text>
           <ComingSoon
             testID="coming-soon-specialists"
             icon="people-outline"
@@ -71,11 +65,10 @@ export default function SpecialistsScreen() {
 }
 
 const styles = StyleSheet.create({
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
   safe: { flex: 1, backgroundColor: colors.bg },
   wideTitleWrap: { paddingBottom: spacing.xs },
   titleWrapMobile: { paddingBottom: spacing.md },
-  wideTitle: { ...typography.h2, color: colors.text },
-  wideSubtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   body: { padding: spacing.lg, paddingBottom: 100 },
   bodyWide: { paddingHorizontal: 0, paddingTop: spacing.xxl, paddingBottom: spacing.xxxl },
   footnote: {

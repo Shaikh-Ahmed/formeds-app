@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
   body: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.border },
   sectionTitle: { ...typography.h3, color: colors.navy, marginBottom: spacing.sm },
   description: { ...typography.body, color: colors.textSecondary, lineHeight: 22 },
-  notice: { flexDirection: 'row', gap: spacing.sm, backgroundColor: '#EFF6FF', borderRadius: radius.md, padding: spacing.md, marginVertical: spacing.xl },
+  notice: { flexDirection: 'row', gap: spacing.sm, backgroundColor: colors.tintBg, borderRadius: radius.md, padding: spacing.md, marginVertical: spacing.xl },
   noticeText: { ...typography.caption, color: colors.navy, flex: 1, lineHeight: 19 },
   done: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, backgroundColor: colors.successBg, borderRadius: radius.lg, paddingVertical: spacing.lg },
   doneText: { ...typography.bodyStrong, color: colors.teal },

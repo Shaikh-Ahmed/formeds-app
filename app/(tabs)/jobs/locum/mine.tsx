@@ -3,7 +3,7 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../../../src/context/AuthContext';
-import { colors, radius, spacing, typography, fonts } from '../../../../src/theme';
+import { colors, radius, spacing, typography, fonts, gloss } from '../../../../src/theme';
 import { PageGrid } from '../../../../src/components/web';
 import { Button, EmptyState, ErrorBanner, ErrorState, KycNotice, Sheet } from '../../../../src/components';
 import { Skeleton } from '../../../../src/components/Skeleton';
@@ -244,9 +244,9 @@ const styles = StyleSheet.create({
   },
   action: {
     paddingHorizontal: spacing.md, minHeight: 36, borderRadius: radius.md,
-    borderWidth: 1, borderColor: colors.navy, justifyContent: 'center', backgroundColor: colors.white,
+    borderWidth: 1, borderColor: colors.primaryFill, justifyContent: 'center', backgroundColor: colors.white,
   },
-  actionPrimary: { backgroundColor: colors.navy },
+  actionPrimary: { backgroundColor: colors.action, ...gloss.fill },
   actionQuiet: { borderColor: colors.border },
   actionText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.navy },
   actionTextPrimary: { color: colors.white },

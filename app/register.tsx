@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { FormScrollView } from '../src/components/FormScrollView';
+import { useFormErrors } from '../src/hooks/useFormErrors';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +10,9 @@ import { Button, FormInput, ErrorBanner } from '../src/components';
 import { colors, radius, spacing, typography, getRoleMeta } from '../src/theme';
 import type { Role } from '../src/theme';
 import { validateEmail, validatePassword, validatePhone, validateRequired, firstError } from '../src/utils/validation';
-import { AuthShell } from '../src/components/web';
+import { AuthShell, AuthRow, AuthTopRow } from '../src/components/web';
+import { GoogleSignInButton } from '../src/components/auth/GoogleSignInButton';
+import { useGoogleSignIn } from '../src/components/auth/useGoogleSignIn';
 
 /**
  * Step 2 of signup. Deliberately minimal: name, email, password, phone.
@@ -24,32 +28,41 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const errs = useFormErrors<'name' | 'email' | 'phone' | 'password'>({
+    known: ['name', 'email', 'phone', 'password'],
+    codes: { email_taken: 'email', phone_taken: 'phone' },
+  });
   const [loading, setLoading] = useState(false);
 
   const { register } = useAuth();
   const router = useRouter();
+  // The role card they tapped becomes the default on the Google onboarding form.
+  const google = useGoogleSignIn(role);
   const roleMeta = getRoleMeta(role);
 
   const nameLabel = role === 'hospital' ? 'Hospital name' : role === 'clinic' ? 'Clinic name' : 'Full name';
   const namePlaceholder =
     role === 'hospital' ? 'e.g. City General Hospital'
       : role === 'clinic' ? 'e.g. Sunrise Care Clinic'
-        : 'e.g. Dr. Anita Sharma';
+        : role === 'student' ? 'e.g. Rahul Sharma'
+          : 'e.g. Dr. Anita Sharma';
 
   const handleRegister = async () => {
     // Same rules the server enforces, so a valid-looking form can't 422.
-    const problem = firstError(
-      validateRequired(name, nameLabel),
-      validateEmail(email),
-      validatePassword(password),
-      validatePhone(phone),
-    );
-    if (problem) { setError(problem); return; }
+    const valid = errs.check({
+      name: validateRequired(name, nameLabel),
+      email: validateEmail(email),
+      phone: validatePhone(phone),
+      password: validatePassword(password),
+    });
+    if (!valid || loading) return;
 
     setLoading(true);
     setError(null);
     try {
-      const pending = await register({ email, password, name: name.trim(), role, phone });
+      const pending = await register({
+        email, password, name: name.trim(), role, phone,
+      });
       router.replace({
         pathname: '/verify',
         params: {
@@ -61,7 +74,8 @@ export default function RegisterScreen() {
         },
       });
     } catch (e: any) {
-      setError(e?.message || 'Registration failed. Please try again.');
+      // "Email already registered" belongs under Email, not in a banner.
+      if (!errs.fromError(e)) setError(e?.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -69,12 +83,13 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <AuthShell maxWidth={520}>
+      <AuthShell maxWidth={680}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <FormScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <AuthTopRow>
           <TouchableOpacity
             testID="register-back-btn"
-            style={styles.backBtn}
+            style={[styles.backBtn, styles.inRow]}
             onPress={() => router.back()}
             accessibilityRole="button"
             accessibilityLabel="Go back"
@@ -82,22 +97,30 @@ export default function RegisterScreen() {
             <Ionicons name="arrow-back" size={24} color={colors.navy} />
           </TouchableOpacity>
 
-          <View style={[styles.roleBadge, { backgroundColor: `${roleMeta.color}15` }]}>
+          <View style={[styles.roleBadge, styles.inRow, { backgroundColor: `${roleMeta.color}15` }]}>
             <Ionicons name={roleMeta.icon} size={20} color={roleMeta.color} />
             <Text style={[styles.roleBadgeText, { color: roleMeta.color }]}>{roleMeta.longLabel}</Text>
           </View>
+          </AuthTopRow>
 
           <Text style={styles.title} accessibilityRole="header">Create account</Text>
-          <Text style={styles.subtitle}>Just four details — you can add the rest later.</Text>
+          <Text style={styles.subtitle}>
+            Just four details — you can add the rest later.
+          </Text>
 
-          <ErrorBanner message={error} />
+          <ErrorBanner message={error || google.error} />
 
+          <GoogleSignInButton divider="below" text="continue_with" testID="register-google"
+            onCredential={google.signIn} onError={google.setError} />
+
+          <AuthRow>
           <FormInput maxLength={120}
             testID="register-name-input"
             label={nameLabel}
             icon="person-outline"
             value={name}
-            onChangeText={setName}
+            onChangeText={v => { setName(v); errs.clear('name'); }}
+            error={errs.fields.name}
             placeholder={namePlaceholder}
             autoCapitalize="words"
             autoComplete="name"
@@ -108,19 +131,23 @@ export default function RegisterScreen() {
             label="Email address"
             icon="mail-outline"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={v => { setEmail(v); errs.clear('email'); }}
+            error={errs.fields.email}
             placeholder="you@example.com"
             keyboardType="email-address"
             autoCapitalize="none"
             autoComplete="email"
             returnKeyType="next"
           />
+          </AuthRow>
+          <AuthRow>
           <FormInput maxLength={16}
             testID="register-phone-input"
             label="Phone number"
             icon="call-outline"
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={v => { setPhone(v); errs.clear('phone'); }}
+            error={errs.fields.phone}
             placeholder="10-digit mobile number"
             keyboardType="phone-pad"
             autoComplete="tel"
@@ -131,14 +158,16 @@ export default function RegisterScreen() {
             label="Password"
             icon="lock-closed-outline"
             value={password}
-            onChangeText={setPassword}
-            placeholder="At least 8 characters, with a number"
+            onChangeText={v => { setPassword(v); errs.clear('password'); }}
+            error={errs.fields.password}
+            placeholder="8+ characters, with a number"
             autoCapitalize="none"
             autoComplete="new-password"
             secure
             returnKeyType="done"
             onSubmitEditing={handleRegister}
           />
+          </AuthRow>
 
           <Text style={styles.legal}>
             We&apos;ll send a code to your email to confirm it&apos;s you.
@@ -147,6 +176,7 @@ export default function RegisterScreen() {
           <Button
             testID="register-submit-btn"
             label="Continue"
+            loadingLabel="Creating account…"
             onPress={handleRegister}
             loading={loading}
             accessibilityHint="Creates your account and sends a verification code"
@@ -157,7 +187,7 @@ export default function RegisterScreen() {
               Already registered? <Text style={styles.linkBold}>Sign in</Text>
             </Text>
           </TouchableOpacity>
-        </ScrollView>
+        </FormScrollView>
       </KeyboardAvoidingView>
       </AuthShell>
     </SafeAreaView>
@@ -167,7 +197,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.white },
   flex: { flex: 1 },
-  scroll: { paddingHorizontal: spacing.xxl, paddingTop: spacing.lg, paddingBottom: spacing.xxxl + spacing.xxl },
+  scroll: { paddingHorizontal: spacing.xxl, paddingTop: spacing.lg, paddingBottom: spacing.xxxl },
   backBtn: {
     width: 44, height: 44, borderRadius: radius.lg, backgroundColor: colors.bgMuted,
     alignItems: 'center', justifyContent: 'center', marginBottom: spacing.xl,
@@ -178,6 +208,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   roleBadgeText: { ...typography.label },
+  inRow: { marginBottom: 0 },
   title: { ...typography.h1, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textSecondary, marginBottom: spacing.xxl },
   legal: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.lg },

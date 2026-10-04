@@ -48,6 +48,7 @@ export function buildJobsQuery(filters: JobFilters = {}): string {
   push('urgent_only', filters.urgent_only);
   push('posted_within_days', filters.posted_within_days);
   push('org_id', filters.org_id);
+  push('audience', filters.audience);
   push('sort', filters.sort);
 
   return params.toString();
@@ -55,7 +56,8 @@ export function buildJobsQuery(filters: JobFilters = {}): string {
 
 /** How many filters the user has actually set, for the "Filters (3)" badge. */
 export function activeFilterCount(filters: JobFilters): number {
-  const { sort: _sort, q: _q, ...rest } = filters;
+  // The audience is set by the page a student is on, not chosen as a filter.
+  const { sort: _sort, q: _q, audience: _audience, ...rest } = filters;
   return Object.values(rest).filter(v => {
     if (Array.isArray(v)) return v.length > 0;
     return v !== undefined && v !== null && v !== '' && v !== false;
@@ -115,8 +117,8 @@ export const fetchJobAlerts = (token: string): Promise<JobAlert[]> =>
 
 // ── Writes ───────────────────────────────────────────────────────────────────
 
-export const createJob = (token: string, data: Record<string, unknown>): Promise<Job> =>
-  apiFetch('/api/jobs/', token, { method: 'POST', body: JSON.stringify(data) });
+export const createJob = (token: string, data: Record<string, unknown>, idempotencyKey?: string): Promise<Job> =>
+  apiFetch('/api/jobs/', token, { method: 'POST', body: JSON.stringify(data), idempotencyKey });
 
 export const updateJob = (
   token: string, jobId: string, patch: Record<string, unknown>,
@@ -139,9 +141,10 @@ export const toggleSaveJob = (token: string, jobId: string): Promise<{ saved: bo
 export const applyToJob = (
   token: string, jobId: string, coverNote = '',
   extra: { answers?: Record<string, unknown>; include_resume?: boolean } = {},
+  idempotencyKey?: string,
 ): Promise<{ status: string }> =>
   apiFetch(`/api/jobs/${jobId}/apply`, token, {
-    method: 'POST', body: JSON.stringify({ cover_note: coverNote, ...extra }),
+    method: 'POST', body: JSON.stringify({ cover_note: coverNote, ...extra }), idempotencyKey,
   });
 
 /**

@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSubmit } from '../../hooks/useSubmit';
+import { ApiError } from '../../utils/api';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { colors, layout, radius, spacing, typography, useBreakpoint, MIN_TOUCH_TARGET } from '../../theme';
+import { colors, layout, radius, spacing, typography, useBreakpoint, MIN_TOUCH_TARGET, isPremium } from '../../theme';
 import { shareJob } from '../../utils/share';
 import { PageGrid } from '../web';
 import { Button } from '../Button';
@@ -15,6 +17,7 @@ import { ApplySheet, type ApplyExtras } from './ApplySheet';
 import { applyToJob, createJobAlert, fetchJob, toggleSaveJob } from '../../api/jobs';
 import { useCollapsibleHeader } from '../../hooks/useCollapsibleHeader';
 import type { Job, JobFilters } from '../../types/jobs';
+import { acceptsRole, appliesForWork, isStudent } from '../../utils/roles';
 
 /** Width of the list pane in the split view. See the arithmetic below. */
 const LIST_PANE = 400;
@@ -60,6 +63,17 @@ export function JobsScreen({
   const { token, user } = useAuth();
   const { isDesktop } = useBreakpoint();
   const router = useRouter();
+  const student = user?.role === 'student';
+  // A student's board shows what they can apply to; Internships narrows it.
+  const preset = useMemo<JobFilters | undefined>(() => {
+    if (segment === 'internships') return { audience: 'students', employment_type: ['internship'] };
+    return student ? { audience: 'students' } : undefined;
+  }, [segment, student]);
+  const emptyAction = student
+    ? (segment === 'internships'
+      ? { label: 'Browse all opportunities', onPress: () => router.replace('/jobs' as any) }
+      : undefined)
+    : undefined;
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -86,7 +100,7 @@ export function JobsScreen({
   const [applyFor, setApplyFor] = useState<Job | null>(null);
   const [appliedIds, setAppliedIds] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
-  const [applying, setApplying] = useState(false);
+  const { submitting: applying, run: runApply } = useSubmit();
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -128,21 +142,23 @@ export function JobsScreen({
     if ((await shareJob(detail)) === 'copied') { setCopied(true); setTimeout(() => setCopied(false), 2200); }
   }, [detail]);
 
-  const submitApplication = useCallback(async (note: string, extras?: ApplyExtras) => {
+  const submitApplication = useCallback((note: string, extras?: ApplyExtras) => runApply(async key => {
     if (!token || !applyFor) return;
-    setApplying(true);
     setActionError(null);
-    try {
-      await applyToJob(token, applyFor.id, note, extras);
+    const markApplied = () => {
       setApplyFor(null);
       setAppliedIds(prev => [...prev, applyFor.id]);
       setDetail(prev => (prev && prev.id === applyFor.id ? { ...prev, has_applied: true } : prev));
+    };
+    try {
+      // Keyed: a second tap or a retry returns this same application.
+      await applyToJob(token, applyFor.id, note, extras, key);
+      markApplied();
     } catch (e: any) {
-      setActionError(e?.message || 'Could not submit your application.');
-    } finally {
-      setApplying(false);
+      if (e instanceof ApiError && e.code === 'already_applied') markApplied();
+      setActionError(e?.message || 'Could not submit your application. Please try again.');
     }
-  }, [token, applyFor]);
+  }, { job: applyFor?.id, note, extras }), [token, applyFor, runApply]);
 
   /**
    * Turns the filters that just returned nothing into a saved search, so the
@@ -166,8 +182,9 @@ export function JobsScreen({
       onQuickApply={setApplyFor}
       appliedIds={appliedIds}
       compact={split}
+      preset={preset}
       emptyAction={
-        user?.role
+        student ? emptyAction : user?.role
           ? { label: 'Post an opportunity', onPress: () => router.push('/jobs/posted' as any) }
           : undefined
       }
@@ -179,14 +196,9 @@ export function JobsScreen({
       <PageGrid fluid testID="jobs-grid">
         {split ? (
           <>
-            <View style={styles.header}>
-              <Text style={styles.h1} accessibilityRole="header">
-                Find your next healthcare opportunity
-              </Text>
-              <Text style={styles.sub}>
-                Roles, locum shifts, fellowships and training posts, matched to your expertise.
-              </Text>
-            </View>
+            {/* No visible page title -- the tabs below say where you are. The
+                heading stays for screen readers, which navigate by headings. */}
+            <Text style={styles.srOnly} accessibilityRole="header">Jobs</Text>
             <JobsSegmentedNav active={segment} />
           </>
         ) : null}
@@ -215,14 +227,9 @@ export function JobsScreen({
               style={[styles.floatingHeader, headerStyle]}
               onLayout={onHeaderLayout}
             >
-              <View style={styles.header}>
-                <Text style={styles.h1} accessibilityRole="header">
-                  Find your next healthcare opportunity
-                </Text>
-                <Text style={styles.sub}>
-                  Roles, locum shifts, fellowships and training posts, matched to your expertise.
-                </Text>
-              </View>
+              {/* No visible page title -- the tabs below say where you are. The
+                  heading stays for screen readers, which navigate by headings. */}
+              <Text style={styles.srOnly} accessibilityRole="header">Jobs</Text>
               <JobsSegmentedNav active={segment} />
             </Animated.View>
             <JobsList
@@ -232,8 +239,9 @@ export function JobsScreen({
               scrollProps={scrollProps}
               contentInsetTop={headerHeight}
               onSaveSearch={saveSearch}
+              preset={preset}
               emptyAction={
-                user?.role
+                student ? emptyAction : user?.role
                   ? { label: 'Post an opportunity', onPress: () => router.push('/jobs/new' as any) }
                   : undefined
               }
@@ -270,7 +278,10 @@ export function JobActionBar({
   onShare: () => void;
   bottomInset: number;
 }) {
+  const { user } = useAuth();
   const closed = job.status !== 'active';
+  // Applicants only where the posting takes their account type.
+  const notEligible = !!user && appliesForWork(user) && !acceptsRole(job, user.role);
   return (
     <View style={[styles.actionBar, { paddingBottom: bottomInset + spacing.md }]}>
       <Pressable
@@ -297,9 +308,10 @@ export function JobActionBar({
         <Ionicons name="share-social-outline" size={22} color={colors.textSecondary} />
       </Pressable>
       <Button
-        label={job.has_applied ? 'Applied' : closed ? 'Closed' : 'Apply now'}
+        label={job.has_applied ? 'Applied' : closed ? 'Closed'
+          : notEligible ? (isStudent(user) ? 'Not open to students' : 'Students only') : 'Apply now'}
         onPress={onApply}
-        disabled={job.has_applied || closed}
+        disabled={job.has_applied || closed || notEligible}
         style={styles.barApply}
         testID="job-apply"
       />
@@ -315,9 +327,7 @@ const styles = StyleSheet.create({
   copiedText: { ...typography.label, color: colors.white },
   flex: { flex: 1 },
 
-  header: { paddingTop: spacing.xl, paddingHorizontal: spacing.lg, gap: spacing.xs },
-  h1: { ...typography.h2, color: colors.text },
-  sub: { ...typography.caption, color: colors.textSecondary, lineHeight: 20 },
+  srOnly: { position: 'absolute', width: 1, height: 1, overflow: 'hidden', opacity: 0 },
 
   // overflow hidden is what lets the header slide out of view rather than
   // over the tab bar; the list scrolls underneath it.

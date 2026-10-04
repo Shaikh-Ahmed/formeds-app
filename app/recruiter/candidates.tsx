@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { TrustMark } from '../../src/components/TrustMark';
+import { useSubmit } from '../../src/hooks/useSubmit';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,6 +53,7 @@ export default function FindTalentScreen() {
   const [opening, setOpening] = useState<string>('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const guard = useSubmit();
   const [inviteError, setInviteError] = useState<string | null>(null);
   // professional id -> the openings they've already been invited to. Loaded
   // from the server so it survives a reload; the server refuses a second
@@ -126,7 +129,9 @@ export default function FindTalentScreen() {
     setOpening(available.find(o => o.key === preset)?.key ?? available[0]?.key ?? '');
   };
 
-  const send = async () => {
+  const send = () => guard.run(key => sendOnce(key), { who: inviting?.id, opening, message });
+
+  const sendOnce = async (key: string) => {
     if (!token || !inviting) return;
     const target = choices.find(o => o.key === opening);
     if (!target) { setInviteError('Choose an opening to invite them to.'); return; }
@@ -134,7 +139,7 @@ export default function FindTalentScreen() {
     try {
       await sendInvitation(token, {
         professional_id: inviting.id, job_id: target.job_id, locum_id: target.locum_id, message: message.trim(),
-      });
+      }, key);
       setInvited(prev => ({ ...prev, [inviting.id]: [...(prev[inviting.id] || []), target.key] }));
       setInviting(null);
     } catch (e: any) {
@@ -242,8 +247,7 @@ export default function FindTalentScreen() {
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={recruiterStyles.row}>
                       <Text style={[recruiterStyles.strong, { flexShrink: 1 }]} numberOfLines={1}>{c.name}</Text>
-                      {c.account_verified ? <Ionicons name="checkmark-circle" size={14} color={colors.teal}
-                        accessibilityLabel="Verified professional" /> : null}
+                      {c.account_verified ? <TrustMark size={14} classicIcon="checkmark-circle" label="Verified professional" /> : null}
                     </View>
                     <Text style={recruiterStyles.muted} numberOfLines={1}>
                       {[c.professional_role, c.specialty].filter(Boolean).join(' · ') || 'Healthcare professional'}
@@ -323,7 +327,7 @@ const styles = StyleSheet.create({
   },
   filterText: { fontSize: 15, fontFamily: fonts.body.semibold, color: colors.navy },
   filterCount: {
-    minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.navy, alignItems: 'center',
+    minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.primaryFill, alignItems: 'center',
     justifyContent: 'center', paddingHorizontal: 5,
   },
   filterCountText: { color: colors.white, fontSize: 12, fontFamily: fonts.body.bold },
