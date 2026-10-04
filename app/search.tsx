@@ -144,7 +144,7 @@ export default function SearchScreen() {
 
           <View style={styles.field}>
             <Ionicons name="search" size={18} color={colors.textSecondary} />
-            <TextInput
+            <TextInput maxLength={100}
               ref={inputRef}
               testID="search-input"
               style={styles.input}

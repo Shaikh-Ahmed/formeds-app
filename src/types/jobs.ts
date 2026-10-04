@@ -17,6 +17,8 @@ export type PayPeriod = 'hour' | 'shift' | 'day' | 'month' | 'year';
 export type JobStatus = 'draft' | 'active' | 'paused' | 'closed' | 'filled' | 'expired';
 export type JobSort = 'newest' | 'pay_high' | 'closing_soon' | 'urgent';
 
+import type { ScreeningQuestion } from './applicants';
+
 export type ApplicationStatusKey =
   | 'applied' | 'reviewing' | 'shortlisted' | 'interviewing'
   | 'offered' | 'hired' | 'rejected' | 'withdrawn';
@@ -61,6 +63,8 @@ export interface Job {
   city?: string;
   state?: string;
   location: string;
+  /** Asked when applying. `preferred` is present only for the job's manager. */
+  screening_questions?: ScreeningQuestion[];
   work_mode: WorkMode;
 
   /** Absent entirely when the employer chose not to disclose pay. */
@@ -104,6 +108,10 @@ export interface Job {
   employer_verified?: boolean;
   employer_type?: string | null;
   poster_role?: string | null;
+  /** Recruiter postings: the client, named only when not confidential. */
+  posted_by_recruiter?: boolean;
+  client_name?: string;
+  client_confidential?: boolean;
 }
 
 export interface JobsPage {
@@ -145,6 +153,10 @@ export interface Application {
   job_location?: string;
   employment_type?: EmploymentType;
   employer_name?: string;
+  interview_at?: string | null;
+  interview_mode?: 'in_person' | 'video' | 'phone' | null;
+  interview_location?: string;
+  resume_name?: string;
 }
 
 // ── Labels ───────────────────────────────────────────────────────────────────
@@ -165,6 +177,13 @@ export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {
 
 /** Order the filter sheet and the posting form both present them in. */
 export const EMPLOYMENT_TYPES = Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[];
+
+/**
+ * What the posting form offers. Locum shifts are posted from the Locum tab
+ * now, so 'locum' is left out; older locum postings still display, filter and
+ * edit as before.
+ */
+export const POSTABLE_EMPLOYMENT_TYPES = EMPLOYMENT_TYPES.filter(t => t !== 'locum');
 
 export const WORK_MODE_LABELS: Record<WorkMode, string> = {
   onsite: 'On-site',

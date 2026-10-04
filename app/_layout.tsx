@@ -19,7 +19,25 @@ if (SENTRY_DSN) {
 // exists but holds only a signup token, so it is not yet an authenticated user.
 const PUBLIC_SEGMENTS = new Set([
   'index', 'login', 'register', 'verify', 'forgot-password', 'reset-password', 'verify-email',
+  'recruiter-register', 'recruiter-login',
 ]);
+
+// Where a recruiter may go. Their portal is the whole app for them: the
+// network's feed, job board, learning, cases and AED are not part of it. The
+// only screens they borrow from Jobs are the ones for their own postings.
+const RECRUITER_AREAS = new Set([
+  'recruiter', 'messages', 'conversation', 'notifications', 'settings', 'profile', 'help',
+]);
+const RECRUITER_JOB_SCREENS = new Set(['new', 'edit', 'applicants', '[id]']);
+const RECRUITER_LOCUM_SCREENS = new Set(['new', 'edit', 'manage', '[id]']);
+
+function recruiterMayOpen(segments: string[]): boolean {
+  const [first, second, third, fourth] = segments;
+  if (first !== '(tabs)') return RECRUITER_AREAS.has(first ?? '');
+  if (second !== 'jobs') return false;
+  if (third === 'locum') return RECRUITER_LOCUM_SCREENS.has(fourth ?? '');
+  return RECRUITER_JOB_SCREENS.has(third ?? '');
+}
 
 function RootNavigator() {
   const { user, loading, token, isKycApproved } = useAuth();
@@ -65,10 +83,21 @@ function RootNavigator() {
     if (loading) return;
 
     if (!user && !inPublicArea) {
-      router.replace('/login');
+      // Signing out of the recruiter portal (or its session expiring) goes
+      // back to the recruiter sign-in, not the professional one.
+      router.replace(currentSegment === 'recruiter' ? '/recruiter-login' : '/login');
+      return;
+    }
+    if (user?.role === 'recruiter' && !inPublicArea && !recruiterMayOpen(segments as string[])) {
+      router.replace('/recruiter' as any);
       return;
     }
     if (user && inPublicArea) {
+      // Recruiters have their own home and their own verification flow.
+      if (user.role === 'recruiter') {
+        router.replace('/recruiter' as any);
+        return;
+      }
       // A signed-in user who still needs KYC lands there first. `isKycApproved`
       // owns the admin exemption so this screen and every KYC-gated control
       // agree on who is approved.
@@ -76,7 +105,7 @@ function RootNavigator() {
       kycPrompted.current = true;
       router.replace(needsKyc ? '/kyc' : '/(tabs)/community');
     }
-  }, [user, loading, inPublicArea, router, isKycApproved]);
+  }, [user, loading, inPublicArea, router, isKycApproved, currentSegment, segments]);
 
   if (loading) {
     return (
@@ -104,14 +133,23 @@ function RootNavigator() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="kyc" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="admin/kyc" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="admin/recruiters" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="recruiter-register" />
+      <Stack.Screen name="recruiter-login" />
+      <Stack.Screen name="opportunities" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="edit-profile" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="subscription" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="checkout" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="help" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="lesson/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="post/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="case/[id]" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="case/new" options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="aed-chat" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="aed/history" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="aed/preferences" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="aed/calculators" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="messages" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="conversation" options={{ animation: 'slide_from_right' }} />

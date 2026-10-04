@@ -14,6 +14,10 @@ interface Props {
   item: Job;
   onPress: () => void;
   onToggleSave?: (job: Job) => void;
+  /** Share the posting. Shown when given. */
+  onShare?: (job: Job) => void;
+  /** Open the apply sheet from the card. Shown only when the job can be applied to. */
+  onQuickApply?: (job: Job) => void;
   /** Marks the row selected in the desktop split view. */
   selected?: boolean;
   /** Trims the card for the narrow list pane beside a detail panel. */
@@ -35,27 +39,25 @@ const MAX_SKILL_CHIPS = 3;
  * make the genuinely exceptional ones — urgent cover, a verified institution —
  * invisible. They are a plain text line; badges are reserved for the exceptions.
  *
+ * The card's own tap target sits BEHIND the content, and Save / Share / Quick
+ * apply sit beside it rather than inside it: a button nested in a button is
+ * invalid HTML on the web and ambiguous to a screen reader.
+ *
  * Memoised because the list re-renders on every keystroke of the search box and
  * a job card is not cheap to lay out.
  */
 export const JobCard = React.memo(function JobCard({
-  item, onPress, onToggleSave, selected = false, compact = false,
+  item, onPress, onToggleSave, onShare, onQuickApply, selected = false, compact = false,
 }: Props) {
   const pay = formatPay(item);
   const experience = formatExperience(item);
   const shiftDates = formatShiftDates(item);
   const skills = item.skills?.slice(0, MAX_SKILL_CHIPS) ?? [];
   const extraSkills = Math.max((item.skills?.length ?? 0) - MAX_SKILL_CHIPS, 0);
+  const canQuickApply = !!onQuickApply && !item.has_applied && !item.can_manage && item.status === 'active';
 
-  // The save toggle can't be a Pressable nested inside the card's own
-  // Pressable: react-native-web renders `accessibilityRole="button"` as a
-  // literal <button>, and a <button> cannot legally contain another
-  // <button> — browsers un-nest it, which breaks click targeting and trips
-  // up screen readers. So it renders as a sibling, absolutely positioned
-  // over the same top-right corner it always occupied; `titleBlockWithSave`
-  // reserves the space under it that the old flex row used to.
   return (
-    <View style={styles.cardWrap}>
+    <View style={[styles.card, compact && styles.cardCompact, selected && styles.cardSelected]}>
       <Pressable
         testID={`job-card-${item.id}`}
         onPress={onPress}
@@ -65,38 +67,62 @@ export const JobCard = React.memo(function JobCard({
           `${formatTypeLine(item)}. ${item.location || 'Location not stated'}. ` +
           `${pay ? pay + '. ' : ''}${postedAgo(item.created_at)}.`
         }
-        style={({ pressed }) => [
-          styles.card,
-          compact && styles.cardCompact,
-          selected && styles.cardSelected,
-          pressed && styles.cardPressed,
+        style={({ pressed, hovered }: any) => [
+          styles.hit,
+          (pressed || hovered) && !selected && styles.cardPressed,
         ]}
-      >
-        <View style={styles.topRow}>
-          <View style={[styles.titleBlock, onToggleSave && styles.titleBlockWithSave]}>
-            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+      />
 
-            <View style={styles.employerRow}>
-              <Avatar
-                name={item.employer_name}
-                uri={item.employer_avatar || undefined}
-                role={item.poster_role || undefined}
-                size={20}
+      <View style={styles.topRow} pointerEvents="box-none">
+        <View style={styles.titleBlock} pointerEvents="none">
+          <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+
+          <View style={styles.employerRow}>
+            <Avatar
+              name={item.employer_name}
+              uri={item.employer_avatar || undefined}
+              role={item.poster_role || undefined}
+              size={20}
+            />
+            <Text style={styles.employer} numberOfLines={1}>{item.employer_name}</Text>
+            {item.employer_verified ? (
+              <Ionicons
+                name="checkmark-circle"
+                size={14}
+                color={colors.teal}
+                // The tick is a claim, so it is announced rather than decorative.
+                accessibilityLabel="Verified organisation"
               />
-              <Text style={styles.employer} numberOfLines={1}>{item.employer_name}</Text>
-              {item.employer_verified ? (
-                <Ionicons
-                  name="checkmark-circle"
-                  size={14}
-                  color={colors.teal}
-                  // The tick is a claim, so it is announced rather than decorative.
-                  accessibilityLabel="Verified organisation"
-                />
-              ) : null}
-            </View>
+            ) : null}
           </View>
+          {item.posted_by_recruiter ? (
+            <Text style={styles.client} numberOfLines={1} testID={`job-client-${item.id}`}>
+              {item.client_name ? `Recruiter posting · For: ${item.client_name}`
+                : item.client_confidential ? 'Recruiter posting · For: Confidential client' : 'Recruiter posting'}
+            </Text>
+          ) : null}
         </View>
 
+        {onToggleSave ? (
+          <Pressable
+            testID={`job-save-${item.id}`}
+            onPress={() => onToggleSave(item)}
+            accessibilityRole="button"
+            accessibilityLabel={item.saved ? `Remove ${item.title} from saved` : `Save ${item.title}`}
+            accessibilityState={{ selected: item.saved }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={({ pressed }) => [styles.saveBtn, pressed && styles.iconPressed]}
+          >
+            <Ionicons
+              name={item.saved ? 'bookmark' : 'bookmark-outline'}
+              size={20}
+              color={item.saved ? colors.navy : colors.textSecondary}
+            />
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View pointerEvents="none" style={styles.body}>
         <View style={styles.metaRow}>
           {item.location ? <MetaItem icon="location-outline" text={item.location} /> : null}
           <MetaItem icon="briefcase-outline" text={formatTypeLine(item)} />
@@ -137,43 +163,49 @@ export const JobCard = React.memo(function JobCard({
             {extraSkills ? <Chip label={`+${extraSkills} more`} tone="neutral" /> : null}
           </View>
         ) : null}
+      </View>
 
-        <View style={styles.footer}>
+      <View style={styles.footer} pointerEvents="box-none">
+        <View style={styles.footerInfo} pointerEvents="none">
           <Text style={styles.posted}>{postedAgo(item.created_at)}</Text>
-          {item.has_applied ? (
-            <View style={styles.applied}>
-              <Ionicons name="checkmark-circle" size={14} color={colors.teal} />
-              <Text style={styles.appliedText}>Applied</Text>
-            </View>
-          ) : item.applicant_count > 0 ? (
+          {!item.has_applied && item.applicant_count > 0 ? (
             <Text style={styles.posted}>
-              {item.applicant_count} {item.applicant_count === 1 ? 'applicant' : 'applicants'}
+              · {item.applicant_count} {item.applicant_count === 1 ? 'applicant' : 'applicants'}
             </Text>
           ) : null}
         </View>
-      </Pressable>
-
-      {onToggleSave ? (
-        <Pressable
-          testID={`job-save-${item.id}`}
-          onPress={() => onToggleSave(item)}
-          accessibilityRole="button"
-          accessibilityLabel={item.saved ? `Remove ${item.title} from saved` : `Save ${item.title}`}
-          accessibilityState={{ selected: item.saved }}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={({ pressed }) => [
-            styles.saveBtn,
-            compact ? styles.saveBtnCompact : styles.saveBtnRegular,
-            pressed && styles.savePressed,
-          ]}
-        >
-          <Ionicons
-            name={item.saved ? 'bookmark' : 'bookmark-outline'}
-            size={20}
-            color={item.saved ? colors.navy : colors.textSecondary}
-          />
-        </Pressable>
-      ) : null}
+        <View style={styles.actions} pointerEvents="box-none">
+          {onShare ? (
+            <Pressable
+              testID={`job-share-${item.id}`}
+              onPress={() => onShare(item)}
+              accessibilityRole="button"
+              accessibilityLabel={`Share ${item.title}`}
+              hitSlop={6}
+              style={({ pressed, hovered }: any) => [styles.iconBtn, hovered && styles.iconHover, pressed && styles.iconPressed]}
+            >
+              <Ionicons name="share-social-outline" size={18} color={colors.navy} />
+            </Pressable>
+          ) : null}
+          {item.has_applied ? (
+            <View style={styles.applied} accessible accessibilityLabel="You have applied">
+              <Ionicons name="checkmark-circle" size={14} color={colors.teal} />
+              <Text style={styles.appliedText}>Applied</Text>
+            </View>
+          ) : canQuickApply ? (
+            <Pressable
+              testID={`job-quick-apply-${item.id}`}
+              onPress={() => onQuickApply!(item)}
+              accessibilityRole="button"
+              accessibilityLabel={`Quick apply to ${item.title}`}
+              style={({ pressed, hovered }: any) => [styles.quick, hovered && styles.quickHover, pressed && styles.iconPressed]}
+            >
+              <Ionicons name="flash" size={14} color={colors.white} />
+              <Text style={styles.quickText}>Quick apply</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
     </View>
   );
 });
@@ -192,34 +224,24 @@ const styles = StyleSheet.create({
   // selected without changing how legible its text is.
   cardSelected: { borderColor: colors.navy, backgroundColor: '#EFF6FF' },
   cardPressed: { backgroundColor: colors.bgMuted },
+  // The card's own tap target, filling it behind the content.
+  hit: { ...StyleSheet.absoluteFillObject, borderRadius: radius.xl + 2 },
+  body: { gap: spacing.sm },
+  iconPressed: { opacity: 0.6 },
 
-  // Position-only wrapper: `card` carries the actual visual shell (border,
-  // radius, padding), so the save button below has something to anchor an
-  // absolute position against without doubling up the shell itself.
-  cardWrap: { position: 'relative' },
-
-  topRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   titleBlock: { flex: 1, gap: spacing.xs },
-  // Reserves the same space the save button used to occupy as a flex
-  // sibling (its 44px width plus the row's old gap), so the title still
-  // wraps clear of it now that it floats above the layout instead.
-  titleBlockWithSave: { paddingRight: MIN_TOUCH_TARGET + spacing.sm },
   title: { ...typography.h3, color: colors.text },
   employerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
   employer: { ...typography.caption, color: colors.textSecondary, flexShrink: 1 },
+  client: { ...typography.small, color: colors.recruiter, marginTop: 2 },
 
   saveBtn: {
-    position: 'absolute',
     width: MIN_TOUCH_TARGET,
     height: MIN_TOUCH_TARGET,
     alignItems: 'flex-end',
     justifyContent: 'flex-start',
   },
-  // Matches each card variant's own padding, so the icon lands exactly
-  // where it always sat as a flex child inside that padding.
-  saveBtnRegular: { top: spacing.lg, right: spacing.lg },
-  saveBtnCompact: { top: spacing.md + 2, right: spacing.md + 2 },
-  savePressed: { backgroundColor: colors.bgMuted, borderRadius: radius.sm },
 
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, rowGap: spacing.xs },
   pay: { ...typography.bodyStrong, color: colors.text },
@@ -232,13 +254,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
     gap: spacing.sm,
     marginTop: spacing.xs,
     paddingTop: spacing.sm,
     borderTopWidth: 1,
     borderTopColor: colors.borderLight,
   },
+  footerInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 1 },
   posted: { ...typography.small, color: colors.textSecondary },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginLeft: 'auto' },
   applied: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   appliedText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.teal },
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white,
+  },
+  iconHover: { backgroundColor: colors.bgMuted },
+  quick: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 36, paddingHorizontal: spacing.md,
+    borderRadius: radius.pill, backgroundColor: colors.navy,
+  },
+  quickHover: { backgroundColor: colors.navyLight },
+  quickText: { ...typography.label, color: colors.white },
 });

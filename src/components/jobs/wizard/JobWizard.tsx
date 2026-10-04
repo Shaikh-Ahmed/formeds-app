@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../../theme';
 import { Button } from '../../Button';
@@ -6,12 +6,18 @@ import { FormInput } from '../../FormInput';
 import { SelectField } from '../../SelectField';
 import { ErrorBanner } from '../../States';
 import { OrgVerifiedBadge } from '../../organizations/OrgVerifiedBadge';
+import { DateField, NumberField, TimeField } from '../../InputFields';
+import { ScreeningEditor, questionErrors } from '../Screening';
+import type { ScreeningQuestion } from '../../../types/applicants';
+import {
+  todayString, validateAmount, validateDate, validateDateOrder, validateInteger,
+} from '../../../utils/validation';
 import { SPECIALTY_OPTIONS } from '../../../data/specialties';
 import { STATE_NAMES, citiesForState } from '../../../data/indiaLocations';
 import { JobCard } from '../JobCard';
 import { JobDetailPanel } from '../JobDetailPanel';
 import {
-  EMPLOYMENT_TYPES, EMPLOYMENT_TYPE_LABELS, PAY_PERIOD_LABELS, WORK_MODE_LABELS,
+  POSTABLE_EMPLOYMENT_TYPES, EMPLOYMENT_TYPE_LABELS, PAY_PERIOD_LABELS, WORK_MODE_LABELS,
   isShiftRole, type EmploymentType, type Job, type PayPeriod, type WorkMode,
 } from '../../../types/jobs';
 import type { Organization } from '../../../types/organizations';
@@ -46,6 +52,12 @@ export interface JobDraft {
   shift_end_date: string;
   shift_time: string;
   shift_duration: string;
+  /** Applications close (YYYY-MM-DD); blank for no deadline. */
+  expires_at: string;
+  screening_questions: ScreeningQuestion[];
+  /** The two pickers behind `shift_time` ("20:00–08:00"). */
+  shift_start_time: string;
+  shift_end_time: string;
   pay_period: PayPeriod;
   pay_min: string;
   pay_max: string;
@@ -62,7 +74,8 @@ export interface JobDraft {
 const EMPTY: JobDraft = {
   title: '', employment_type: 'full_time', specialty: '', department: '', vacancies: '1',
   org_id: null, work_mode: 'onsite', state: '', city: '',
-  shift_start_date: '', shift_end_date: '', shift_time: '', shift_duration: '',
+  shift_start_date: '', shift_end_date: '', shift_time: '', shift_duration: '', expires_at: '',
+  shift_start_time: '', shift_end_time: '', screening_questions: [],
   pay_period: 'month', pay_min: '', pay_max: '', pay_disclosed: true,
   experience_min: '', skills: '', requirements: '',
   description: '', responsibilities: '', is_urgent: false,
@@ -73,6 +86,7 @@ const STEPS = [
   { key: 'basics', title: 'The role', hint: 'What you are hiring for.' },
   { key: 'place', title: 'Place and schedule', hint: 'Where the work happens, and when.' },
   { key: 'terms', title: 'Terms', hint: 'Pay, experience and requirements.' },
+  { key: 'screening', title: 'Screening questions', hint: 'Optional. Asked when a professional applies.' },
   { key: 'describe', title: 'Describe and publish', hint: 'The detail, then a look before it goes live.' },
 ] as const;
 
@@ -103,6 +117,10 @@ export function JobWizard({
   error,
   onCancel,
   posterName = 'You',
+  allowSelf = true,
+  firstStepExtra,
+  serverFieldErrors,
+  hasApplicants = false,
 }: {
   initial?: Partial<JobDraft>;
   mode?: 'create' | 'edit';
@@ -113,8 +131,19 @@ export function JobWizard({
   error?: string | null;
   onCancel?: () => void;
   posterName?: string;
+  /** False when the poster must post as one of `organizations` (a recruiter's agency). */
+  allowSelf?: boolean;
+  /** Extra fields shown on the first step, after "Posting as". */
+  firstStepExtra?: React.ReactNode;
+  /** Per-field refusals from the last submit (see utils/api errorFields). */
+  serverFieldErrors?: Record<string, string>;
+  /** Editing a job people have applied to (the screening step says what happens). */
+  hasApplicants?: boolean;
 }) {
-  const [draft, setDraft] = useState<JobDraft>({ ...EMPTY, ...initial });
+  const [draft, setDraft] = useState<JobDraft>(() => {
+    const base = { ...EMPTY, ...initial };
+    return { ...base, ...splitShiftTime(base.shift_time) };
+  });
   const [step, setStep] = useState(0);
   // Per step, so moving forward surfaces this step's gaps without lighting up
   // fields the person has not seen yet.
@@ -132,26 +161,76 @@ export function JobWizard({
    * only after a round trip, on a screen they have already left.
    */
   const problems = useMemo(() => {
-    const out: Record<number, Record<string, string>> = { 0: {}, 1: {}, 2: {}, 3: {} };
-    if (draft.title.trim().length < 6) out[0].title = 'Give the role a full title.';
+    const out: Record<number, Record<string, string>> = { 0: {}, 1: {}, 2: {}, 3: {}, 4: {} };
+    const today = todayString();
+    // Dates already stored are not re-judged against today on an edit -- the
+    // server applies the same rule -- so an older posting can still be fixed.
+    const moved = (k: 'shift_start_date' | 'shift_end_date' | 'expires_at') => mode !== 'edit' || draft[k] !== (initial?.[k] ?? '');
+
+    if (draft.title.trim().length < 6) out[0].title = 'Give the role a full title (at least 6 characters).';
+    const openings = validateInteger(draft.vacancies, 'Number of openings', { required: true, min: 1, max: 999 });
+    if (openings) out[0].vacancies = openings;
+
     if (needsCity && !draft.city) out[1].city = 'Choose a city, or set the role to remote.';
-    if (shift && !draft.shift_start_date) {
-      out[1].shift_start_date = 'A locum or temporary post needs a start date.';
+    if (shift) {
+      const start = validateDate(draft.shift_start_date, 'Start date', { required: true, notPast: moved('shift_start_date') });
+      if (start) out[1].shift_start_date = start === 'Please choose the start date.'
+        ? 'A locum or temporary post needs a start date.' : start;
+      const end = validateDate(draft.shift_end_date, 'End date')
+        ?? validateDateOrder(draft.shift_start_date, draft.shift_end_date, 'End date cannot be before the start date.');
+      if (end) out[1].shift_end_date = end;
+      if ((draft.shift_start_time && !draft.shift_end_time) || (!draft.shift_start_time && draft.shift_end_time)) {
+        out[1].shift_time = 'Choose both a start and an end time, or neither.';
+      } else if (draft.shift_start_time && draft.shift_start_time === draft.shift_end_time) {
+        out[1].shift_time = 'Start and end times must be different.';
+      }
     }
-    const min = Number(draft.pay_min) || 0;
-    const max = Number(draft.pay_max) || 0;
-    if (min && max && max < min) out[2].pay = 'Maximum pay must be at least the minimum.';
+    const deadline = validateDate(draft.expires_at, 'Application deadline', { notPast: moved('expires_at') });
+    if (deadline) out[1].expires_at = deadline;
+    else if (shift && draft.expires_at && draft.shift_start_date && draft.expires_at > draft.shift_start_date) {
+      out[1].expires_at = 'Application deadline cannot be after the start date.';
+    }
+    void today;
+
+    if (draft.pay_disclosed) {
+      const pmin = validateAmount(draft.pay_min, 'Minimum pay', { max: 100_000_000 });
+      const pmax = validateAmount(draft.pay_max, 'Maximum pay', { max: 100_000_000 });
+      const min = Number(draft.pay_min) || 0;
+      const max = Number(draft.pay_max) || 0;
+      if (pmin || pmax) out[2].pay = (pmin || pmax) as string;
+      else if (min && max && max < min) out[2].pay = 'Maximum pay must be at least the minimum.';
+    }
+    const exp = validateInteger(draft.experience_min, 'Minimum experience', { max: 80 });
+    if (exp) out[2].experience_min = exp;
+
+    const qErrors = questionErrors(draft.screening_questions);
+    Object.entries(qErrors).forEach(([i, m]) => { out[3][`q${i}`] = m; });
     if (draft.description.trim().length < 40) {
-      out[3].description = 'Describe the role in at least a couple of sentences.';
+      out[4].description = 'Describe the role in at least a couple of sentences (40 characters or more).';
     }
     if (draft.screening_questions.some(q => q.text.trim().length < 4)) {
       out[3].screening = 'Give each screening question a full question, or remove it.';
     }
     return out;
-  }, [draft, needsCity, shift]);
+  }, [draft, needsCity, shift, mode, initial]);
+
+  // The server's refusals, placed on the step and field they belong to, and
+  // the wizard moved back to that step so the person can see it.
+  const server = useMemo(() => {
+    const out: Record<number, Record<string, string>> = { 0: {}, 1: {}, 2: {}, 3: {}, 4: {} };
+    Object.entries(serverFieldErrors ?? {}).forEach(([field, message]) => {
+      const [stepNo, key] = SERVER_FIELD_STEP[field] ?? [0, field];
+      out[stepNo][key] = message;
+    });
+    return out;
+  }, [serverFieldErrors]);
+  useEffect(() => {
+    const first = [0, 1, 2, 3, 4].find(i => Object.keys(server[i]).length);
+    if (first !== undefined) setStep(first);
+  }, [server]);
 
   const stepOk = (i: number) => Object.keys(problems[i] ?? {}).length === 0;
-  const err = (i: number, key: string) => (touched[i] ? problems[i]?.[key] : undefined);
+  const err = (i: number, key: string) => (touched[i] ? problems[i]?.[key] : undefined) ?? server[i]?.[key];
 
   const next = () => {
     setTouched(t => ({ ...t, [step]: true }));
@@ -182,11 +261,21 @@ export function JobWizard({
       ? {
           shift_start_date: draft.shift_start_date,
           ...(draft.shift_end_date ? { shift_end_date: draft.shift_end_date } : {}),
-          shift_time: draft.shift_time.trim(),
-          shift_duration: draft.shift_duration.trim(),
+          // Two pickers in, the same display strings out: "20:00–08:00" and
+          // a duration worked out from them, never typed separately.
+          shift_time: draft.shift_start_time && draft.shift_end_time
+            ? `${draft.shift_start_time}–${draft.shift_end_time}` : draft.shift_time.trim(),
+          shift_duration: draft.shift_start_time && draft.shift_end_time
+            ? shiftDuration(draft.shift_start_time, draft.shift_end_time) : draft.shift_duration.trim(),
         }
       : {}),
     is_urgent: draft.is_urgent,
+    screening_questions: draft.screening_questions.map(q => ({
+      ...(q.id ? { id: q.id } : {}), text: q.text.trim(), type: q.type, required: q.required,
+      options: q.options.map(o => o.trim()).filter(Boolean), preferred: q.preferred || '',
+    })),
+    // Omitted when blank on a new post; null clears it on an edit.
+    ...(draft.expires_at ? { expires_at: draft.expires_at } : mode === 'edit' ? { expires_at: null } : {}),
     ...(draft.org_id ? { org_id: draft.org_id, posted_as: 'organization' } : {}),
     // Blank rows are dropped rather than sent — a question with no text
     // would fail server validation anyway, and `problems[3].screening`
@@ -206,8 +295,8 @@ export function JobWizard({
     // Every step is checked here, not just the last: someone can reach step four
     // by going back and forth, and a draft with a broken pay range would be
     // rejected by the server anyway.
-    setTouched({ 0: true, 1: true, 2: true, 3: true });
-    const firstBad = [0, 1, 2, 3].find(i => !stepOk(i));
+    setTouched({ 0: true, 1: true, 2: true, 3: true, 4: true });
+    const firstBad = [0, 1, 2, 3, 4].find(i => !stepOk(i));
     if (firstBad !== undefined) { setStep(firstBad); return; }
     onSubmit(payload(), { publish });
   };
@@ -232,12 +321,14 @@ export function JobWizard({
             {organizations.length || onCreateOrganization ? (
               <Field label="Posting as">
                 <ChipRow>
-                  <Choice
-                    label="Myself"
-                    selected={draft.org_id === null}
-                    onPress={() => set('org_id', null)}
-                    testID="wizard-as-self"
-                  />
+                  {allowSelf ? (
+                    <Choice
+                      label="Myself"
+                      selected={draft.org_id === null}
+                      onPress={() => set('org_id', null)}
+                      testID="wizard-as-self"
+                    />
+                  ) : null}
                   {organizations.map(o => (
                     <Choice
                       key={o.id}
@@ -250,9 +341,9 @@ export function JobWizard({
                 </ChipRow>
                 {org ? (
                   <OrgVerifiedBadge status={org.verification_status} />
-                ) : (
+                ) : allowSelf ? (
                   <Text style={styles.hint}>This role will show your own name as the employer.</Text>
-                )}
+                ) : null}
                 {onCreateOrganization ? (
                   <Pressable
                     onPress={onCreateOrganization}
@@ -266,7 +357,9 @@ export function JobWizard({
               </Field>
             ) : null}
 
-            <FormInput
+            {firstStepExtra}
+
+            <FormInput maxLength={140}
               label="Job title"
               value={draft.title}
               onChangeText={v => set('title', v)}
@@ -277,7 +370,10 @@ export function JobWizard({
 
             <Field label="Opportunity type">
               <ChipRow>
-                {EMPLOYMENT_TYPES.map(t => (
+                {/* An older locum posting keeps its own type while being edited. */}
+                {(draft.employment_type === 'locum'
+                  ? [...POSTABLE_EMPLOYMENT_TYPES, 'locum' as const]
+                  : POSTABLE_EMPLOYMENT_TYPES).map(t => (
                   <Choice
                     key={t}
                     label={EMPLOYMENT_TYPE_LABELS[t]}
@@ -298,17 +394,19 @@ export function JobWizard({
               icon="medical-outline"
               testID="wizard-specialty"
             />
-            <FormInput
+            <FormInput maxLength={120}
               label="Department (optional)"
               value={draft.department}
               onChangeText={v => set('department', v)}
               placeholder="e.g. Cardiology"
             />
-            <FormInput
+            <NumberField
               label="Number of openings"
               value={draft.vacancies}
               onChangeText={v => set('vacancies', v)}
-              keyboardType="number-pad"
+              maxDigits={3}
+              error={err(0, 'vacancies')}
+              testID="wizard-vacancies"
             />
           </>
         ) : null}
@@ -362,32 +460,53 @@ export function JobWizard({
                 showing these always would just invite a 422. */}
             {shift ? (
               <View testID="wizard-shift-fields">
-                <FormInput
+                <DateField
                   label="Start date"
                   value={draft.shift_start_date}
-                  onChangeText={v => set('shift_start_date', v)}
-                  placeholder="YYYY-MM-DD"
+                  onChange={v => set('shift_start_date', v)}
+                  min={mode === 'edit' ? undefined : todayString()}
                   error={err(1, 'shift_start_date')}
                   testID="wizard-shift-start"
                 />
-                <FormInput
+                <DateField
                   label="End date (optional)"
                   value={draft.shift_end_date}
-                  onChangeText={v => set('shift_end_date', v)}
-                  placeholder="YYYY-MM-DD"
+                  onChange={v => set('shift_end_date', v)}
+                  min={draft.shift_start_date || todayString()}
+                  clearable
+                  error={err(1, 'shift_end_date')}
+                  testID="wizard-shift-end"
                 />
-                <FormInput
-                  label="Shift time"
-                  value={draft.shift_time}
-                  onChangeText={v => set('shift_time', v)}
-                  placeholder="e.g. 20:00 – 08:00"
-                />
-                <FormInput
-                  label="Duration"
-                  value={draft.shift_duration}
-                  onChangeText={v => set('shift_duration', v)}
-                  placeholder="e.g. 12 hours"
-                />
+                <View style={styles.row}>
+                  <View style={styles.flex}>
+                    <TimeField label="Shift starts (optional)" value={draft.shift_start_time}
+                      onChange={v => set('shift_start_time', v)} clearable testID="wizard-shift-time-start" />
+                  </View>
+                  <View style={styles.flex}>
+                    <TimeField label="Shift ends" value={draft.shift_end_time}
+                      onChange={v => set('shift_end_time', v)} clearable testID="wizard-shift-time-end" />
+                  </View>
+                </View>
+                {err(1, 'shift_time') ? <Text style={styles.error}>{err(1, 'shift_time')}</Text>
+                  : draft.shift_start_time && draft.shift_end_time ? (
+                    <Text style={styles.hint}>
+                      {shiftDuration(draft.shift_start_time, draft.shift_end_time)}
+                      {draft.shift_end_time < draft.shift_start_time ? ', ending the next morning' : ''}
+                    </Text>
+                  ) : draft.shift_time && !draft.shift_start_time ? (
+                    <Text style={styles.hint}>Currently: {draft.shift_time}</Text>
+                  ) : null}
+            <DateField
+              label="Applications close (optional)"
+              value={draft.expires_at}
+              onChange={v => set('expires_at', v)}
+              min={todayString()}
+              max={shift && draft.shift_start_date ? draft.shift_start_date : undefined}
+              clearable
+              helper="The listing stops taking applications after this date."
+              error={err(1, 'expires_at')}
+              testID="wizard-deadline"
+            />
               </View>
             ) : null}
           </>
@@ -406,22 +525,20 @@ export function JobWizard({
               <>
                 <View style={styles.row}>
                   <View style={styles.flex}>
-                    <FormInput
+                    <NumberField
                       label="From"
+                      prefix="₹"
                       value={draft.pay_min}
                       onChangeText={v => set('pay_min', v)}
-                      keyboardType="number-pad"
-                      placeholder="₹"
                       testID="wizard-pay-min"
                     />
                   </View>
                   <View style={styles.flex}>
-                    <FormInput
+                    <NumberField
                       label="To"
+                      prefix="₹"
                       value={draft.pay_max}
                       onChangeText={v => set('pay_max', v)}
-                      keyboardType="number-pad"
-                      placeholder="₹"
                       testID="wizard-pay-max"
                     />
                   </View>
@@ -443,20 +560,23 @@ export function JobWizard({
               </>
             ) : null}
 
-            <FormInput
-              label="Minimum years of experience"
+            <NumberField
+              label="Minimum experience"
+              suffix="years"
               value={draft.experience_min}
               onChangeText={v => set('experience_min', v)}
-              keyboardType="number-pad"
+              maxDigits={2}
               placeholder="0"
+              error={err(2, 'experience_min')}
+              testID="wizard-experience"
             />
-            <FormInput
+            <FormInput maxLength={700}
               label="Skills"
               value={draft.skills}
               onChangeText={v => set('skills', v)}
               placeholder="Comma separated, e.g. Echocardiography, Angioplasty"
             />
-            <FormInput
+            <FormInput maxLength={8000}
               label="Qualifications and registration"
               value={draft.requirements}
               onChangeText={v => set('requirements', v)}
@@ -468,18 +588,27 @@ export function JobWizard({
         ) : null}
 
         {step === 3 ? (
+          <ScreeningEditor
+            questions={draft.screening_questions}
+            onChange={qs => set('screening_questions', qs)}
+            errors={touched[3] ? Object.fromEntries(Object.entries(problems[3]).map(([k, v]) => [Number(k.slice(1)), v])) : {}}
+            hasApplicants={mode === 'edit' && hasApplicants}
+          />
+        ) : null}
+
+        {step === 4 ? (
           <>
-            <FormInput
+            <FormInput maxLength={20000}
               label="About the role"
               value={draft.description}
               onChangeText={v => set('description', v)}
               placeholder="Responsibilities, the team, the setting, and what makes this role worth taking."
               multiline
               rows={5}
-              error={err(3, 'description')}
+              error={err(4, 'description')}
               testID="wizard-description"
             />
-            <FormInput
+            <FormInput maxLength={8000}
               label="Key responsibilities (optional)"
               value={draft.responsibilities}
               onChangeText={v => set('responsibilities', v)}
@@ -599,6 +728,7 @@ function usePreviewJob(draft: JobDraft, org: Organization | undefined, posterNam
     skills: draft.skills.split(',').map(s => s.trim()).filter(Boolean),
     shift_start_date: draft.shift_start_date || null,
     shift_end_date: draft.shift_end_date || null,
+    expires_at: draft.expires_at || null,
     shift_time: draft.shift_time,
     shift_duration: draft.shift_duration,
     is_urgent: draft.is_urgent,
@@ -622,6 +752,37 @@ function usePreviewJob(draft: JobDraft, org: Organization | undefined, posterNam
     // no badge at all, whatever their own KYC says.
     employer_verified: org ? org.verified : undefined,
   }), [draft, org, posterName]);
+}
+
+/** Which step (and which of its fields) a server-side field name belongs to. */
+const SERVER_FIELD_STEP: Record<string, [number, string]> = {
+  title: [0, 'title'], vacancies: [0, 'vacancies'], specialty: [0, 'specialty'],
+  city: [1, 'city'], shift_start_date: [1, 'shift_start_date'], shift_end_date: [1, 'shift_end_date'],
+  expires_at: [1, 'expires_at'], shift_time: [1, 'shift_time'],
+  pay_min: [2, 'pay'], pay_max: [2, 'pay'], experience_min: [2, 'experience_min'],
+  description: [4, 'description'], responsibilities: [4, 'description'], screening_questions: [3, 'q0'],
+};
+
+/** Business-rule codes from the Jobs API, and the field each belongs to. */
+export const JOB_ERROR_FIELDS: Record<string, string> = {
+  start_in_past: 'shift_start_date', deadline_in_past: 'expires_at', deadline_after_start: 'expires_at',
+};
+
+/** "20:00–08:00" (or "20:00 - 08:00") into the two pickers; blank otherwise. */
+export function splitShiftTime(value: string): { shift_start_time: string; shift_end_time: string } {
+  const m = /^\s*([01]\d|2[0-3]):([0-5]\d)\s*[–-]\s*([01]\d|2[0-3]):([0-5]\d)\s*$/.exec(value || '');
+  return m ? { shift_start_time: `${m[1]}:${m[2]}`, shift_end_time: `${m[3]}:${m[4]}` }
+    : { shift_start_time: '', shift_end_time: '' };
+}
+
+/** "12 hours" / "8 hours 30 min", overnight aware. */
+export function shiftDuration(start: string, end: string): string {
+  const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3));
+  let mins = toMin(end) - toMin(start);
+  if (mins <= 0) mins += 24 * 60;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${h} hour${h === 1 ? '' : 's'}${m ? ` ${m} min` : ''}`;
 }
 
 function Progress({ step }: { step: number }) {

@@ -6,6 +6,7 @@ import { View, Pressable, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, useBreakpoint } from '../../src/theme';
 import { MobileTopBar, AppDrawer } from '../../src/components/mobile';
+import { AedLogo } from '../../src/components/aed/AedLogo';
 import { apiFetch } from '../../src/utils/api';
 
 /**
@@ -29,7 +30,8 @@ function AEDBubble({ bottomInset }: { bottomInset: number }) {
         pressed && bubbleStyles.pressed,
       ]}
     >
-      <Ionicons name="pulse" size={26} color={colors.white} />
+      {/* The bubble is already the red badge, so the mark sits straight on it. */}
+      <AedLogo size={50} round />
     </Pressable>
   );
 }
@@ -67,6 +69,11 @@ export default function TabLayout() {
   const { isMobile } = useBreakpoint();
   const insets = useSafeAreaInsets();
   const role = user?.role || 'healthcare_professional';
+  // A recruiter only reaches this group for the posting and applicant screens
+  // under Jobs. Their portal is the whole app for them, so none of the
+  // network's chrome (feed bar, tabs, drawer, AED) is shown around those.
+  const isRecruiter = role === 'recruiter';
+  const showChrome = isMobile && !isRecruiter;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [unreadMsgs, setUnreadMsgs] = useState(0);
@@ -75,20 +82,20 @@ export default function TabLayout() {
   // The mobile bar is persistent across tabs, so its badge counts can't be
   // owned by any one screen's fetch. (Desktop counts are loaded in _layout.)
   const loadCounts = useCallback(async () => {
-    if (!token || !isMobile) return;
+    if (!token || !showChrome) return;
     const [msgs, notifs] = await Promise.all([
       apiFetch('/api/messages/unread-total', token).catch(() => ({ count: 0 })),
       apiFetch('/api/notifications/unread-count', token).catch(() => ({ count: 0 })),
     ]);
     setUnreadMsgs(msgs.count || 0);
     setUnreadNotifs(notifs.count || 0);
-  }, [token, isMobile]);
+  }, [token, showChrome]);
 
   useFocusEffect(useCallback(() => { loadCounts(); }, [loadCounts]));
 
   return (
     <View style={styles.root}>
-      {isMobile && (
+      {showChrome && (
         <MobileTopBar unreadMessages={unreadMsgs} onOpenDrawer={() => setDrawerOpen(true)} />
       )}
 
@@ -101,7 +108,7 @@ export default function TabLayout() {
           // height is left unset — an explicit height overrides it and drops
           // the labels behind the Android gesture bar / iPhone home indicator.
           // Since we do want a fixed height, the inset is added back by hand.
-          tabBarStyle: isMobile
+          tabBarStyle: showChrome
             ? {
                 backgroundColor: colors.white,
                 borderTopWidth: StyleSheet.hairlineWidth,
@@ -132,7 +139,7 @@ export default function TabLayout() {
         <Tabs.Screen name="specialists" options={{
           title: role === 'clinic' ? 'Listings' : 'Specialists',
           tabBarIcon: ({ color, size }) => <Ionicons name="people" size={size} color={color} />,
-          href: role === 'hospital' ? null : '/(tabs)/specialists',
+          href: role === 'hospital' || role === 'recruiter' ? null : '/(tabs)/specialists',
         }} />
         <Tabs.Screen name="alerts" options={{
           title: 'Alerts',
@@ -145,9 +152,9 @@ export default function TabLayout() {
         <Tabs.Screen name="profile" options={{ href: null }} />
       </Tabs>
 
-      {isMobile && <AEDBubble bottomInset={insets.bottom} />}
+      {showChrome && <AEDBubble bottomInset={insets.bottom} />}
 
-      <AppDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      {isRecruiter ? null : <AppDrawer visible={drawerOpen} onClose={() => setDrawerOpen(false)} />}
     </View>
   );
 }

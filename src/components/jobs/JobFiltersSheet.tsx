@@ -70,6 +70,7 @@ export function JobFiltersSheet({
   return (
     <Sheet
       visible={visible}
+      scroll={false}
       onClose={onClose}
       title="Filter jobs"
       testID="jobs-filters-sheet"
@@ -271,7 +272,7 @@ function PayInput({
   return (
     <View style={styles.payField}>
       <Text style={styles.payLabel}>{label}</Text>
-      <TextInput
+      <TextInput maxLength={9}
         testID={testID}
         style={styles.payInput}
         value={value == null ? '' : String(value)}

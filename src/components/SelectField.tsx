@@ -157,7 +157,7 @@ export function SelectField({
               {searchable ? (
                 <View style={styles.searchBar}>
                   <Ionicons name="search" size={18} color={colors.textMuted} />
-                  <TextInput
+                  <TextInput maxLength={100}
                     testID={testID ? `${testID}-search` : undefined}
                     style={styles.searchInput}
                     placeholder={searchPlaceholder}

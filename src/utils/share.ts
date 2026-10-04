@@ -36,3 +36,51 @@ export async function shareLink({
     return false;
   }
 }
+
+/**
+ * The public web address of a page in the app. On the web that is wherever
+ * the app is being served from; in the native app it is EXPO_PUBLIC_WEB_URL.
+ * (The backend's address is NOT a page anyone can open.)
+ */
+export function webLink(path: string): string {
+  const configured = (process.env.EXPO_PUBLIC_WEB_URL || '').replace(/\/$/, '');
+  const origin = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : configured;
+  return `${origin || configured}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+export type ShareOutcome = 'shared' | 'copied' | 'dismissed';
+
+/**
+ * Share where the platform can (phones, and browsers with a share sheet);
+ * otherwise -- most desktop browsers -- copy the link, so the button always
+ * does something the person can see. Callers show "Link copied" on 'copied'.
+ */
+export async function shareOrCopy(opts: { url: string; title?: string; message?: string }): Promise<ShareOutcome> {
+  if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
+    const nav = navigator as any;
+    if (typeof nav.share === 'function') {
+      try {
+        await nav.share({ url: opts.url, title: opts.title, text: opts.message });
+        return 'shared';
+      } catch (e: any) {
+        if (e?.name === 'AbortError') return 'dismissed';
+      }
+    }
+    try {
+      await nav.clipboard.writeText(opts.url);
+      return 'copied';
+    } catch {
+      return 'dismissed';
+    }
+  }
+  return (await shareLink(opts)) ? 'shared' : 'dismissed';
+}
+
+/** A job's shareable link and text, in one place. */
+export function shareJob(job: { id: string; title: string; employer_name?: string }): Promise<ShareOutcome> {
+  return shareOrCopy({
+    url: webLink(`/jobs/${job.id}`),
+    title: job.title,
+    message: job.employer_name ? `${job.title} at ${job.employer_name}` : job.title,
+  });
+}

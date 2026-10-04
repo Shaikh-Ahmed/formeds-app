@@ -7,9 +7,13 @@ import { apiFetch, API_URL } from '../../src/utils/api';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { timeAgo } from '../../src/utils/time';
-import { Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer, ActionSheet } from '../../src/components';
+import {
+  Avatar, RoleBadge, KycNotice, CasesList, ExpandableText, MediaViewer, ActionSheet, ArticleFeedCard,
+} from '../../src/components';
 import { PageGrid, ProfileRail, FeedRail, Hoverable } from '../../src/components/web';
-import { colors, spacing, radius, typography, compactAction, useBreakpoint, MIN_TOUCH_TARGET } from '../../src/theme';
+import {
+  colors, fonts, spacing, radius, typography, compactAction, useBreakpoint, MIN_TOUCH_TARGET,
+} from '../../src/theme';
 import { useCollapsibleHeader, focusScrollInset } from '../../src/hooks/useCollapsibleHeader';
 
 const FEED_PAGE_SIZE = 20;
@@ -184,20 +188,38 @@ export default function FeedScreen() {
   // already does — it lands at the top because the feed sorts by recency.
   const handleReposted = useCallback(() => { loadData(); }, [loadData]);
 
-  const renderPost = ({ item }: { item: Post }) => (
-    <PostCard
-      item={item}
-      isMobile={isMobile}
-      token={token}
-      currentUserId={user?.id}
-      onOpenProfile={() => router.push({ pathname: '/post/[id]', params: { id: item.id } } as any)}
-      onLike={() => handleLike(item.id)}
-      onShare={() => handleShare(item)}
-      onOpenImage={() => setViewerPost(item)}
-      onDeleted={handleDeleted}
-      onReposted={handleReposted}
-    />
-  );
+  const renderPost = ({ item }: { item: Post }) => {
+    // An article pulled into the feed (PubMed/OpenAlex) is not an
+    // author-written post — it gets its own card, never PostCard's
+    // delete/report/repost menu, which assumes a ForMeds author.
+    if (item.post_type === 'article') {
+      const isLiked = item.likes?.includes(user?.id || '');
+      return (
+        <ArticleFeedCard
+          post={item as any}
+          isLiked={isLiked}
+          onLike={handleLike}
+          onComment={(id: string) => router.push({ pathname: '/post/[id]', params: { id } } as any)}
+          onShare={handleShare}
+        />
+      );
+    }
+
+    return (
+      <PostCard
+        item={item}
+        isMobile={isMobile}
+        token={token}
+        currentUserId={user?.id}
+        onOpenProfile={() => router.push({ pathname: '/post/[id]', params: { id: item.id } } as any)}
+        onLike={() => handleLike(item.id)}
+        onShare={() => handleShare(item)}
+        onOpenImage={() => setViewerPost(item)}
+        onDeleted={handleDeleted}
+        onReposted={handleReposted}
+      />
+    );
+  };
 
   return (
     // No page title and no header icon row: the persistent top bar already
@@ -271,7 +293,7 @@ export default function FeedScreen() {
             {/* Posting is KYC-gated server-side; explain that instead of letting
                 the user write a post and only then hit a 403. */}
             <KycNotice action="post to the community" />
-            <TextInput testID="post-input" style={styles.composeInput} placeholder="Share something with the community..." placeholderTextColor="#94A3B8" value={newPost} onChangeText={setNewPost} multiline editable={isKycApproved} />
+            <TextInput maxLength={5000} testID="post-input" style={styles.composeInput} placeholder="Share something with the community..." placeholderTextColor="#94A3B8" value={newPost} onChangeText={setNewPost} multiline editable={isKycApproved} />
           
             {attachedImage && (
               <View style={styles.attachedImageWrap}>
@@ -742,17 +764,23 @@ const styles = StyleSheet.create({
   },
   postCardWide: { marginBottom: spacing.lg },
   postHeadRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
-  postHeader: { flex: 1, flexDirection: 'row', marginBottom: 12, borderRadius: radius.md, marginHorizontal: -4, paddingHorizontal: 4, paddingVertical: 2 },
+  // flex: 1 so this shares the row with menuBtn rather than filling it —
+  // the rest (gap, hover radius) is unchanged from before the 3-dot menu.
+  postHeader: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: 12,
+    borderRadius: radius.md, marginHorizontal: -4, paddingHorizontal: 4, paddingVertical: 2,
+  },
   postHeaderHover: { backgroundColor: colors.bgMuted },
-  avatarCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1A3A5C', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  avatarText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
-  postMeta: { flex: 1 },
+  // The spacing lives on the row itself. It used to sit on an inline avatar
+  // style that stopped being used when the shared Avatar replaced it, which
+  // left the role badge touching the avatar and the time touching the badge.
+  postMeta: { flex: 1, gap: 4 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  authorName: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  roleTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginRight: 8 },
-  roleTagText: { fontSize: 11, fontWeight: '600' },
-  timeText: { fontSize: 12, color: '#94A3B8' },
+  authorName: { fontSize: 16, fontFamily: fonts.body.semibold, color: colors.text },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  // textSecondary, not the lighter textMuted: the time is read, and the
+  // lighter grey falls below text contrast on white.
+  timeText: { ...typography.small, color: colors.textSecondary },
   menuBtn: {
     width: MIN_TOUCH_TARGET, height: MIN_TOUCH_TARGET,
     alignItems: 'center', justifyContent: 'center', marginTop: -spacing.xs, marginRight: -spacing.xs,

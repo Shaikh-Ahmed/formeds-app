@@ -62,6 +62,18 @@ export interface FieldDef {
   lookup?: LookupConfig;
   /** Hidden while the named boolean field is true (e.g. end date vs "current"). */
   hiddenWhen?: string;
+  /** A month/year that has already happened (the current one counts). */
+  notFuture?: boolean;
+  /** Must be on or after the named field (end after start, expiry after issue). */
+  onOrAfter?: string;
+  /** An https link; optionally only to these hosts (LinkedIn, ORCID...). */
+  url?: boolean;
+  hosts?: string[];
+  /** Numbers: upper bound, and whether decimals are allowed. */
+  max?: number;
+  decimals?: boolean;
+  /** Text: the server's length cap, enforced while typing. */
+  maxLength?: number;
 }
 
 export interface EntryForm {
@@ -79,14 +91,14 @@ export const ENTRY_FORMS: Record<EntryKind, EntryForm> = {
     addTitle: 'Add experience',
     editTitle: 'Edit experience',
     fields: [
-      { key: 'title', label: 'Job title', type: 'text', required: true, placeholder: 'Senior Consultant Cardiologist' },
-      { key: 'organization', label: 'Organization', type: 'text', required: true, placeholder: 'Apollo Hospitals' },
+      { key: 'title', label: 'Job title', type: 'text', required: true, placeholder: 'Senior Consultant Cardiologist', maxLength: 120 },
+      { key: 'organization', label: 'Organization', type: 'text', required: true, placeholder: 'Apollo Hospitals', maxLength: 160 },
       { key: 'employment_type', label: 'Employment type', type: 'select', options: toOptions(EMPLOYMENT_TYPE_LABELS) },
       { key: 'department', label: 'Department', type: 'text', placeholder: 'Cardiology' },
       { key: 'location', label: 'Location', type: 'text', placeholder: 'Hyderabad, Telangana' },
       { key: 'is_current', label: 'I currently work here', type: 'switch' },
-      { key: 'start_date', label: 'Start date', type: 'month' },
-      { key: 'end_date', label: 'End date', type: 'month', hiddenWhen: 'is_current' },
+      { key: 'start_date', label: 'Start date', type: 'month', notFuture: true },
+      { key: 'end_date', label: 'End date', type: 'month', hiddenWhen: 'is_current', onOrAfter: 'start_date' },
       {
         key: 'description',
         label: 'Responsibilities and achievements',
@@ -112,8 +124,8 @@ export const ENTRY_FORMS: Record<EntryKind, EntryForm> = {
         type: 'switch',
         helper: 'Training posts are labelled separately from academic degrees.',
       },
-      { key: 'start_year', label: 'Start year', type: 'year' },
-      { key: 'end_year', label: 'End year', type: 'year' },
+      { key: 'start_year', label: 'Start year', type: 'year', max: new Date().getFullYear() + 1 },
+      { key: 'end_year', label: 'End year (or expected)', type: 'year', onOrAfter: 'start_year' },
       { key: 'grade', label: 'Grade or score', type: 'text' },
       { key: 'description', label: 'Description', type: 'textarea' },
     ],
@@ -125,11 +137,11 @@ export const ENTRY_FORMS: Record<EntryKind, EntryForm> = {
     fields: [
       { key: 'name', label: 'Certification', type: 'text', required: true, placeholder: 'ACLS, BLS, PALS…' },
       { key: 'issuer', label: 'Issuing organization', type: 'text', required: true, placeholder: 'American Heart Association' },
-      { key: 'issue_date', label: 'Issued', type: 'month' },
+      { key: 'issue_date', label: 'Issued', type: 'month', notFuture: true },
       { key: 'does_not_expire', label: 'This credential does not expire', type: 'switch' },
-      { key: 'expiry_date', label: 'Expires', type: 'month', hiddenWhen: 'does_not_expire' },
-      { key: 'credential_id', label: 'Credential ID', type: 'text' },
-      { key: 'credential_url', label: 'Credential URL', type: 'text', placeholder: 'https://…' },
+      { key: 'expiry_date', label: 'Expires', type: 'month', hiddenWhen: 'does_not_expire', onOrAfter: 'issue_date' },
+      { key: 'credential_id', label: 'Credential ID', type: 'text', maxLength: 80 },
+      { key: 'credential_url', label: 'Credential URL', type: 'text', placeholder: 'https://…', url: true },
     ],
   },
 
@@ -139,8 +151,8 @@ export const ENTRY_FORMS: Record<EntryKind, EntryForm> = {
     fields: [
       { key: 'title', label: 'Award', type: 'text', required: true, placeholder: 'Best Resident Award' },
       { key: 'issuer', label: 'Awarded by', type: 'text', placeholder: 'AIIMS' },
-      { key: 'date', label: 'Date', type: 'month' },
-      { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'date', label: 'Date', type: 'month', notFuture: true },
+      { key: 'description', label: 'Description', type: 'textarea', maxLength: 1000 },
     ],
   },
 
@@ -150,10 +162,10 @@ export const ENTRY_FORMS: Record<EntryKind, EntryForm> = {
     fields: [
       { key: 'title', label: 'Title', type: 'text', required: true },
       { key: 'journal', label: 'Journal', type: 'text', placeholder: 'Indian Heart Journal' },
-      { key: 'publication_date', label: 'Published', type: 'month' },
+      { key: 'publication_date', label: 'Published', type: 'month', notFuture: true },
       { key: 'authors', label: 'Authors', type: 'tags', placeholder: 'Sharma R' },
       { key: 'doi', label: 'DOI', type: 'text', placeholder: '10.1016/j.ihj.2024.01.001' },
-      { key: 'url', label: 'Link', type: 'text', placeholder: 'https://…' },
+      { key: 'url', label: 'Link', type: 'text', placeholder: 'https://…', url: true },
       { key: 'abstract', label: 'Abstract', type: 'textarea' },
     ],
   },
@@ -167,7 +179,7 @@ export const ENTRY_FORMS: Record<EntryKind, EntryForm> = {
       { key: 'title', label: 'Presentation title', type: 'text' },
       { key: 'location', label: 'Location', type: 'text' },
       { key: 'date', label: 'Date', type: 'month' },
-      { key: 'cme_credits', label: 'CME credits', type: 'number' },
+      { key: 'cme_credits', label: 'CME credits', type: 'number', max: 500, decimals: true },
       { key: 'description', label: 'Notes', type: 'textarea' },
     ],
   },
@@ -196,8 +208,8 @@ export const ENTRY_FORMS: Record<EntryKind, EntryForm> = {
         ],
       },
       { key: 'state', label: 'State or country', type: 'text' },
-      { key: 'issue_date', label: 'Registered', type: 'month' },
-      { key: 'expiry_date', label: 'Expires', type: 'month' },
+      { key: 'issue_date', label: 'Registered', type: 'month', notFuture: true },
+      { key: 'expiry_date', label: 'Expires', type: 'month', onOrAfter: 'issue_date' },
     ],
   },
 };
@@ -235,7 +247,7 @@ export const SCALAR_FORMS: Record<ScalarFormKey, EntryForm> = {
     addTitle: 'Edit profile',
     editTitle: 'Edit profile',
     fields: [
-      { key: 'name', label: 'Full name', type: 'text', required: true },
+      { key: 'name', label: 'Full name', type: 'text', required: true, maxLength: 120 },
       {
         key: 'headline',
         label: 'Professional headline',
@@ -267,7 +279,7 @@ export const SCALAR_FORMS: Record<ScalarFormKey, EntryForm> = {
         },
       },
       { key: 'preferred_location', label: 'Preferred location', type: 'text' },
-      { key: 'years_experience', label: 'Years of experience', type: 'number' },
+      { key: 'years_experience', label: 'Years of experience', type: 'number', max: 80 },
     ],
   },
   about: {
@@ -344,12 +356,72 @@ export const SCALAR_FORMS: Record<ScalarFormKey, EntryForm> = {
     addTitle: 'Add professional links',
     editTitle: 'Edit professional links',
     fields: [
-      { key: 'linkedin', label: 'LinkedIn', type: 'text', placeholder: 'https://linkedin.com/in/…' },
-      { key: 'orcid', label: 'ORCID', type: 'text', placeholder: 'https://orcid.org/0000-…' },
-      { key: 'researchgate', label: 'ResearchGate', type: 'text', placeholder: 'https://researchgate.net/profile/…' },
-      { key: 'google_scholar', label: 'Google Scholar', type: 'text', placeholder: 'https://scholar.google.com/…' },
-      { key: 'website', label: 'Website', type: 'text', placeholder: 'https://…' },
-      { key: 'portfolio', label: 'Portfolio', type: 'text', placeholder: 'https://…' },
+      { key: 'linkedin', label: 'LinkedIn', type: 'text', placeholder: 'https://linkedin.com/in/…', url: true, hosts: ['linkedin.com'] },
+      { key: 'orcid', label: 'ORCID', type: 'text', placeholder: 'https://orcid.org/0000-…', url: true, hosts: ['orcid.org'] },
+      { key: 'researchgate', label: 'ResearchGate', type: 'text', placeholder: 'https://researchgate.net/profile/…', url: true, hosts: ['researchgate.net'] },
+      { key: 'google_scholar', label: 'Google Scholar', type: 'text', placeholder: 'https://scholar.google.com/…', url: true, hosts: ['scholar.google.com', 'google.com'] },
+      { key: 'website', label: 'Website', type: 'text', placeholder: 'https://…', url: true },
+      { key: 'portfolio', label: 'Portfolio', type: 'text', placeholder: 'https://…', url: true },
     ],
   },
 };
+
+/**
+ * Everything wrong with an entry, keyed by field: the same rules the server
+ * applies (models/schemas.py), so a problem is shown on the field it belongs
+ * to before a round trip. Hidden fields are skipped.
+ */
+export function entryFieldErrors(form: EntryForm, values: Record<string, any>, now: Date = new Date()): Record<string, string> {
+  const out: Record<string, string> = {};
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  for (const f of form.fields) {
+    if (f.hiddenWhen && values[f.hiddenWhen]) continue;
+    const v = values[f.key];
+    const blank = v === undefined || v === null || String(v).trim() === '';
+    if (f.required && blank) { out[f.key] = `${f.label} is required.`; continue; }
+    if (blank) continue;
+    if (f.type === 'month' && f.notFuture && String(v) > thisMonth) out[f.key] = `${f.label} cannot be in the future.`;
+    if (f.type === 'year' && f.max && Number(v) > f.max) out[f.key] = `${f.label} is too far in the future.`;
+    if (f.type === 'number') {
+      const n = Number(v);
+      if (!Number.isFinite(n) || n < 0) out[f.key] = `${f.label} must be a positive number.`;
+      else if (f.max !== undefined && n > f.max) out[f.key] = `${f.label} must be at most ${f.max}.`;
+      else if (!f.decimals && !Number.isInteger(n)) out[f.key] = `${f.label} must be a whole number.`;
+    }
+    if (f.url) {
+      const raw = String(v).trim();
+      const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+      try {
+        const u = new URL(withScheme);
+        const host = u.hostname.toLowerCase();
+        if (u.protocol !== 'https:' || !host.includes('.')) throw new Error();
+        if (f.hosts && !f.hosts.some(h => host === h || host.endsWith(`.${h}`))) {
+          out[f.key] = `${f.label} must be a link to ${f.hosts[0]}.`;
+        }
+      } catch {
+        out[f.key] = `Please enter a valid link, e.g. https://example.com.`;
+      }
+    }
+    if (f.onOrAfter) {
+      const other = values[f.onOrAfter];
+      const before = form.fields.find(x => x.key === f.onOrAfter);
+      if (other !== undefined && other !== null && String(other) !== '' && String(v) < String(other)) {
+        out[f.key] = `${f.label.replace(/ \(.*\)$/, '')} cannot be earlier than ${(before?.label ?? 'the start').toLowerCase()}.`;
+      }
+    }
+  }
+  return out;
+}
+
+/** Links are stored as the full https URL the user meant. */
+export function normalizeEntryValues(form: EntryForm, values: Record<string, any>): Record<string, any> {
+  const out = { ...values };
+  for (const f of form.fields) {
+    const v = out[f.key];
+    if (f.url && typeof v === 'string' && v.trim() && !/^[a-z][a-z0-9+.-]*:\/\//i.test(v.trim())) {
+      out[f.key] = `https://${v.trim()}`;
+    }
+    if (f.type === 'number' && typeof v === 'string' && v !== '') out[f.key] = Number(v);
+  }
+  return out;
+}

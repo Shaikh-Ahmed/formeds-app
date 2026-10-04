@@ -7,7 +7,8 @@ import { useAuth } from '../../../../src/context/AuthContext';
 import { colors, spacing, typography, MIN_TOUCH_TARGET } from '../../../../src/theme';
 import { PageColumn } from '../../../../src/components/web';
 import { EmptyState, ErrorState, LoadingState } from '../../../../src/components';
-import { JobWizard, type JobDraft } from '../../../../src/components/jobs/wizard/JobWizard';
+import { errorFields } from '../../../../src/utils/api';
+import { JOB_ERROR_FIELDS, JobWizard, type JobDraft } from '../../../../src/components/jobs/wizard/JobWizard';
 import { fetchJob, setJobStatus, updateJob } from '../../../../src/api/jobs';
 import { fetchMyOrganizations } from '../../../../src/api/organizations';
 import type { Job } from '../../../../src/types/jobs';
@@ -30,11 +31,14 @@ export default function EditJobScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { token, user } = useAuth();
   const router = useRouter();
+  // Recruiters manage their postings from the portal, not the job board.
+  const postingsHref = user?.role === 'recruiter' ? '/recruiter/jobs' : '/jobs/posted';
 
   const [job, setJob] = useState<Job | null>(null);
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [actionError, setActionError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -50,6 +54,7 @@ export default function EditJobScreen() {
       setOrgs(mine);
     } catch (e: any) {
       setError(e?.message || 'Could not load this posting.');
+      setFieldErrors(errorFields(e, JOB_ERROR_FIELDS));
     } finally {
       setLoading(false);
     }
@@ -71,13 +76,13 @@ export default function EditJobScreen() {
       if (publish && job.status === 'draft') {
         await setJobStatus(token, job.id, 'active');
       }
-      router.replace('/jobs/posted' as any);
+      router.replace(postingsHref as any);
     } catch (e: any) {
       setActionError(e?.message || 'Could not save these changes.');
     } finally {
       setSubmitting(false);
     }
-  }, [token, job, router]);
+  }, [token, job, router, postingsHref]);
 
   if (loading) return <LoadingState label="Loading posting…" />;
   if (error) return <ErrorState message={error} onRetry={load} />;
@@ -91,7 +96,7 @@ export default function EditJobScreen() {
           title="Not your posting"
           hint="Only the person or organisation that published a role can edit it."
           actionLabel="Back to jobs"
-          onAction={() => router.replace('/jobs' as any)}
+          onAction={() => router.replace((user?.role === 'recruiter' ? '/recruiter/jobs' : '/jobs') as any)}
         />
       </SafeAreaView>
     );
@@ -119,6 +124,8 @@ export default function EditJobScreen() {
         </View>
 
         <JobWizard
+            serverFieldErrors={fieldErrors}
+            hasApplicants={(job?.applicant_count ?? 0) > 0}
           mode="edit"
           initial={toDraft(job)}
           organizations={orgs}
@@ -149,6 +156,8 @@ function toDraft(job: Job): Partial<JobDraft> {
     shift_end_date: job.shift_end_date ?? '',
     shift_time: job.shift_time ?? '',
     shift_duration: job.shift_duration ?? '',
+    expires_at: job.expires_at ? String(job.expires_at).slice(0, 10) : '',
+    screening_questions: (job.screening_questions ?? []).map(q => ({ ...q, preferred: q.preferred ?? '' })),
     pay_period: job.pay_period,
     // Empty rather than "0": a withheld or unset figure should show a blank
     // field, not a zero the employer then has to delete.

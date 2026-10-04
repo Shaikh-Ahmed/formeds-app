@@ -9,21 +9,25 @@ interface Props {
   /** Right-hand accessory (e.g. a save button). */
   right?: React.ReactNode;
   onBack?: () => void;
+  /** False on a top-level screen, where there is nowhere to go back to. */
+  showBack?: boolean;
 }
 
-export function ScreenHeader({ title, right, onBack }: Props) {
+export function ScreenHeader({ title, right, onBack, showBack = true }: Props) {
   const router = useRouter();
   return (
     <View style={styles.header}>
-      <TouchableOpacity
-        onPress={onBack ?? (() => router.back())}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-        style={styles.backBtn}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Ionicons name="arrow-back" size={24} color={colors.navy} />
-      </TouchableOpacity>
+      {showBack ? (
+        <TouchableOpacity
+          onPress={onBack ?? (() => router.back())}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          style={styles.backBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.navy} />
+        </TouchableOpacity>
+      ) : null}
       <Text style={styles.title} numberOfLines={1} accessibilityRole="header">{title}</Text>
       <View style={styles.right}>{right}</View>
     </View>

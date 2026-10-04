@@ -27,18 +27,18 @@ describe('JobWizard', () => {
   it('says where you are, out loud', () => {
     setup();
     // A progress bar alone announces nothing; the count is the accessible part.
-    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 1 of 4');
+    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 1 of 5');
   });
 
   it('advances only when this step is satisfied', () => {
     setup();
     fireEvent.press(screen.getByTestId('wizard-next'));
-    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 1 of 4');
-    expect(screen.getByText('Give the role a full title.')).toBeTruthy();
+    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 1 of 5');
+    expect(screen.getByText('Give the role a full title (at least 6 characters).')).toBeTruthy();
 
     typeTitle('Senior Consultant Cardiologist');
     fireEvent.press(screen.getByTestId('wizard-next'));
-    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 2 of 4');
+    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 2 of 5');
   });
 
   it('does not block step one on a field belonging to a later step', () => {
@@ -48,15 +48,20 @@ describe('JobWizard', () => {
     typeTitle('Senior Consultant Cardiologist');
     fireEvent.press(screen.getByTestId('wizard-next'));
 
-    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 2 of 4');
+    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 2 of 5');
     expect(screen.queryByText(/Describe the role/)).toBeNull();
   });
 
-  it('shows shift fields for a locum and hides them for a standing post', () => {
+  it('no longer offers Locum, which has its own tab now', () => {
+    setup();
+    expect(screen.queryByTestId('wizard-type-locum')).toBeNull();
+  });
+
+  it('shows shift fields for a dated role and hides them for a standing post', () => {
     setup();
     typeTitle('Overnight Emergency Cover');
 
-    fireEvent.press(screen.getByTestId('wizard-type-locum'));
+    fireEvent.press(screen.getByTestId('wizard-type-temporary'));
     fireEvent.press(screen.getByTestId('wizard-next'));
     expect(screen.getByTestId('wizard-shift-fields')).toBeTruthy();
 
@@ -73,12 +78,12 @@ describe('JobWizard', () => {
 
     // On-site by default, so Next is blocked until a city is chosen...
     fireEvent.press(screen.getByTestId('wizard-next'));
-    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 2 of 4');
+    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 2 of 5');
 
     // ...and remote removes the requirement rather than demanding a fake city.
     fireEvent.press(screen.getByTestId('wizard-mode-remote'));
     fireEvent.press(screen.getByTestId('wizard-next'));
-    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 3 of 4');
+    expect(screen.getByTestId('wizard-progress').props.children.join('')).toBe('Step 3 of 5');
   });
 
   it('offers draft and publish as separate outcomes when creating', () => {
@@ -87,6 +92,8 @@ describe('JobWizard', () => {
     fireEvent.press(screen.getByTestId('wizard-next'));
     fireEvent.press(screen.getByTestId('wizard-mode-remote'));
     fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    // Past the (optional) screening questions.
     fireEvent.press(screen.getByTestId('wizard-next'));
 
     expect(screen.getByTestId('wizard-draft')).toBeTruthy();
@@ -99,6 +106,8 @@ describe('JobWizard', () => {
     fireEvent.press(screen.getByTestId('wizard-next'));
     fireEvent.press(screen.getByTestId('wizard-mode-remote'));
     fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    // Past the (optional) screening questions.
     fireEvent.press(screen.getByTestId('wizard-next'));
 
     expect(screen.getByTestId('wizard-preview')).toBeTruthy();
@@ -115,6 +124,8 @@ describe('JobWizard', () => {
     fireEvent.press(screen.getByTestId('wizard-next'));
     fireEvent.press(screen.getByTestId('wizard-mode-remote'));
     fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    // Past the (optional) screening questions.
     fireEvent.press(screen.getByTestId('wizard-next'));
     fireEvent.changeText(
       screen.getByTestId('wizard-description'),
@@ -143,6 +154,8 @@ describe('JobWizard', () => {
     fireEvent.press(screen.getByTestId('wizard-mode-remote'));
     fireEvent.press(screen.getByTestId('wizard-next'));
     fireEvent.press(screen.getByTestId('wizard-next'));
+    // Past the (optional) screening questions.
+    fireEvent.press(screen.getByTestId('wizard-next'));
     fireEvent.changeText(
       screen.getByTestId('wizard-description'),
       'Join a busy interventional service running a full cath lab rota, with a supportive team.',
@@ -163,11 +176,13 @@ describe('JobWizard', () => {
     fireEvent.press(screen.getByTestId('wizard-mode-remote'));
     fireEvent.press(screen.getByTestId('wizard-next'));
     fireEvent.press(screen.getByTestId('wizard-next'));
+    // Past the (optional) screening questions.
+    fireEvent.press(screen.getByTestId('wizard-next'));
 
     // Description never filled in.
     fireEvent.press(screen.getByTestId('wizard-publish'));
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByText('Describe the role in at least a couple of sentences.')).toBeTruthy();
+    expect(screen.getByText('Describe the role in at least a couple of sentences (40 characters or more).')).toBeTruthy();
   });
 
   it('drops screening questions with no real text rather than sending blanks', () => {
@@ -272,9 +287,34 @@ describe('JobWizard', () => {
     fireEvent.press(screen.getByTestId('wizard-next'));
     fireEvent.press(screen.getByTestId('wizard-next'));
     fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
 
     // A published role cannot be un-published back into a draft.
     expect(screen.queryByTestId('wizard-draft')).toBeNull();
     expect(screen.getByTestId('wizard-publish')).toBeTruthy();
+  });
+
+  it('sends screening questions with the posting, and refuses half-written ones', () => {
+    const onSubmit = jest.fn();
+    setup({ onSubmit });
+    typeTitle('Senior Staff Nurse ICU');
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-mode-remote'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.press(screen.getByTestId('screening-add'));
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    expect(screen.getByText('Write the question in at least 5 characters.')).toBeTruthy();
+    fireEvent.changeText(screen.getByTestId('screening-text-0'), 'Are you willing to work night shifts?');
+    fireEvent.press(screen.getByTestId('wizard-next'));
+    fireEvent.changeText(
+      screen.getByTestId('wizard-description'),
+      'Senior staff nurse for a busy medical ICU with a supportive, well-staffed team.',
+    );
+    fireEvent.press(screen.getByTestId('wizard-publish'));
+    const [payload] = onSubmit.mock.calls[0];
+    expect(payload.screening_questions).toEqual([{
+      text: 'Are you willing to work night shifts?', type: 'yes_no', required: true, options: [], preferred: '',
+    }]);
   });
 });

@@ -1,656 +1,467 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../../src/context/AuthContext';
-import { colors, radius, spacing, typography, fonts, MIN_TOUCH_TARGET } from '../../../../src/theme';
-import { PageColumn } from '../../../../src/components/web';
-import { Avatar, EmptyState, ErrorBanner, ErrorState } from '../../../../src/components';
-import { Skeleton } from '../../../../src/components/Skeleton';
+import { colors, fonts, radius, spacing, typography, useBreakpoint, MIN_TOUCH_TARGET } from '../../../../src/theme';
+import { Button, ErrorBanner, ErrorState, LoadingState, SelectField, Sheet } from '../../../../src/components';
+import { ChoiceChips } from '../../../../src/components/locum/ChoiceChips';
 import { JobBadge } from '../../../../src/components/jobs/JobMeta';
-import { fetchApplicantResume, fetchApplicants, fetchJob, setApplicationStatus } from '../../../../src/api/jobs';
-import { postedAgo } from '../../../../src/utils/time';
-import { openBlob } from '../../../../src/utils/download';
-import { APPLICATION_STATUS_META, type Application, type ApplicationStatusKey, type Job } from '../../../../src/types/jobs';
+import { ApplicantList, SORT_LABELS } from '../../../../src/components/jobs/applicants/ApplicantList';
+import { ApplicantDetailPanel } from '../../../../src/components/jobs/applicants/ApplicantDetail';
+import { InterviewSheet } from '../../../../src/components/jobs/applicants/InterviewSheet';
+import { openFileUrl } from '../../../../src/components/jobs/ResumeCard';
+import { fetchJob, setApplicationStatus } from '../../../../src/api/jobs';
+import {
+  bulkSetStatus, fetchApplicantDetail, fetchApplicantResume, scheduleInterview, searchApplicants,
+} from '../../../../src/api/applicants';
+import { EMPLOYMENT_TYPE_LABELS, APPLICATION_STATUS_META, type ApplicationStatusKey, type Job } from '../../../../src/types/jobs';
+import type { ApplicantDetail, ApplicantPage, ApplicantSort } from '../../../../src/types/applicants';
 
-const TONE_FOR_BADGE = {
-  neutral: 'neutral', teal: 'teal', navy: 'navy', warning: 'warning', danger: 'danger',
-} as const;
-
-/** The pipeline, in the order a hire actually moves through it. */
-const PIPELINE: ApplicationStatusKey[] = [
-  'applied', 'reviewing', 'shortlisted', 'interviewing', 'offered', 'hired', 'rejected',
-];
-
-/** What an employer can move someone to from where they are now. */
-const NEXT_STEPS: Partial<Record<ApplicationStatusKey, ApplicationStatusKey[]>> = {
-  applied: ['reviewing', 'shortlisted', 'rejected'],
-  reviewing: ['shortlisted', 'rejected'],
-  shortlisted: ['interviewing', 'rejected'],
-  interviewing: ['offered', 'rejected'],
-  offered: ['hired', 'rejected'],
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const day = (iso?: string | null) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 };
+const JOB_STATUS_TONE = { active: 'teal', draft: 'neutral', paused: 'warning', closed: 'neutral', filled: 'navy', expired: 'neutral' } as const;
+const EMPLOYER_MOVES: ApplicationStatusKey[] = ['reviewing', 'shortlisted', 'interviewing', 'offered', 'hired', 'rejected'];
+
+interface Filters { verified?: boolean; city?: string; exp_min?: number; has_resume?: boolean; screening?: 'meets' | 'unmet' }
 
 /**
- * Who applied to one posting.
+ * The applicant workspace for one posting.
  *
- * Deliberately not an ATS. The employer needs to see who is interested, judge
- * them, and move them along or not — so this offers exactly the transitions
- * that make sense from the applicant's current stage, and nothing else. There
- * are no bulk actions, no scoring and no notes-on-notes.
+ * Wide screens: the job at the top, the applicant list on the left and the
+ * selected applicant on the right, so an employer can work through a pool
+ * without leaving the page. Phones: the list, then one applicant, then back.
  *
- * The applicant summary is whatever `public_card` puts on the wire, which
- * deliberately excludes email and phone. Contacting someone goes through the
- * existing conversation route rather than handing over their details, because
- * this screen is reachable by anyone who can post a job.
+ * The list is searched, filtered, sorted and paged on the server; one
+ * applicant's detail (profile, screening answers, resume, timeline) loads
+ * only when they are opened. Every action goes through the server's rules --
+ * this screen only shows what those rules allow.
  */
-export default function ApplicantsScreen() {
+export default function ApplicantWorkspace() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const router = useRouter();
+  const { width, isMobile } = useBreakpoint();
+  const split = !isMobile && width >= 900;
 
   const [job, setJob] = useState<Job | null>(null);
-  const [apps, setApps] = useState<Application[]>([]);
-  const [filter, setFilter] = useState<ApplicationStatusKey | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [selectMode, setSelectMode] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [bulkBusy, setBulkBusy] = useState(false);
+  const [jobError, setJobError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    if (!token || !id) { setLoading(false); return; }
-    setError(null);
-    try {
-      const [j, a] = await Promise.all([fetchJob(token, id), fetchApplicants(token, id)]);
-      setJob(j);
-      setApps(a);
-    } catch (e: any) {
-      setError(e?.message || 'Could not load applicants for this posting.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  const [query, setQuery] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [status, setStatus] = useState<ApplicationStatusKey | 'all'>('all');
+  const [sort, setSort] = useState<ApplicantSort>('newest');
+  const [filters, setFilters] = useState<Filters>({});
+  const [pageData, setPageData] = useState<ApplicantPage | null>(null);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<ApplicantDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [checked, setChecked] = useState<string[]>([]);
+
+  const [sheet, setSheet] = useState<null | 'filters' | 'sort' | 'status' | 'bulk' | 'more' | 'interview'>(null);
+  const [confirmReject, setConfirmReject] = useState<null | { ids: string[] }>(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [draftFilters, setDraftFilters] = useState<Filters>({});
+
+  // ── Loading ──────────────────────────────────────────────────────────────
+  useEffect(() => { const t = setTimeout(() => setDebounced(query.trim()), 300); return () => clearTimeout(t); }, [query]);
+  useEffect(() => { if (toast) { const t = setTimeout(() => setToast(null), 3000); return () => clearTimeout(t); } }, [toast]);
+
+  const loadJob = useCallback(async () => {
+    if (!token || !id) return;
+    try { setJob(await fetchJob(token, id)); setJobError(null); } catch (e: any) {
+      setJobError(e?.status === 403 ? 'You can only manage applicants for your own postings.' : 'Unable to load this posting.');
     }
   }, [token, id]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const reqSeq = useRef(0);
+  const loadList = useCallback(async (pageNo = 1) => {
+    if (!token || !id) return;
+    const seq = ++reqSeq.current;
+    if (pageNo === 1) setListLoading(true); else setLoadingMore(true);
+    try {
+      const res = await searchApplicants(token, id, {
+        q: debounced, status: status === 'all' ? undefined : status, sort, page: pageNo, limit: 25, ...filters,
+      });
+      if (seq !== reqSeq.current) return; // a newer search has started
+      setPageData(prev => (pageNo > 1 && prev ? { ...res, items: [...prev.items, ...res.items] } : res));
+      setListError(null);
+    } catch (e: any) {
+      if (seq === reqSeq.current) setListError(e?.message || 'Unable to load applicants.');
+    } finally {
+      if (seq === reqSeq.current) { setListLoading(false); setLoadingMore(false); }
+    }
+  }, [token, id, debounced, status, sort, filters]);
 
-  const counts = useMemo(() => {
-    const out: Partial<Record<ApplicationStatusKey, number>> = {};
-    for (const a of apps) out[a.status] = (out[a.status] ?? 0) + 1;
-    return out;
-  }, [apps]);
+  useFocusEffect(useCallback(() => { loadJob(); }, [loadJob]));
+  useEffect(() => { loadList(1); }, [loadList]);
 
-  const visible = useMemo(
-    () => (filter ? apps.filter(a => a.status === filter) : apps),
-    [apps, filter],
-  );
+  // A wide screen always has someone open: the first applicant, until chosen.
+  useEffect(() => {
+    if (split && !selectedId && pageData?.items.length) setSelectedId(pageData.items[0].id);
+  }, [split, selectedId, pageData]);
 
-  /**
-   * Bulk actions only make sense against a single pipeline stage — mixing
-   * statuses would mean offering the union of every stage's next steps, most
-   * of which wouldn't apply to most of the selection. Selecting a filter
-   * scopes it to one stage automatically, so bulk mode piggybacks on that
-   * instead of its own status picker.
-   */
-  const bulkSteps = filter ? NEXT_STEPS[filter] ?? [] : [];
+  const loadDetail = useCallback(async (appId: string) => {
+    if (!token) return;
+    setDetailLoading(true); setDetailError(null);
+    try { setDetail(await fetchApplicantDetail(token, appId)); } catch (e: any) {
+      setDetail(null); setDetailError(e?.message || 'Unable to load this applicant.');
+    } finally { setDetailLoading(false); }
+  }, [token]);
 
-  const setFilterAndReset = (next: ApplicationStatusKey | null) => {
-    setFilter(next);
-    setSelectMode(false);
-    setSelected(new Set());
+  useEffect(() => { if (selectedId) { setDetail(null); loadDetail(selectedId); } }, [selectedId, loadDetail]);
+
+  const refresh = useCallback(async () => {
+    await Promise.all([loadList(1), selectedId ? loadDetail(selectedId) : Promise.resolve()]);
+  }, [loadList, loadDetail, selectedId]);
+
+  // ── Actions ──────────────────────────────────────────────────────────────
+  const move = useCallback(async (next: ApplicationStatusKey) => {
+    if (!token || !detail) return;
+    if (next === 'rejected') { setConfirmReject({ ids: [detail.application.id] }); return; }
+    setBusy(true); setActionError(null); setSheet(null);
+    try {
+      await setApplicationStatus(token, detail.application.id, next);
+      setToast(`Moved to ${APPLICATION_STATUS_META[next].label}`);
+      await refresh();
+    } catch (e: any) {
+      setActionError(e?.status === 409 ? e.message : `Unable to update application status. Your changes were not saved.${e?.message ? ` (${e.message})` : ''}`);
+    } finally { setBusy(false); }
+  }, [token, detail, refresh]);
+
+  const reject = async () => {
+    if (!token || !confirmReject) return;
+    const ids = confirmReject.ids;
+    setBusy(true); setActionError(null);
+    try {
+      if (ids.length === 1 && detail?.application.id === ids[0]) await setApplicationStatus(token, ids[0], 'rejected');
+      else {
+        const res = await bulkSetStatus(token, id!, ids, 'rejected');
+        setToast(`${res.moved.length} marked not selected${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+      }
+      setConfirmReject(null); setChecked([]);
+      await refresh();
+    } catch {
+      setActionError('Unable to update application status. Your changes were not saved.');
+    } finally { setBusy(false); }
   };
 
-  const toggleSelect = useCallback((appId: string) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(appId)) next.delete(appId); else next.add(appId);
-      return next;
-    });
-  }, []);
-
-  const selectAllVisible = useCallback(() => {
-    setSelected(new Set(visible.map(a => a.id)));
-  }, [visible]);
-
-  const bulkMove = useCallback(async (status: ApplicationStatusKey) => {
-    if (!token || selected.size === 0) return;
-    const ids = Array.from(selected);
-    setActionError(null);
-    setBulkBusy(true);
-    const results = await Promise.allSettled(ids.map(appId => setApplicationStatus(token, appId, status)));
-    const failed = results.filter(r => r.status === 'rejected').length;
-    const succeededIds = ids.filter((_, i) => results[i].status === 'fulfilled');
-    setApps(prev => prev.map(a => (succeededIds.includes(a.id) ? { ...a, status } : a)));
-    setBulkBusy(false);
-    setSelectMode(false);
-    setSelected(new Set());
-    if (failed > 0) {
-      setActionError(
-        succeededIds.length > 0
-          ? `Moved ${succeededIds.length} to ${APPLICATION_STATUS_META[status].label}. ${failed} couldn't be updated — try those again.`
-          : `Couldn't update ${failed === 1 ? 'that applicant' : 'those applicants'}. Try again.`,
-      );
-    }
-  }, [token, selected]);
-
-  /**
-   * Optimistic, then reconciled. A pipeline move is a considered click, and
-   * making the employer wait a round trip to see the chip change invites them
-   * to click it twice.
-   */
-  const move = useCallback(async (app: Application, status: ApplicationStatusKey) => {
-    if (!token) return;
-    setActionError(null);
-    setBusy(app.id);
-    const previous = apps;
-    setApps(prev => prev.map(a => (a.id === app.id ? { ...a, status } : a)));
+  const bulk = async (next: ApplicationStatusKey) => {
+    if (!token || !id || !checked.length) return;
+    if (next === 'rejected') { setSheet(null); setConfirmReject({ ids: checked }); return; }
+    setBusy(true); setSheet(null); setActionError(null);
     try {
-      await setApplicationStatus(token, app.id, status);
-    } catch (e: any) {
-      setApps(previous);
-      setActionError(e?.message || 'Could not update this application.');
-    } finally {
-      setBusy(null);
-    }
-  }, [token, apps]);
+      const res = await bulkSetStatus(token, id, checked, next);
+      setToast(`${res.moved.length} moved to ${APPLICATION_STATUS_META[next].label}${res.skipped.length ? `, ${res.skipped.length} skipped` : ''}`);
+      setChecked([]);
+      await refresh();
+    } catch {
+      setActionError('Unable to update application status. Your changes were not saved.');
+    } finally { setBusy(false); }
+  };
 
-  const [resumeBusyId, setResumeBusyId] = useState<string | null>(null);
-
-  const downloadResume = useCallback(async (app: Application) => {
-    if (!token || resumeBusyId) return;
-    setActionError(null);
-    setResumeBusyId(app.id);
+  const saveInterview = async (v: Parameters<typeof scheduleInterview>[2]) => {
+    if (!token || !detail) return;
+    setBusy(true); setActionError(null);
     try {
-      const blob = await fetchApplicantResume(token, app.id);
-      await openBlob(blob, `${app.user_name.replace(/\s+/g, '-')}-resume.pdf`);
+      await scheduleInterview(token, detail.application.id, v);
+      setSheet(null); setToast('Interview scheduled. The applicant has been told.');
+      await refresh();
     } catch (e: any) {
-      setActionError(e?.message || "Could not download this applicant's resume.");
-    } finally {
-      setResumeBusyId(null);
-    }
-  }, [token, resumeBusyId]);
+      setActionError(e?.message || 'Unable to schedule the interview.');
+    } finally { setBusy(false); }
+  };
+
+  const openResume = async (download: boolean) => {
+    if (!token || !detail) return;
+    setSheet(null);
+    try {
+      const res = await fetchApplicantResume(token, detail.application.id);
+      openFileUrl(download && res.url.includes('token=') ? `${res.url}&download=${encodeURIComponent(res.name)}` : res.url);
+    } catch { setActionError('Unable to load this resume. Please try again.'); }
+  };
+
+  const filterCount = Object.values(filters).filter(v => v !== undefined && v !== '' && v !== 0).length;
+  const counts = pageData?.counts;
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  if (jobError && !job) return <ErrorState message={jobError} onRetry={loadJob} />;
+  if (!job) return <LoadingState />;
+
+  const header = (
+    <View style={styles.header}>
+      <Pressable onPress={() => (router.canGoBack() ? router.back()
+        : router.replace((user?.role === 'recruiter' ? '/recruiter/jobs' : '/jobs/posted') as any))}
+        accessibilityRole="button" accessibilityLabel="Back to your postings" hitSlop={8} style={styles.back}>
+        <Ionicons name="arrow-back" size={22} color={colors.navy} />
+      </Pressable>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <View style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={2} accessibilityRole="header">{job.title}</Text>
+          <JobBadge label={job.status.charAt(0).toUpperCase() + job.status.slice(1)} tone={JOB_STATUS_TONE[job.status] ?? 'neutral'} />
+        </View>
+        <Text style={styles.sub} numberOfLines={2}>
+          {[job.employer_name, job.location, EMPLOYMENT_TYPE_LABELS[job.employment_type],
+            job.published_at || job.created_at ? `Posted ${day(job.published_at || job.created_at)}` : null,
+            job.expires_at ? `Closes ${day(job.expires_at)}` : null].filter(Boolean).join(' · ')}
+        </Text>
+      </View>
+      {!isMobile ? (
+        <View style={styles.kpis}>
+          <Kpi label="Applicants" value={pageData?.all_total ?? job.applicant_count ?? 0} />
+          <Kpi label="Shortlisted" value={counts?.shortlisted ?? 0} />
+          <Kpi label="Interviewing" value={counts?.interviewing ?? 0} />
+          <Kpi label="Hired" value={counts?.hired ?? 0} />
+        </View>
+      ) : null}
+      <Pressable onPress={() => router.push(`/jobs/edit/${job.id}` as any)} accessibilityRole="button"
+        style={({ hovered }: any) => [styles.manage, hovered && { backgroundColor: colors.bgMuted }]} testID="workspace-edit-job">
+        <Ionicons name="create-outline" size={16} color={colors.navy} />
+        {!isMobile ? <Text style={styles.manageText}>Edit job</Text> : null}
+      </Pressable>
+    </View>
+  );
+
+  const list = (
+    <ApplicantList
+      page={pageData} loading={listLoading} error={listError} onRetry={() => loadList(1)}
+      query={query} onQuery={setQuery} status={status} onStatus={s => { setStatus(s); setChecked([]); }}
+      sort={sort} onSort={() => setSheet('sort')}
+      onOpenFilters={() => { setDraftFilters(filters); setSheet('filters'); }} filterCount={filterCount}
+      selectedId={selectedId} onSelect={setSelectedId}
+      checked={checked} onToggle={a => setChecked(prev => (prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]))}
+      onLoadMore={() => pageData && loadList(pageData.page + 1)} loadingMore={loadingMore}
+    />
+  );
+
+  const detailPane = (
+    <ApplicantDetailPanel
+      detail={detail} loading={detailLoading} error={detailError} onRetry={() => selectedId && loadDetail(selectedId)}
+      onBack={split ? undefined : () => { setSelectedId(null); setDetail(null); }}
+      onMessage={() => detail && router.push(`/conversation?userId=${detail.applicant.id}` as any)}
+      onMove={s => ((s as string) === '__menu' ? setSheet('status') : move(s))}
+      onInterview={() => setSheet('interview')}
+      onMore={() => setSheet('more')}
+      busy={busy}
+    />
+  );
+
+  const bulkBar = checked.length ? (
+    <View style={styles.bulk} testID="bulk-bar">
+      <Text style={styles.bulkText}>{checked.length} selected</Text>
+      <View style={styles.bulkActions}>
+        <BulkBtn label="Shortlist" onPress={() => bulk('shortlisted')} testID="bulk-shortlist" />
+        <BulkBtn label="Change status" onPress={() => setSheet('bulk')} testID="bulk-status" />
+        <BulkBtn label="Not selected" danger onPress={() => bulk('rejected')} testID="bulk-reject" />
+        <Pressable onPress={() => setChecked([])} accessibilityRole="button" accessibilityLabel="Clear selection" hitSlop={8}>
+          <Ionicons name="close" size={20} color={colors.white} />
+        </Pressable>
+      </View>
+    </View>
+  ) : null;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <PageColumn testID="applicants-column">
-        <View style={styles.header}>
-          <Pressable
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/jobs/posted' as any))}
-            accessibilityRole="button"
-            accessibilityLabel="Back to your postings"
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={({ pressed }) => [styles.back, pressed && styles.pressed]}
-          >
-            <Ionicons name="arrow-back" size={22} color={colors.text} />
-          </Pressable>
-          <View style={styles.headerText}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {job?.title || 'Applicants'}
-            </Text>
-            <Text style={styles.headerSub}>
-              {apps.length} {apps.length === 1 ? 'applicant' : 'applicants'}
-            </Text>
-          </View>
-        </View>
-
-        <ErrorBanner message={actionError} />
-
-        {apps.length ? (
-          <View style={styles.filterRow} accessibilityRole="tablist">
-            <FilterChip
-              label={`All ${apps.length}`}
-              selected={filter === null}
-              onPress={() => setFilterAndReset(null)}
-            />
-            {PIPELINE.filter(s => counts[s]).map(s => (
-              <FilterChip
-                key={s}
-                label={`${APPLICATION_STATUS_META[s].label} ${counts[s]}`}
-                selected={filter === s}
-                onPress={() => setFilterAndReset(filter === s ? null : s)}
-                testID={`applicant-filter-${s}`}
-              />
-            ))}
-          </View>
-        ) : null}
-
-        {/* Bulk selection only makes sense once a single stage is picked —
-            see the note on bulkSteps above. */}
-        {filter && bulkSteps.length > 0 && visible.length > 0 ? (
-          <View style={styles.selectRow}>
-            {selectMode ? (
-              <>
-                <Pressable
-                  onPress={() => (selected.size === visible.length ? setSelected(new Set()) : selectAllVisible())}
-                  accessibilityRole="button"
-                  accessibilityLabel={selected.size === visible.length ? 'Deselect all' : 'Select all'}
-                  style={({ pressed }) => [styles.selectLink, pressed && styles.pressed]}
-                >
-                  <Text style={styles.selectLinkText}>
-                    {selected.size === visible.length ? 'Deselect all' : `Select all ${visible.length}`}
-                  </Text>
-                </Pressable>
-                <Text style={styles.selectedCount}>{selected.size} selected</Text>
-                <Pressable
-                  onPress={() => { setSelectMode(false); setSelected(new Set()); }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel selection"
-                  style={({ pressed }) => [styles.selectLink, pressed && styles.pressed]}
-                >
-                  <Text style={styles.selectLinkText}>Cancel</Text>
-                </Pressable>
-              </>
-            ) : (
-              <Pressable
-                testID="bulk-select-toggle"
-                onPress={() => setSelectMode(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Select multiple applicants"
-                style={({ pressed }) => [styles.selectLink, pressed && styles.pressed]}
-              >
-                <Ionicons name="checkbox-outline" size={16} color={colors.navy} />
-                <Text style={styles.selectLinkText}>Select</Text>
-              </Pressable>
+    <SafeAreaView style={styles.safe} edges={['top']} testID="applicant-workspace">
+      {header}
+      <ErrorBanner message={actionError} />
+      {toast ? <View style={styles.toast} accessibilityLiveRegion="polite"><Text style={styles.toastText}>{toast}</Text></View> : null}
+      {split ? (
+        <View style={styles.split}>
+          <View style={styles.listPane}>{list}{bulkBar}</View>
+          <View style={styles.detailPane}>
+            {selectedId ? detailPane : (
+              <View style={styles.pick}><Ionicons name="person-outline" size={28} color={colors.textMuted} />
+                <Text style={styles.sub}>Select an applicant to see their details.</Text></View>
             )}
           </View>
-        ) : null}
+        </View>
+      ) : selectedId ? (
+        <View style={styles.flex}>{detailPane}</View>
+      ) : (
+        <View style={styles.flex}>{list}{bulkBar}</View>
+      )}
 
-        <FlatList
-          data={loading ? [] : visible}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <ApplicantRow
-              app={item}
-              busy={busy === item.id}
-              onMove={status => move(item, status)}
-              onOpenProfile={() => router.push(`/profile/${item.user_id}` as any)}
-              onMessage={() => router.push(`/conversation?userId=${item.user_id}` as any)}
-              selectMode={selectMode}
-              selected={selected.has(item.id)}
-              onToggleSelect={() => toggleSelect(item.id)}
-              onDownloadResume={() => downloadResume(item)}
-              resumeBusy={resumeBusyId === item.id}
-            />
-          )}
-          contentContainerStyle={[styles.list, selectMode && bulkSteps.length > 0 && styles.listWithBulkBar]}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => { setRefreshing(true); load(); }}
-              tintColor={colors.navy}
-            />
-          }
-          ListEmptyComponent={
-            loading ? (
-              <View style={styles.pad}>
-                {[0, 1, 2].map(i => (
-                  <View key={i} style={styles.card}>
-                    <Skeleton height={40} width={40} radius={20} />
-                    <Skeleton height={13} width="55%" />
-                    <Skeleton height={11} width="35%" />
-                  </View>
-                ))}
-              </View>
-            ) : error ? (
-              <ErrorState message={error} onRetry={load} />
-            ) : filter ? (
-              <EmptyState
-                icon="funnel-outline"
-                title={`Nobody at ${APPLICATION_STATUS_META[filter].label.toLowerCase()}`}
-                hint="Clear the filter to see everyone who applied."
-                actionLabel="Show all applicants"
-                onAction={() => setFilterAndReset(null)}
-              />
-            ) : (
-              <EmptyState
-                icon="people-outline"
-                title="No applicants yet"
-                hint="Verified professionals who apply to this posting will appear here."
-                actionLabel="View the posting"
-                onAction={() => router.push(`/jobs/${id}` as any)}
-              />
-            )
-          }
-        />
+      {/* Sort */}
+      <Sheet visible={sheet === 'sort'} onClose={() => setSheet(null)} title="Sort applicants">
+        <View style={styles.sheetBody}>
+          {(Object.keys(SORT_LABELS) as ApplicantSort[]).map(s => (
+            <MenuRow key={s} label={SORT_LABELS[s]} selected={sort === s} onPress={() => { setSort(s); setSheet(null); }}
+              testID={`sort-${s}`} />
+          ))}
+        </View>
+      </Sheet>
 
-        {selectMode && bulkSteps.length > 0 ? (
-          <View style={styles.bulkBar}>
-            <Text style={styles.bulkBarCount}>
-              {selected.size === 0 ? 'Select applicants to move together' : `${selected.size} selected`}
-            </Text>
-            <View style={styles.bulkBarActions}>
-              {bulkSteps.map(status => (
-                <Pressable
-                  key={status}
-                  testID={`bulk-move-${status}`}
-                  onPress={() => bulkMove(status)}
-                  disabled={selected.size === 0 || bulkBusy}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Move ${selected.size} selected to ${APPLICATION_STATUS_META[status].label}`}
-                  style={({ pressed }) => [
-                    styles.bulkAction,
-                    status === 'rejected' && styles.bulkActionQuiet,
-                    (selected.size === 0 || bulkBusy || pressed) && styles.pressed,
-                  ]}
-                >
-                  <Text style={[styles.bulkActionText, status === 'rejected' && styles.actionTextQuiet]}>
-                    {bulkBusy ? 'Updating…' : `Move to ${APPLICATION_STATUS_META[status].label}`}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+      {/* Filters: only what the data actually has. */}
+      <Sheet visible={sheet === 'filters'} onClose={() => setSheet(null)} title="Filter applicants" testID="filter-sheet"
+        footer={(
+          <View style={styles.row}>
+            <Button label="Clear" variant="outline" style={styles.flex} onPress={() => setDraftFilters({})} />
+            <Button label="Show applicants" style={styles.flex} testID="filters-apply"
+              onPress={() => { setFilters(draftFilters); setSheet(null); }} />
           </View>
-        ) : null}
-      </PageColumn>
+        )}>
+        <View style={styles.sheetBody}>
+          <ChoiceChips label="Verification" allowDeselect value={draftFilters.verified === undefined ? '' : draftFilters.verified ? 'yes' : 'no'}
+            onChange={v => setDraftFilters(f => ({ ...f, verified: v ? v === 'yes' : undefined }))}
+            choices={[{ value: 'yes', label: 'Verified' }, { value: 'no', label: 'Not verified' }]} testID="filter-verified" />
+          <SelectField label="City" value={draftFilters.city || ''} options={['', ...(pageData?.cities ?? [])]}
+            placeholder="Any city" onChange={v => setDraftFilters(f => ({ ...f, city: v || undefined }))} testID="filter-city" />
+          <ChoiceChips label="Experience" allowDeselect value={draftFilters.exp_min ? String(draftFilters.exp_min) : ''}
+            onChange={v => setDraftFilters(f => ({ ...f, exp_min: v ? Number(v) : undefined }))}
+            choices={[{ value: '1', label: '1+ yrs' }, { value: '3', label: '3+ yrs' }, { value: '5', label: '5+ yrs' },
+              { value: '10', label: '10+ yrs' }]} testID="filter-exp" />
+          <ChoiceChips label="Resume" allowDeselect value={draftFilters.has_resume === undefined ? '' : draftFilters.has_resume ? 'yes' : 'no'}
+            onChange={v => setDraftFilters(f => ({ ...f, has_resume: v ? v === 'yes' : undefined }))}
+            choices={[{ value: 'yes', label: 'Has a resume' }, { value: 'no', label: 'No resume' }]} testID="filter-resume" />
+          {pageData?.has_screening ? (
+            <ChoiceChips label="Screening" allowDeselect value={draftFilters.screening || ''}
+              onChange={v => setDraftFilters(f => ({ ...f, screening: (v || undefined) as Filters['screening'] }))}
+              choices={[{ value: 'meets', label: 'Meets preferences' }, { value: 'unmet', label: 'Some not met' }]}
+              testID="filter-screening" />
+          ) : null}
+        </View>
+      </Sheet>
+
+      {/* Change status: only the moves the server allows from here. */}
+      <Sheet visible={sheet === 'status'} onClose={() => setSheet(null)} title="Move to">
+        <View style={styles.sheetBody}>
+          {(detail?.application.allowed_moves ?? []).map(s => (
+            <MenuRow key={s} label={APPLICATION_STATUS_META[s].label} icon={APPLICATION_STATUS_META[s].icon as any}
+              danger={s === 'rejected'} onPress={() => move(s)} testID={`move-${s}`} />
+          ))}
+        </View>
+      </Sheet>
+
+      <Sheet visible={sheet === 'bulk'} onClose={() => setSheet(null)} title={`Move ${checked.length} applicants to`}>
+        <View style={styles.sheetBody}>
+          <Text style={styles.sub}>Applicants who cannot make this move (a hire, a withdrawal) are skipped and reported.</Text>
+          {EMPLOYER_MOVES.map(s => (
+            <MenuRow key={s} label={APPLICATION_STATUS_META[s].label} icon={APPLICATION_STATUS_META[s].icon as any}
+              danger={s === 'rejected'} onPress={() => bulk(s)} testID={`bulk-move-${s}`} />
+          ))}
+        </View>
+      </Sheet>
+
+      <Sheet visible={sheet === 'more'} onClose={() => setSheet(null)} title="More">
+        <View style={styles.sheetBody}>
+          <MenuRow label="View full ForMeds profile" icon="person-circle-outline"
+            onPress={() => { setSheet(null); if (detail) router.push(`/profile/${detail.applicant.id}` as any); }} />
+          {detail?.resume.available ? (
+            <>
+              <MenuRow label="Open resume in a new tab" icon="open-outline" onPress={() => openResume(false)} />
+              <MenuRow label="Download resume" icon="download-outline" onPress={() => openResume(true)} />
+            </>
+          ) : null}
+        </View>
+      </Sheet>
+
+      <InterviewSheet visible={sheet === 'interview'} name={detail?.applicant.name ?? ''} current={detail?.application.interview ?? null}
+        onClose={() => setSheet(null)} onSave={saveInterview} saving={busy} error={sheet === 'interview' ? actionError : null} />
+
+      <Sheet visible={!!confirmReject} onClose={() => setConfirmReject(null)}
+        title={confirmReject && confirmReject.ids.length > 1 ? `Mark ${confirmReject.ids.length} applicants as not selected?` : 'Mark as not selected?'}
+        footer={(
+          <View style={styles.row}>
+            <Button label="Cancel" variant="outline" style={styles.flex} onPress={() => setConfirmReject(null)} />
+            <Button label="Not selected" variant="danger" style={styles.flex} onPress={reject} loading={busy}
+              testID="confirm-reject" />
+          </View>
+        )}>
+        <View style={styles.sheetBody}>
+          <Text style={styles.body}>They will be told their application was not taken forward. You can reconsider later from their profile.</Text>
+        </View>
+      </Sheet>
     </SafeAreaView>
   );
 }
 
-function ApplicantRow({
-  app, busy, onMove, onOpenProfile, onMessage, selectMode, selected, onToggleSelect,
-  onDownloadResume, resumeBusy,
-}: {
-  app: Application;
-  busy: boolean;
-  onMove: (status: ApplicationStatusKey) => void;
-  onOpenProfile: () => void;
-  onMessage: () => void;
-  selectMode?: boolean;
-  selected?: boolean;
-  onToggleSelect?: () => void;
-  onDownloadResume: () => void;
-  resumeBusy: boolean;
-}) {
-  const meta = APPLICATION_STATUS_META[app.status] ?? APPLICATION_STATUS_META.applied;
-  const card = (app as any).applicant ?? {};
-  const next = NEXT_STEPS[app.status] ?? [];
-
+function Kpi({ label, value }: { label: string; value: number }) {
   return (
-    <View style={styles.card} testID={`applicant-${app.id}`}>
-      <Pressable
-        onPress={selectMode ? onToggleSelect : onOpenProfile}
-        accessibilityRole="button"
-        accessibilityLabel={selectMode ? `${selected ? 'Deselect' : 'Select'} ${app.user_name}` : `View the profile of ${app.user_name}`}
-        accessibilityState={selectMode ? { selected: !!selected } : undefined}
-        style={({ pressed }) => [styles.identity, pressed && styles.pressed]}
-      >
-        {selectMode ? (
-          <Ionicons
-            name={selected ? 'checkbox' : 'square-outline'}
-            size={22}
-            color={selected ? colors.navy : colors.textSecondary}
-          />
-        ) : null}
-        <Avatar name={app.user_name} uri={card.avatar} role={card.role} size={44} />
-        <View style={styles.identityText}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>{app.user_name}</Text>
-            {card.account_verified ? (
-              <Ionicons
-                name="checkmark-circle"
-                size={14}
-                color={colors.teal}
-                accessibilityLabel="Verified healthcare professional"
-              />
-            ) : null}
-          </View>
-          {card.headline ? (
-            <Text style={styles.headline} numberOfLines={1}>{card.headline}</Text>
-          ) : null}
-          <Text style={styles.meta} numberOfLines={1}>
-            {[
-              app.specialty || card.specialty,
-              card.years_experience ? `${card.years_experience} years` : null,
-              card.city || card.location,
-            ].filter(Boolean).join(' · ')}
-          </Text>
-        </View>
-      </Pressable>
-
-      {app.cover_note ? (
-        <Text style={styles.note} numberOfLines={4}>{app.cover_note}</Text>
-      ) : null}
-
-      {app.screening_answers?.length ? (
-        <View style={styles.screening}>
-          {app.screening_answers.map(a => (
-            <View key={a.question_id} style={styles.screeningRow}>
-              <Ionicons
-                name={a.answer === 'yes' ? 'checkmark-circle-outline' : 'close-circle-outline'}
-                size={14}
-                color={a.answer === 'yes' ? colors.teal : colors.textSecondary}
-              />
-              <Text style={styles.screeningText} numberOfLines={2}>
-                {a.text} <Text style={styles.screeningAnswer}>{a.answer === 'yes' ? 'Yes' : 'No'}</Text>
-              </Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      <View style={styles.statusRow}>
-        <JobBadge label={meta.label} icon={meta.icon as any} tone={TONE_FOR_BADGE[meta.tone]} />
-        <Text style={styles.applied}>
-          {postedAgo(app.created_at).replace('Posted', 'Applied')}
-        </Text>
-      </View>
-
-      <View style={styles.actions}>
-        {next.map(status => (
-          <Pressable
-            key={status}
-            testID={`move-${app.id}-${status}`}
-            onPress={() => onMove(status)}
-            disabled={busy}
-            accessibilityRole="button"
-            accessibilityLabel={`Move ${app.user_name} to ${APPLICATION_STATUS_META[status].label}`}
-            style={({ pressed }) => [
-              styles.action,
-              status === 'rejected' && styles.actionQuiet,
-              (pressed || busy) && styles.pressed,
-            ]}
-          >
-            <Text
-              style={[styles.actionText, status === 'rejected' && styles.actionTextQuiet]}
-            >
-              {APPLICATION_STATUS_META[status].label}
-            </Text>
-          </Pressable>
-        ))}
-        {/* Contact goes through a conversation, never an email address: the
-            applicant list is reachable by anyone who can post a job, so
-            public_card withholds email and phone by design. */}
-        <Pressable
-          onPress={onMessage}
-          accessibilityRole="button"
-          accessibilityLabel={`Message ${app.user_name}`}
-          style={({ pressed }) => [styles.action, styles.actionQuiet, pressed && styles.pressed]}
-        >
-          <Ionicons name="chatbubble-outline" size={14} color={colors.textSecondary} />
-          <Text style={styles.actionTextQuiet}>Message</Text>
-        </Pressable>
-        <Pressable
-          testID={`applicant-resume-${app.id}`}
-          onPress={onDownloadResume}
-          disabled={resumeBusy}
-          accessibilityRole="button"
-          accessibilityLabel={`Download ${app.user_name}'s resume`}
-          style={({ pressed }) => [styles.action, styles.actionQuiet, (pressed || resumeBusy) && styles.pressed]}
-        >
-          <Ionicons name="download-outline" size={14} color={colors.textSecondary} />
-          <Text style={styles.actionTextQuiet}>{resumeBusy ? 'Preparing…' : 'Resume'}</Text>
-        </Pressable>
-      </View>
+    <View style={styles.kpi} accessible accessibilityLabel={`${label}: ${value}`}>
+      <Text style={styles.kpiValue}>{value}</Text>
+      <Text style={styles.kpiLabel}>{label}</Text>
     </View>
   );
 }
 
-function FilterChip({
-  label, selected, onPress, testID,
-}: {
-  label: string; selected: boolean; onPress: () => void; testID?: string;
+function MenuRow({ label, icon, selected, danger, onPress, testID }: {
+  label: string; icon?: keyof typeof Ionicons.glyphMap; selected?: boolean; danger?: boolean; onPress: () => void; testID?: string;
 }) {
   return (
-    <Pressable
-      testID={testID}
-      onPress={onPress}
-      accessibilityRole="tab"
-      accessibilityState={{ selected }}
-      accessibilityLabel={label}
-      style={({ pressed }) => [styles.chip, selected && styles.chipOn, pressed && styles.pressed]}
-    >
-      <Text style={[styles.chipText, selected && styles.chipTextOn]}>{label}</Text>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected }} testID={testID}
+      style={({ pressed, hovered }: any) => [styles.menuRow, (hovered || pressed) && { backgroundColor: colors.bgMuted }]}>
+      {icon ? <Ionicons name={icon} size={20} color={danger ? colors.redText : colors.navy} /> : null}
+      <Text style={[styles.menuText, danger && { color: colors.redText }]}>{label}</Text>
+      {selected ? <Ionicons name="checkmark" size={20} color={colors.navy} /> : null}
+    </Pressable>
+  );
+}
+
+function BulkBtn({ label, onPress, danger, testID }: { label: string; onPress: () => void; danger?: boolean; testID?: string }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" testID={testID}
+      style={({ pressed }) => [styles.bulkBtn, danger && styles.bulkBtnDanger, pressed && { opacity: 0.8 }]}>
+      <Text style={styles.bulkBtnText}>{label}</Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
+  flex: { flex: 1 },
+  row: { flexDirection: 'row', gap: spacing.sm },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.white,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border, flexWrap: 'wrap',
   },
-  back: {
-    width: MIN_TOUCH_TARGET,
-    height: MIN_TOUCH_TARGET,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
+  back: { width: MIN_TOUCH_TARGET, height: MIN_TOUCH_TARGET, alignItems: 'flex-start', justifyContent: 'center' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  title: { ...typography.h2, color: colors.text, flexShrink: 1 },
+  sub: { ...typography.caption, color: colors.textSecondary },
+  body: { ...typography.body, color: colors.text },
+  kpis: { flexDirection: 'row', gap: spacing.lg },
+  kpi: { alignItems: 'center', minWidth: 64 },
+  kpiValue: { fontSize: 22, lineHeight: 26, fontFamily: fonts.heading.bold, color: colors.text },
+  kpiLabel: { ...typography.small, color: colors.textSecondary },
+  manage: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: spacing.md,
+    borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border,
   },
-  headerText: { flex: 1, gap: 2 },
-  headerTitle: { ...typography.h3, color: colors.text },
-  headerSub: { ...typography.small, color: colors.textSecondary },
-
-  filterRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+  manageText: { ...typography.label, color: colors.navy },
+  split: { flex: 1, flexDirection: 'row' },
+  listPane: { width: 380, borderRightWidth: 1, borderRightColor: colors.border, backgroundColor: colors.white },
+  detailPane: { flex: 1, minWidth: 0 },
+  pick: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
+  bulk: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, flexWrap: 'wrap',
+    padding: spacing.md, backgroundColor: colors.navy,
   },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.white,
-    minHeight: 34,
-    justifyContent: 'center',
+  bulkText: { ...typography.label, color: colors.white },
+  bulkActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  bulkBtn: { minHeight: 36, paddingHorizontal: spacing.md, borderRadius: radius.pill, backgroundColor: colors.navyLight, justifyContent: 'center' },
+  bulkBtnDanger: { backgroundColor: colors.redText },
+  bulkBtnText: { ...typography.label, color: colors.white },
+  toast: {
+    position: 'absolute', bottom: spacing.xl, alignSelf: 'center', zIndex: 10, backgroundColor: colors.text,
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.pill,
   },
-  chipOn: { backgroundColor: colors.navy, borderColor: colors.navy },
-  chipText: { ...typography.small, color: colors.textSecondary },
-  chipTextOn: { color: colors.white, fontFamily: fonts.body.semibold },
-
-  selectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-  },
-  selectLink: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' },
-  selectLinkText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.navy },
-  selectedCount: { ...typography.small, color: colors.textSecondary, flex: 1, textAlign: 'center' },
-
-  list: { padding: spacing.lg, paddingBottom: spacing.xxxl * 2, gap: spacing.md },
-  listWithBulkBar: { paddingBottom: spacing.xxxl * 3 },
-
-  bulkBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.white,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.sm,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 12,
-  },
-  bulkBarCount: { ...typography.small, color: colors.textSecondary, textAlign: 'center' },
-  bulkBarActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, justifyContent: 'center' },
-  bulkAction: {
-    minHeight: MIN_TOUCH_TARGET,
-    paddingHorizontal: spacing.lg,
+  toastText: { ...typography.label, color: colors.white },
+  sheetBody: { padding: spacing.lg, gap: spacing.xs },
+  menuRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 48, paddingHorizontal: spacing.md,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.navy,
-    backgroundColor: colors.navy,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  bulkActionQuiet: { backgroundColor: colors.white, borderColor: colors.border },
-  bulkActionText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.white },
-  pad: { gap: spacing.md },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: radius.xl + 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  identityText: { flex: 1, gap: 2 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  name: { ...typography.bodyStrong, color: colors.text, flexShrink: 1 },
-  headline: { ...typography.caption, color: colors.textSecondary },
-  meta: { ...typography.small, color: colors.textSecondary },
-
-  note: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    lineHeight: 19,
-    paddingLeft: spacing.md,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.border,
-  },
-
-  screening: { gap: spacing.xs },
-  screeningRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
-  screeningText: { ...typography.caption, color: colors.textSecondary, flex: 1, lineHeight: 18 },
-  screeningAnswer: { fontFamily: fonts.body.semibold, color: colors.text },
-
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap' },
-  applied: { ...typography.small, color: colors.textSecondary },
-
-  actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  action: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    minHeight: 36,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.navy,
-    backgroundColor: colors.white,
-    justifyContent: 'center',
-  },
-  actionQuiet: { borderColor: colors.border },
-  actionText: { ...typography.small, fontFamily: fonts.body.semibold, color: colors.navy },
-  actionTextQuiet: { ...typography.small, color: colors.textSecondary },
-  pressed: { opacity: 0.65 },
+  menuText: { ...typography.body, color: colors.text, flex: 1 },
 });

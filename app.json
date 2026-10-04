@@ -45,7 +45,14 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "ForMeds uses the microphone so you can dictate questions to AED.",
+          "speechRecognitionPermission": "ForMeds turns your dictated AED questions into text."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

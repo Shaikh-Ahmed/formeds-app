@@ -1,11 +1,12 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useDebounced } from '../../hooks/useDebounced';
 import { focusScrollInset, type CollapsibleScrollProps } from '../../hooks/useCollapsibleHeader';
-import { colors, spacing } from '../../theme';
+import { colors, radius, spacing, typography } from '../../theme';
+import { shareJob } from '../../utils/share';
 import { EmptyState, ErrorState } from '../States';
 import { Button } from '../Button';
 import { JobCard } from './JobCard';
@@ -38,6 +39,8 @@ export function JobsList({
   compact = false,
   emptyAction,
   onSaveSearch,
+  onQuickApply,
+  appliedIds,
 }: {
   scrollProps?: CollapsibleScrollProps;
   contentInsetTop?: number;
@@ -48,8 +51,19 @@ export function JobsList({
   emptyAction?: { label: string; onPress: () => void };
   /** Offered when a search returns nothing worth waiting for. */
   onSaveSearch?: (filters: JobFilters) => void;
+  /** Opens the apply sheet for a card; the card shows Quick apply when given. */
+  onQuickApply?: (job: Job) => void;
+  /** Jobs applied to since the list loaded, so their cards say so at once. */
+  appliedIds?: string[];
 }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  // Only professionals apply; everyone else never sees the button.
+  const canApply = user?.role === 'healthcare_professional';
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { if (copied) { const t = setTimeout(() => setCopied(false), 2200); return () => clearTimeout(t); } }, [copied]);
+  const onShare = useCallback(async (job: Job) => {
+    if ((await shareJob(job)) === 'copied') setCopied(true);
+  }, []);
 
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<JobFilters>({ sort: 'newest' });
@@ -110,6 +124,11 @@ export function JobsList({
 
   return (
     <View style={styles.flex}>
+      {copied ? (
+        <View style={styles.copied} accessibilityLiveRegion="polite" testID="job-link-copied">
+          <Text style={styles.copiedText}>Link copied</Text>
+        </View>
+      ) : null}
       <FlatList
         data={loading ? [] : items}
         {...scrollProps}
@@ -117,7 +136,9 @@ export function JobsList({
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
           <JobCard
-            item={item}
+            item={appliedIds?.includes(item.id) ? { ...item, has_applied: true } : item}
+            onShare={onShare}
+            onQuickApply={canApply ? onQuickApply : undefined}
             selected={item.id === selectedId}
             compact={compact}
             onPress={() => onSelect(item)}
@@ -255,6 +276,11 @@ function NoResults({
 }
 
 const styles = StyleSheet.create({
+  copied: {
+    position: 'absolute', bottom: spacing.xl, alignSelf: 'center', zIndex: 20, backgroundColor: colors.text,
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.pill,
+  },
+  copiedText: { ...typography.label, color: colors.white },
   noResults: { gap: spacing.md },
   recovery: { gap: spacing.sm, paddingHorizontal: spacing.xl },
   flex: { flex: 1 },
